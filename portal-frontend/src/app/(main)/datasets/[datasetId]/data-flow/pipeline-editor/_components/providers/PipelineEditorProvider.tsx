@@ -673,9 +673,10 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
 
   // ===== Loading State =====
   // Without the locks a provisioned node looks editable, and without the removal state a save could remove Layers and
-  // APIs without asking, so the editor waits for both.
+  // APIs without asking. A read-only editor removes nothing, so it opens also when the removal state failed to load.
+  const isWaitingForRemovalState = removalState === null && !isReadOnly
   const isLoadingEditor =
-    pipelinesQuery.isLoading || isLoadingSinkLocks || removalState === null || !hasSettledDatasourcesOnOpen
+    pipelinesQuery.isLoading || isLoadingSinkLocks || isWaitingForRemovalState || !hasSettledDatasourcesOnOpen
 
   // ===== Cross-session state =====
   const hasAnyDirtySession = useMemo(() => sessionManager.sessions.some(s => s.isDirty), [sessionManager.sessions])

@@ -459,6 +459,16 @@ describe('PipelineEditorProviderComponent', () => {
       expect(contextRef.current?.isLoadingEditor).toBe(true)
     })
 
+    // A failed Layers, Data sinks or Dataset request leaves the removal state null for good.
+    it('opens a read-only editor without the removal state', () => {
+      removalState.current = null
+      mockReadOnly.isReadOnly = true
+
+      renderProvider()
+
+      expect(contextRef.current?.isLoadingEditor).toBe(false)
+    })
+
     it('is false once both queries are done', () => {
       renderProvider()
 
