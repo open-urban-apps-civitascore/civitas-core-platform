@@ -44,6 +44,7 @@ import {
   mergeRemovals,
   needsConfirmation,
   NO_REMOVAL,
+  planDataSinkUnlink,
   planPipelineDelete,
   planPipelineSaves,
 } from '@/utils/dataSinkRemoval'
@@ -494,6 +495,14 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       edges: p.edges.map(edge => ({ ...edge, selected: false })),
     }))
   }, [updatePipeline])
+
+  const canUnlinkDelete = useCallback(
+    (dataSinkIds: string[]) => {
+      if (!removalState || !pipeline?.id) return true
+      return needsConfirmation(planDataSinkUnlink(removalState, pipeline.id, dataSinkIds))
+    },
+    [removalState, pipeline?.id],
+  )
 
   const getSelectedNodesCallback = useCallback(() => getSelectedNodes(pipeline), [pipeline])
 
@@ -1125,6 +1134,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       // Data sink locks
       getSinkLocks,
       getSinkLockReason,
+      canUnlinkDelete,
 
       // Session info
       activeSessionId: activeSession?.id || null,
@@ -1164,6 +1174,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
       hasAnyDirtySession,
       getSinkLocks,
       getSinkLockReason,
+      canUnlinkDelete,
     ],
   )
 

@@ -118,9 +118,22 @@ export const planPipelineSaves = (state: DatasetRemovalState, saves: PipelineSav
   return removals
 }
 
+/** What saving the Pipeline without these of its Data sinks removes. */
+export const planDataSinkUnlink = (
+  state: DatasetRemovalState,
+  pipelineId: string,
+  dataSinkIds: string[],
+): DataSinkRemoval => {
+  const removedLinks = dataSinkIds.map(dataSinkId => ({ pipelineId, dataSinkId }))
+  return planDataSinkRemoval({ ...state, request: { removedLinks, deletedDataSinkIds: [] } })
+}
+
 /** What deleting the Pipeline removes. */
 export const planPipelineDelete = (state: DatasetRemovalState, pipelineId: string): DataSinkRemoval => {
   const linkedDataSinks = state.dataSinks.filter(dataSink => dataSink.pipelineIds.includes(pipelineId))
-  const removedLinks = linkedDataSinks.map(dataSink => ({ pipelineId, dataSinkId: dataSink.id }))
-  return planDataSinkRemoval({ ...state, request: { removedLinks, deletedDataSinkIds: [] } })
+  return planDataSinkUnlink(
+    state,
+    pipelineId,
+    linkedDataSinks.map(dataSink => dataSink.id),
+  )
 }

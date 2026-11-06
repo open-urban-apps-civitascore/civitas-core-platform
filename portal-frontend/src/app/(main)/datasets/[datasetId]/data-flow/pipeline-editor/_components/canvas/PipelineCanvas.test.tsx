@@ -29,7 +29,12 @@ const selectedSinkNode = (data: GeoPersistenceNodeData = nodeData) =>
     data,
   }) as PipelineNode
 
-const renderCanvas = (isReadOnly = false, node = selectedSinkNode(), dispatch = vi.fn()) => {
+const renderCanvas = (
+  isReadOnly = false,
+  node = selectedSinkNode(),
+  canUnlinkDelete = () => true,
+  dispatch = vi.fn(),
+) => {
   const contextValue = {
     pipeline: { id: 'pipeline-1', name: 'Test', nodes: [node], edges: [] },
     dispatch,
@@ -37,6 +42,7 @@ const renderCanvas = (isReadOnly = false, node = selectedSinkNode(), dispatch = 
     addEdge: vi.fn(),
     validateConnection: () => true,
     hideValidationPanel: vi.fn(),
+    canUnlinkDelete,
   } as unknown as ActivePipelineContextValue
 
   render(
@@ -81,6 +87,17 @@ describe('PipelineCanvas', () => {
     await userEvent.click(await screen.findByTestId('discardButton'))
 
     expect(removedNodeIds(dispatch)).toEqual([])
+  })
+
+  it('removes a saved Data storage node without asking when its removal deletes nothing', async () => {
+    const canUnlinkDelete = vi.fn(() => false)
+    const dispatch = renderCanvas(false, selectedSinkNode(), canUnlinkDelete)
+
+    await userEvent.keyboard('{Delete}')
+
+    expect(canUnlinkDelete).toHaveBeenCalledWith(['sink-1'])
+    expect(screen.queryByText('dataSinkNodeRemoval.description')).not.toBeInTheDocument()
+    expect(removedNodeIds(dispatch)).toEqual(['geo-1'])
   })
 
   it('removes an unsaved Data storage node without asking', async () => {

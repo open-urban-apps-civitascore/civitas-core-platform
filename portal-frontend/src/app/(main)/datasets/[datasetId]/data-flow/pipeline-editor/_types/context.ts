@@ -119,6 +119,8 @@ export interface ActivePipelineContextValue {
   getSinkLocks: (entityId: string | undefined) => DataSinkLocks
   /** Why this data sink node must not be edited, or null when it may be */
   getSinkLockReason: (node: PipelineNode) => SinkLockReason | null
+  /** Whether saving the active pipeline without these saved data sinks can delete stored data, a Layer or an API */
+  canUnlinkDelete: (dataSinkIds: string[]) => boolean
 
   // ===== Session Info =====
   /** ID of the active session */

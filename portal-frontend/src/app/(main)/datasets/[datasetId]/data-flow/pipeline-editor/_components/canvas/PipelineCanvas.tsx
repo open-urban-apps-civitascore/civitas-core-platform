@@ -14,6 +14,7 @@ import {
   type Connection,
   ConnectionMode,
   type EdgeChange,
+  type Node,
   type NodeChange,
   type OnBeforeDelete,
   type OnSelectionChangeParams,
@@ -41,8 +42,12 @@ interface PipelineCanvasProps {
   className?: string
 }
 
-const isSavedDataSinkNode = (data: PipelineNodeData) =>
-  (isFrostNodeData(data) || isGeoPersistenceNodeData(data)) && !!data.entityId
+const savedDataSinkIds = (nodes: Node[]) =>
+  nodes.flatMap(node => {
+    const data = node.data as PipelineNodeData
+    const isDataSinkNode = isFrostNodeData(data) || isGeoPersistenceNodeData(data)
+    return isDataSinkNode && data.entityId ? [data.entityId] : []
+  })
 
 // ============================================================================
 // Component
@@ -55,7 +60,8 @@ const isSavedDataSinkNode = (data: PipelineNodeData) =>
  */
 export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }) => {
   const t = useTranslations('pipelineEditor')
-  const { pipeline, dispatch, addNode, addEdge, validateConnection, hideValidationPanel } = useActivePipeline()
+  const { pipeline, dispatch, addNode, addEdge, validateConnection, hideValidationPanel, canUnlinkDelete } =
+    useActivePipeline()
   const { isReadOnly } = useReadOnly()
   const canEdit = !isReadOnly
 
@@ -84,10 +90,10 @@ export const PipelineCanvas: React.FC<PipelineCanvasProps> = ({ className = '' }
 
   const onBeforeDelete = useCallback<OnBeforeDelete>(
     async ({ nodes }) => {
-      const hasSavedDataSink = nodes.some(node => isSavedDataSinkNode(node.data as PipelineNodeData))
-      return !hasSavedDataSink || confirmDataSinkNodeRemoval()
+      const dataSinkIds = savedDataSinkIds(nodes)
+      return dataSinkIds.length === 0 || !canUnlinkDelete(dataSinkIds) || confirmDataSinkNodeRemoval()
     },
-    [confirmDataSinkNodeRemoval],
+    [canUnlinkDelete, confirmDataSinkNodeRemoval],
   )
 
   const onDropNode = useCallback(
