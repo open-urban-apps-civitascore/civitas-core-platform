@@ -31,6 +31,7 @@ import {
 import { RemovalConfirmModal } from '@/components/modals/removal-confirm-modal/RemovalConfirmModal'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { CONNECTOR_TYPES } from '@/const/connectors'
+import { useConfirmation } from '@/hooks/use-confirmation'
 import { useDataSinkRemovalState } from '@/hooks/use-data-sink-removal-state'
 import { useDatasetPermissions } from '@/hooks/use-dataset-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
@@ -255,21 +256,7 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
   // dataset discards its stored data (the sink's storage is rebuilt on the next release).
   // Save-All pauses on such a change and awaits an explicit confirmation via this promise before
   // sending confirmDataLoss to the backend.
-  const [isDataLossDialogOpen, setIsDataLossDialogOpen] = useState(false)
-  const dataLossResolveRef = useRef<((confirmed: boolean) => void) | null>(null)
-
-  const resolveDataLossDialog = useCallback((isConfirmed: boolean) => {
-    setIsDataLossDialogOpen(false)
-    dataLossResolveRef.current?.(isConfirmed)
-    dataLossResolveRef.current = null
-  }, [])
-
-  const confirmDataLoss = useCallback((): Promise<boolean> => {
-    setIsDataLossDialogOpen(true)
-    return new Promise<boolean>(resolve => {
-      dataLossResolveRef.current = resolve
-    })
-  }, [])
+  const { confirm: confirmDataLoss, dialog: dataLossDialog } = useConfirmation()
 
   // ===== Load pipelines from backend on mount =====
   useEffect(() => {
@@ -1184,15 +1171,15 @@ export const PipelineEditorProviderComponent: React.FC<PipelineEditorProviderCom
     <ActivePipelineProvider value={contextValue}>
       <NodeValidationContext.Provider value={getNodeValidationSeverity}>{children}</NodeValidationContext.Provider>
       <WarningModal
-        open={isDataLossDialogOpen}
-        onOpenChange={open => {
-          if (!open) resolveDataLossDialog(false)
+        open={dataLossDialog.open}
+        onOpenChange={isOpen => {
+          if (!isOpen) dataLossDialog.onCancel()
         }}
         title={t('dataLoss.title')}
         description={t('dataLoss.description')}
         confirmButtonTitle={t('dataLoss.confirm')}
-        onConfirm={() => resolveDataLossDialog(true)}
-        onDiscard={() => resolveDataLossDialog(false)}
+        onConfirm={dataLossDialog.onConfirm}
+        onDiscard={dataLossDialog.onCancel}
       />
       <RemovalConfirmModal
         dialog={deleteRemovalDialog}
