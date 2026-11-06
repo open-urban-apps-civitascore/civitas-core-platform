@@ -53,8 +53,10 @@ export const RemovalConfirmModal = (props: RemovalConfirmModalProps) => {
       description={
         <div className="space-y-3">
           <p>{description}</p>
-          <RemovedItemList heading={t('layers')} names={layers} testId="removalConfirmLayers" />
-          <RemovedItemList heading={t('apis')} names={apis} testId="removalConfirmApis" />
+          <div className="max-h-[50vh] space-y-3 overflow-y-auto">
+            <RemovedItemList heading={t('layers')} names={layers} testId="removalConfirmLayers" />
+            <RemovedItemList heading={t('apis')} names={apis} testId="removalConfirmApis" />
+          </div>
           {hasStoredData && <p data-testid="removalConfirmStoredData">{t('storedData')}</p>}
         </div>
       }
