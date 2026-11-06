@@ -75,7 +75,7 @@ services:
       start_period: 40s
 
   superset:
-    image: registry.gitlab.com/civitas-connect/civitas-core/civitas-core-v2/superset:7.0.0rc2-civitas-d177df7e
+    image: registry.gitlab.com/civitas-connect/civitas-core/civitas-core-v2/superset:7.0.0rc2-civitas-c33d77a2
     mem_limit: 1g
     container_name: civitas-superset
     restart: unless-stopped
@@ -85,6 +85,7 @@ services:
     environment:
       SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:-dev-only-civitas-superset-secret-key}
       SUPERSET_PUBLIC_URL: ${SUPERSET_PUBLIC_URL:-http://localhost:8092}
+      PORTAL_PUBLIC_URL: ${PORTAL_PUBLIC_URL:-http://localhost:3000}
       SUPERSET_DB_HOST: postgis-dev-env
       SUPERSET_DB_PORT: 5432
       SUPERSET_DB_NAME: ${SUPERSET_DB_NAME:-superset}
