@@ -1,12 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { PipelinePayload } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_types'
 import { PipelineOutputDTO } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_types/pipeline'
-import {
-  confirmDataLossParams,
-  invalidateRemovalQueries,
-} from '@/app/services/api/datasets/data-sink-removal/clientRequests'
+import { DATASETS_QUERY_KEY } from '@/app/services/api/datasets/clientRequests'
 import { DATASINKS_QUERY_KEY } from '@/app/services/api/datasets/datasinks/clientRequests'
+import { LAYERS_QUERY_KEY } from '@/app/services/api/datasets/layers/clientRequests'
 import { apiRequest, type ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 
 const API_REQUEST_HEADER = 'x-api-request'
@@ -15,6 +13,17 @@ const PIPELINES_QUERY_KEY = 'pipelines'
 type UpdatePipelineInput = { pipelineId: string; data: PipelinePayload; isDataLossConfirmed?: boolean }
 
 type DeletePipelineInput = { pipelineId: string; isDataLossConfirmed?: boolean }
+
+/** Query params that confirm the deletion of stored data; undefined when not confirmed. */
+const confirmDataLossParams = (isDataLossConfirmed = false): URLSearchParams | undefined =>
+  isDataLossConfirmed ? new URLSearchParams({ confirmDataLoss: 'true' }) : undefined
+
+/** A removal can delete Data sinks, Layers and APIs (the Dataset's namedApis) besides the Pipeline. */
+const invalidateRemovalQueries = (queryClient: QueryClient, datasetId: string) => {
+  queryClient.invalidateQueries({ queryKey: [DATASETS_QUERY_KEY] })
+  queryClient.invalidateQueries({ queryKey: [LAYERS_QUERY_KEY] })
+  queryClient.invalidateQueries({ queryKey: [DATASINKS_QUERY_KEY, datasetId] })
+}
 
 /**
  * Fetches all pipelines for a dataset.
