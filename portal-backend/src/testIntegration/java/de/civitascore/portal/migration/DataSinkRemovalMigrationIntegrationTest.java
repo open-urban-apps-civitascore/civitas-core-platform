@@ -101,6 +101,31 @@ class DataSinkRemovalMigrationIntegrationTest {
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 
+  // A pending sink that kept its configuration would keep its Data structure in use.
+  @Test
+  void migrate_rejectsAPendingSinkThatKeepsItsConfiguration() {
+    assertThatThrownBy(
+            () ->
+                jdbc.sql(
+                        "UPDATE data_sinks SET state = 'PENDING_UNPROVISION', provisioned = true,"
+                            + " configuration_urn = 'urn:core:test:datasink:1.0.0' WHERE id = :id::uuid")
+                    .param("id", LINKED_SINK)
+                    .update())
+        .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
+  @Test
+  void migrate_rejectsATableToDropOnAnActiveSink() {
+    assertThatThrownBy(
+            () ->
+                jdbc.sql(
+                        "UPDATE data_sinks SET unprovision_table_name = 'observations'"
+                            + " WHERE id = :id::uuid")
+                    .param("id", LINKED_SINK)
+                    .update())
+        .isInstanceOf(DataIntegrityViolationException.class);
+  }
+
   private static FluentConfiguration portalFlyway(DriverManagerDataSource dataSource) {
     return Flyway.configure().dataSource(dataSource).locations("classpath:db/migration");
   }

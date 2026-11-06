@@ -70,6 +70,7 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
   private final ModelRegistryGateway modelRegistryGateway;
   private final ScopeAccessAuthorizer scopeAccessAuthorizer;
   private final DataSinkRemovalService dataSinkRemovalService;
+  private final DataSinkTableNames dataSinkTableNames;
 
   public DataSinkService(
       DataSinkRepository dataSinkRepository,
@@ -79,7 +80,8 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
       ModelRegistryGateway modelRegistryGateway,
       ScopeAccessAuthorizer scopeAccessAuthorizer,
       DataSetMutationGuard dataSetMutationGuard,
-      DataSinkRemovalService dataSinkRemovalService) {
+      DataSinkRemovalService dataSinkRemovalService,
+      DataSinkTableNames dataSinkTableNames) {
     super(dataSetMutationGuard);
     this.dataSinkRepository = dataSinkRepository;
     this.dataSinkMapper = dataSinkMapper;
@@ -88,6 +90,7 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
     this.modelRegistryGateway = modelRegistryGateway;
     this.scopeAccessAuthorizer = scopeAccessAuthorizer;
     this.dataSinkRemovalService = dataSinkRemovalService;
+    this.dataSinkTableNames = dataSinkTableNames;
   }
 
   @Override
@@ -239,7 +242,7 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
     if (entity.getDataSinkType() != DataSinkType.POSTGIS) {
       return;
     }
-    String tableName = tableNameOf(entity);
+    String tableName = dataSinkTableNames.of(entity);
     if (tableName == null) {
       return;
     }
@@ -247,7 +250,7 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
     dataSinkRepository.findByDataSetId(entity.getDataSet().getId()).stream()
         .filter(sibling -> !Objects.equals(sibling.getId(), entity.getId()))
         .filter(sibling -> sibling.getDataSinkType() == DataSinkType.POSTGIS)
-        .filter(sibling -> tableName.equalsIgnoreCase(tableNameOf(sibling)))
+        .filter(sibling -> tableName.equalsIgnoreCase(dataSinkTableNames.of(sibling)))
         .findFirst()
         .ifPresent(
             sibling -> {
@@ -276,24 +279,6 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
     return "This DataSink's tableName '%s' is already used by another POSTGIS DataSink of this"
             .formatted(tableName)
         + " dataset; rename it to change this sink";
-  }
-
-  /**
-   * A sink's {@code tableName} lives in its registry-stored configuration document rather than on
-   * the row, so the uniqueness check resolves it through the sink's pin. Null when the sink has no
-   * stored configuration yet.
-   */
-  private String tableNameOf(DataSink sink) {
-    if (sink.getConfigurationUrn() == null) {
-      return null;
-    }
-    return modelRegistryGateway
-        .fetchPayload(sink.getConfigurationUrn())
-        .map(ModelRegistryGateway.RegistryDocument::content)
-        .map(content -> content.get("tableName"))
-        .filter(String.class::isInstance)
-        .map(String.class::cast)
-        .orElse(null);
   }
 
   /**

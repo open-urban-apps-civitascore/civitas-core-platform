@@ -14,7 +14,6 @@ import de.civitascore.portal.configuration.PipelineClosureValidationProperties;
 import de.civitascore.portal.configuration.SagaProperties;
 import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.ConnectorType;
-import de.civitascore.portal.model.embedded.DataSinkState;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.PipelineRuntimeState;
 import de.civitascore.portal.model.entity.DataSet;
@@ -347,8 +346,11 @@ class DataSetSagaPublisherTest {
     @BeforeEach
     void setUp() {
       active = postgisSink(UUID.randomUUID(), "active_table");
-      pending = postgisSink(UUID.randomUUID(), "pending_table");
-      pending.setState(DataSinkState.PENDING_UNPROVISION);
+      pending = new DataSink();
+      pending.setId(UUID.randomUUID());
+      pending.setDataSinkType(DataSinkType.POSTGIS);
+      pending.setProvisioned(true);
+      pending.markPendingUnprovision("pending_table");
       dataSet = new DataSet();
       dataSet.setId(UUID.randomUUID());
       dataSet.setName("test");

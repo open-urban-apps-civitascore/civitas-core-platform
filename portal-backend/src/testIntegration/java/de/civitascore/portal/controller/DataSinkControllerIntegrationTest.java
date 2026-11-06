@@ -925,7 +925,7 @@ class DataSinkControllerIntegrationTest
       assertThat(confirmed.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
       assertThat(dataSinkRepository.findById(id).orElseThrow().getState())
           .isEqualTo(DataSinkState.PENDING_UNPROVISION);
-      assertThat(modelRegistryGateway.fetchPayload(sink.getConfigurationUrn())).isPresent();
+      assertThat(modelRegistryGateway.fetchPayload(sink.getConfigurationUrn())).isEmpty();
       assertThat(performGetById(id).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
   }

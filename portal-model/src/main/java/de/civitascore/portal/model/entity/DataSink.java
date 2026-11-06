@@ -86,7 +86,13 @@ public class DataSink extends DataSetOwnedEntity {
 
   @Enumerated(EnumType.STRING)
   @Column(name = "state", nullable = false, length = 32)
+  @Setter(AccessLevel.NONE)
   @NotNull private DataSinkState state = DataSinkState.ACTIVE;
+
+  /** The PostGIS table the next release drops; set only while the sink waits for it. */
+  @Column(name = "unprovision_table_name", length = 63)
+  @Setter(AccessLevel.NONE)
+  private String unprovisionTableName;
 
   /** A Layer's {@code datasink_id} is non-null, so layers cannot outlive their sink. */
   @OneToMany(
@@ -99,5 +105,20 @@ public class DataSink extends DataSetOwnedEntity {
 
   public boolean isActive() {
     return state == DataSinkState.ACTIVE;
+  }
+
+  /**
+   * Keeps only what the next release needs to remove the storage, and drops the link to the
+   * configuration in Model Forge: that configuration names the sink's Data structure and would keep
+   * it in use. The caller deletes the configuration itself.
+   *
+   * @param tableName the PostGIS table the release drops; {@code null} for a sink without a table
+   */
+  public void markPendingUnprovision(String tableName) {
+    state = DataSinkState.PENDING_UNPROVISION;
+    unprovisionTableName = tableName;
+    configurationUrn = null;
+    configurationLogicalUrn = null;
+    pipelines.clear();
   }
 }

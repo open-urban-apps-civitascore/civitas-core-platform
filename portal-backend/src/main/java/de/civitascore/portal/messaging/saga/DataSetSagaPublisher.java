@@ -208,6 +208,9 @@ public class DataSetSagaPublisher {
   }
 
   private DataSinkPayload toDataSinkPayload(DataSink sink) {
+    if (!sink.isActive()) {
+      return toPendingUnprovisionPayload(sink);
+    }
     Map<String, Object> configuration =
         fetchConfiguration(sink.getConfigurationUrn(), "DataSink", sink.getId());
     // Keyed by the DataSink's configuration CORE URN, the same URN the pipelines' dataSinkIds list.
@@ -216,6 +219,15 @@ public class DataSetSagaPublisher {
         sink.getDataSinkType() != null ? sink.getDataSinkType().name() : null,
         configuration,
         resolveDataStructure(sink, configuration));
+  }
+
+  private static DataSinkPayload toPendingUnprovisionPayload(DataSink sink) {
+    String tableName = sink.getUnprovisionTableName();
+    return new DataSinkPayload(
+        null,
+        sink.getDataSinkType().name(),
+        tableName != null ? Map.of("tableName", tableName) : null,
+        null);
   }
 
   /**

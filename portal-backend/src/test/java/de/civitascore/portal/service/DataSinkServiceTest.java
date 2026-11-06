@@ -14,7 +14,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.mapper.DataSinkMapper;
-import de.civitascore.portal.model.embedded.DataSinkState;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSet;
@@ -45,7 +44,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
@@ -63,7 +61,7 @@ class DataSinkServiceTest {
 
   @Mock private DataSetMutationGuard dataSetMutationGuard;
 
-  @InjectMocks private DataSinkService dataSinkService;
+  private DataSinkService dataSinkService;
 
   private static final String STORED_LOGICAL_URN =
       "urn:core:platform:civitas:datasink:common:00000000-0000-4000-8000-000000000013";
@@ -71,6 +69,21 @@ class DataSinkServiceTest {
   private static final UUID STRUCTURE_ID = UUID.fromString("5cf6e9e7-fa0d-877a-bda7-df0cc339e439");
   private static final String ELEMENT_URN =
       "urn:core:platform:civitas:element:common:" + STRUCTURE_ID + ":1.0.0";
+
+  @BeforeEach
+  void createService() {
+    dataSinkService =
+        new DataSinkService(
+            dataSinkRepository,
+            dataSinkMapper,
+            dataSetRepository,
+            dataStructureVersionRepository,
+            modelRegistryGateway,
+            scopeAccessAuthorizer,
+            dataSetMutationGuard,
+            dataSinkRemovalService,
+            new DataSinkTableNames(modelRegistryGateway));
+  }
 
   @BeforeEach
   void stubPayloadStore() {
@@ -243,7 +256,7 @@ class DataSinkServiceTest {
       DataSink sink = new DataSink();
       sink.setId(sinkId);
       sink.setDataSet(dataSet(UUID.randomUUID()));
-      sink.setState(DataSinkState.PENDING_UNPROVISION);
+      sink.markPendingUnprovision(null);
       when(dataSinkRepository.findByIdWithRelations(sinkId)).thenReturn(Optional.of(sink));
 
       assertThatThrownBy(() -> dataSinkService.deleteById(sinkId))
@@ -676,7 +689,7 @@ class DataSinkServiceTest {
     void shouldExplainATableNameHeldByARemovedSink() {
       UUID dataSetId = UUID.randomUUID();
       DataSink removed = postgisSink(UUID.randomUUID(), dataSetId, "messwerte");
-      removed.setState(DataSinkState.PENDING_UNPROVISION);
+      removed.markPendingUnprovision("messwerte");
 
       DataSinkInputDTO input = postgisInput(dataSetId, "messwerte");
       stubCreate(dataSetId, input);

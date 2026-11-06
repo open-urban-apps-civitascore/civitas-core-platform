@@ -129,7 +129,11 @@ class DataSetServiceTest {
         modelRegistryGateway,
         new DataSetMutationGuard(dataSetRepository),
         pipelineClosureValidator,
-        new DataSinkRemovalService(dataSinkRepository, layerRepository, modelRegistryGateway));
+        new DataSinkRemovalService(
+            dataSinkRepository,
+            layerRepository,
+            modelRegistryGateway,
+            new DataSinkTableNames(modelRegistryGateway)));
   }
 
   private static AllowedScopes wildcardScopes() {
@@ -1948,12 +1952,12 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("CREATE: deletes the pending sinks and their configurations")
+    @DisplayName("CREATE: deletes the pending sinks")
     void createDeletesPendingSinks() {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
       ds.setPendingSagaType(PendingSagaType.CREATE);
-      DataSink pending = pendingSink(DataSinkType.POSTGIS, "urn:core:datasink:pending");
+      DataSink pending = pendingSink(DataSinkType.POSTGIS);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
       stubPendingSinks(id, List.of(pending));
@@ -1962,30 +1966,8 @@ class DataSetServiceTest {
       commit();
 
       verify(dataSinkRepository).delete(pending);
-      verify(modelRegistryGateway).deletePayload("urn:core:datasink:pending");
       verify(dataSinkRepository, never()).save(pending);
       assertThat(ds.getProjectId()).isEqualTo("proj-1");
-    }
-
-    @Test
-    @DisplayName("CREATE: a configuration Model Forge refuses to delete does not fail the release")
-    void createCompletesWhenPendingConfigurationIsNotDeleted() {
-      UUID id = UUID.randomUUID();
-      DataSet ds = availableDataSet(id);
-      ds.setPendingSagaType(PendingSagaType.CREATE);
-      DataSink pending = pendingSink(DataSinkType.POSTGIS, "urn:core:datasink:pending");
-      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
-      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-      stubPendingSinks(id, List.of(pending));
-      doThrow(new IllegalStateException("refused"))
-          .when(modelRegistryGateway)
-          .deletePayload("urn:core:datasink:pending");
-
-      createService().handleSagaCompleted(id, emptyResult(id));
-      commit();
-
-      verify(dataSinkRepository).delete(pending);
-      assertThat(ds.getPendingSagaType()).isNull();
     }
 
     @Test
@@ -1996,7 +1978,7 @@ class DataSetServiceTest {
       ds.setPendingSagaType(PendingSagaType.CREATE);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-      stubPendingSinks(id, List.of(pendingSink(DataSinkType.FROST, null)));
+      stubPendingSinks(id, List.of(pendingSink(DataSinkType.FROST)));
 
       createService().handleSagaCompleted(id, projectDeletedResult(id));
 
@@ -2012,7 +1994,7 @@ class DataSetServiceTest {
       ds.setPendingSagaType(PendingSagaType.CREATE);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-      stubPendingSinks(id, List.of(pendingSink(DataSinkType.FROST, null)));
+      stubPendingSinks(id, List.of(pendingSink(DataSinkType.FROST)));
 
       createService().handleSagaCompleted(id, emptyResult(id));
 
@@ -2058,13 +2040,12 @@ class DataSetServiceTest {
           .thenReturn(pending);
     }
 
-    private static DataSink pendingSink(DataSinkType type, String configurationLogicalUrn) {
+    private static DataSink pendingSink(DataSinkType type) {
       DataSink sink = new DataSink();
       sink.setId(UUID.randomUUID());
       sink.setDataSinkType(type);
       sink.setProvisioned(true);
-      sink.setState(DataSinkState.PENDING_UNPROVISION);
-      sink.setConfigurationLogicalUrn(configurationLogicalUrn);
+      sink.markPendingUnprovision(null);
       return sink;
     }
 

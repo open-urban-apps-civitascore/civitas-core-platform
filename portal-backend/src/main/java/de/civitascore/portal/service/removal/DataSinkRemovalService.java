@@ -9,6 +9,7 @@ import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
+import de.civitascore.portal.service.DataSinkTableNames;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import java.util.List;
@@ -39,6 +40,7 @@ public class DataSinkRemovalService {
   private final DataSinkRepository dataSinkRepository;
   private final LayerRepository layerRepository;
   private final ModelRegistryGateway modelRegistryGateway;
+  private final DataSinkTableNames dataSinkTableNames;
 
   /**
    * Checks the change and computes what it takes with it on the state after the change. Writes
@@ -69,9 +71,9 @@ public class DataSinkRemovalService {
 
   /**
    * Adds and removes the prepared links, then deletes the planned Layers and deactivates the
-   * planned Data sinks: one that was never provisioned is deleted, and its Model Forge
-   * configuration after the commit; a provisioned one keeps its row as PENDING_UNPROVISION until
-   * the next release removes its storage. Last the planned APIs go.
+   * planned Data sinks: one that was never provisioned is deleted; a provisioned one keeps its row
+   * as PENDING_UNPROVISION until the next release removes its storage. Either way its Model Forge
+   * configuration is deleted after the commit. Last the planned APIs go.
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public void apply(PreparedDataSinkChange prepared) {
@@ -99,18 +101,13 @@ public class DataSinkRemovalService {
   }
 
   /**
-   * Deletes the PENDING_UNPROVISION Data sinks of the Dataset once a release removed their storage,
-   * and their Model Forge configurations after the commit.
+   * Deletes the PENDING_UNPROVISION Data sinks of the Dataset once a release removed their storage.
    */
   @Transactional(propagation = Propagation.MANDATORY)
   public void deleteUnprovisioned(DataSet dataSet) {
-    List<DataSink> pending =
-        dataSinkRepository.findByDataSetIdAndState(
-            dataSet.getId(), DataSinkState.PENDING_UNPROVISION);
-    for (DataSink sink : pending) {
-      dataSinkRepository.delete(sink);
-      deleteConfigurationAfterCommit(sink);
-    }
+    dataSinkRepository
+        .findByDataSetIdAndState(dataSet.getId(), DataSinkState.PENDING_UNPROVISION)
+        .forEach(dataSinkRepository::delete);
   }
 
   private PreparedDataSinkChange prepareLinks(
@@ -238,14 +235,15 @@ public class DataSinkRemovalService {
   }
 
   private void deactivate(DataSink sink) {
-    sink.getPipelines().clear();
+    String configurationLogicalUrn = sink.getConfigurationLogicalUrn();
     if (sink.isProvisioned()) {
-      sink.setState(DataSinkState.PENDING_UNPROVISION);
+      sink.markPendingUnprovision(dataSinkTableNames.of(sink));
       dataSinkRepository.save(sink);
-      return;
+    } else {
+      sink.getPipelines().clear();
+      dataSinkRepository.delete(sink);
     }
-    dataSinkRepository.delete(sink);
-    deleteConfigurationAfterCommit(sink);
+    deleteConfigurationAfterCommit(sink.getId(), configurationLogicalUrn);
   }
 
   /**
@@ -253,9 +251,7 @@ public class DataSinkRemovalService {
    * leaves the restored row without its configuration. After the commit, a configuration Model
    * Forge does not delete is only logged and stays stranded: no row references it any more.
    */
-  private void deleteConfigurationAfterCommit(DataSink sink) {
-    UUID sinkId = sink.getId();
-    String urn = sink.getConfigurationLogicalUrn();
+  private void deleteConfigurationAfterCommit(UUID sinkId, String urn) {
     if (urn == null) {
       return;
     }

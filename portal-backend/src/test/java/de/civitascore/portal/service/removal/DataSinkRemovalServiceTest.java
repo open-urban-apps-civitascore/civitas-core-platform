@@ -21,16 +21,18 @@ import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
+import de.civitascore.portal.service.DataSinkTableNames;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -46,13 +48,19 @@ class DataSinkRemovalServiceTest {
   @Mock private LayerRepository layerRepository;
   @Mock private ModelRegistryGateway modelRegistryGateway;
 
-  @InjectMocks private DataSinkRemovalService service;
+  private DataSinkRemovalService service;
 
   private DataSet dataSet;
   private Pipeline pipeline;
 
   @BeforeEach
   void dataSetWithPipeline() {
+    service =
+        new DataSinkRemovalService(
+            dataSinkRepository,
+            layerRepository,
+            modelRegistryGateway,
+            new DataSinkTableNames(modelRegistryGateway));
     dataSet = new DataSet();
     dataSet.setId(UUID.randomUUID());
     pipeline = new Pipeline();
@@ -206,7 +214,7 @@ class DataSinkRemovalServiceTest {
   @Test
   void prepare_linkPipeline_pendingDataSink_isRejected() {
     DataSink pending = unlinkedSink(dataSet);
-    pending.setState(DataSinkState.PENDING_UNPROVISION);
+    pending.markPendingUnprovision(null);
     when(dataSinkRepository.findAllById(Set.of(pending.getId()))).thenReturn(List.of(pending));
 
     assertThatThrownBy(
@@ -293,19 +301,29 @@ class DataSinkRemovalServiceTest {
   }
 
   @Test
-  void apply_provisionedSink_staysPendingWithoutLinksAndKeepsItsConfiguration() {
+  void apply_provisionedSink_staysPendingWithItsTableAndWithoutItsConfiguration() {
+    // A configuration kept until the release would keep the sink's Data structure in use.
     DataSink sink = activeSink(DataSinkType.POSTGIS, true);
     sink.setConfigurationLogicalUrn(CONFIGURATION_URN);
+    sink.setConfigurationUrn(CONFIGURATION_URN + ":1.0.0");
+    when(modelRegistryGateway.fetchPayload(CONFIGURATION_URN + ":1.0.0"))
+        .thenReturn(
+            Optional.of(
+                new ModelRegistryGateway.RegistryDocument(Map.of("tableName", "readings"), null)));
 
     service.apply(
         PreparedDataSinkChange.removalOnly(
             new DataSinkRemovalPlan(dataSet, List.of(sink), List.of(), List.of())));
+    commit();
 
     assertThat(sink.getState()).isEqualTo(DataSinkState.PENDING_UNPROVISION);
     assertThat(sink.getPipelines()).isEmpty();
+    assertThat(sink.getUnprovisionTableName()).isEqualTo("readings");
+    assertThat(sink.getConfigurationUrn()).isNull();
+    assertThat(sink.getConfigurationLogicalUrn()).isNull();
     verify(dataSinkRepository).save(sink);
     verify(dataSinkRepository, never()).delete(any(DataSink.class));
-    verify(modelRegistryGateway, never()).deletePayload(any());
+    verify(modelRegistryGateway).deletePayload(CONFIGURATION_URN);
   }
 
   @Test

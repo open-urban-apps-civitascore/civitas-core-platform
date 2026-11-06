@@ -18,11 +18,14 @@ SELECT pipeline_id, id FROM data_sinks WHERE pipeline_id IS NOT NULL;
 ALTER TABLE data_sinks DROP COLUMN pipeline_id;
 
 -- A removed Data sink whose storage exists stays as PENDING_UNPROVISION until a release removes the
--- storage.
+-- storage. It keeps only the table name the release drops, not its Model Forge configuration.
 ALTER TABLE data_sinks
     ADD COLUMN state VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+    ADD COLUMN unprovision_table_name VARCHAR(63),
     ADD CONSTRAINT ck_data_sinks_state CHECK (state IN ('ACTIVE', 'PENDING_UNPROVISION')),
-    ADD CONSTRAINT ck_data_sinks_pending_provisioned CHECK (state = 'ACTIVE' OR provisioned);
+    ADD CONSTRAINT ck_data_sinks_pending_provisioned CHECK (state = 'ACTIVE' OR provisioned),
+    ADD CONSTRAINT ck_data_sinks_pending_unconfigured CHECK (state = 'ACTIVE' OR configuration_urn IS NULL),
+    ADD CONSTRAINT ck_data_sinks_unprovision_table_pending CHECK (unprovision_table_name IS NULL OR state = 'PENDING_UNPROVISION');
 
 -- A Layer goes with the API that publishes it.
 ALTER TABLE layers

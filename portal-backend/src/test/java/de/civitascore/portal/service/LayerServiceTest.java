@@ -8,7 +8,6 @@ import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.mapper.LayerMapper;
 import de.civitascore.portal.model.embedded.ApiStandard;
-import de.civitascore.portal.model.embedded.DataSinkState;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.Layer;
@@ -133,7 +132,7 @@ class LayerServiceTest {
       DataSink dataSink = new DataSink();
       dataSink.setId(dataSinkId);
       dataSink.setDataSet(ds);
-      dataSink.setState(DataSinkState.PENDING_UNPROVISION);
+      dataSink.markPendingUnprovision(null);
       when(layerMapper.toEntity(any())).thenReturn(new Layer());
       when(dataSetRepository.findById(dataSetId)).thenReturn(Optional.of(ds));
       when(dataSinkRepository.findById(dataSinkId)).thenReturn(Optional.of(dataSink));

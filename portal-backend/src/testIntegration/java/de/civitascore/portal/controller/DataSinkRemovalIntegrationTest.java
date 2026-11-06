@@ -9,6 +9,7 @@ import de.civitascore.portal.model.embedded.DataSinkState;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
+import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
 import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.NamedApi;
@@ -97,7 +98,7 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
         null,
         sink -> {
           sink.setProvisioned(true);
-          sink.setState(DataSinkState.PENDING_UNPROVISION);
+          sink.markPendingUnprovision(null);
         });
   }
 
@@ -280,6 +281,37 @@ class DataSinkRemovalIntegrationTest extends BaseKeycloakIntegrationTest {
       assertThat(apiStandards()).isEmpty();
       assertThat(modelRegistryGateway.fetchPayload(pipeline.getModelUrn())).isEmpty();
       assertThat(modelRegistryGateway.fetchPayload(sink.getConfigurationUrn())).isEmpty();
+    }
+
+    @Test
+    @DisplayName(
+        "with confirmation a provisioned sink keeps only its table, so its Data structure can be"
+            + " deleted")
+    void confirmed_provisionedSinkFreesItsDataStructure() {
+      MapSurface surface = mapSurface(true);
+      DataStructure structure = portalData.dataStructure();
+      DataStructureVersion road =
+          portalData.attachModel(
+              portalData.dataStructureVersion(structure),
+              portalData.dataStructureVersionModel("Road"));
+      DataSink sink =
+          portalData.attachSinkConfiguration(
+              surface.sink(), Map.of("tableName", "roads", "element", road.getModelUrn()));
+      String configurationUrn = sink.getConfigurationUrn();
+
+      ResponseEntity<JsonNode> response =
+          exchange(HttpMethod.DELETE, pipelinePath() + CONFIRMED, null);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+      DataSink pending = dataSinkRepository.findById(sink.getId()).orElseThrow();
+      assertThat(pending.getState()).isEqualTo(DataSinkState.PENDING_UNPROVISION);
+      assertThat(pending.getUnprovisionTableName()).isEqualTo("roads");
+      assertThat(pending.getConfigurationUrn()).isNull();
+      assertThat(modelRegistryGateway.fetchPayload(configurationUrn)).isEmpty();
+      assertThat(
+              exchange(HttpMethod.DELETE, "/datastructures/" + structure.getId(), null)
+                  .getStatusCode())
+          .isEqualTo(HttpStatus.NO_CONTENT);
     }
 
     @Test
