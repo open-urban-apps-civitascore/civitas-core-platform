@@ -1,16 +1,19 @@
 import json
 import logging
 import os
+import re
 from typing import Any
 from uuid import UUID
 
-from flask import g
+from flask import abort, g, request
+from flask_login import current_user
 from superset.security.manager import SupersetSecurityManager
 
 from opa_client import OpaClient
 
 logger = logging.getLogger(__name__)
 _opa = OpaClient(os.getenv("OPA_URL", "http://civitas-opa:8181"))
+_PROTECTED_DELETE_PATH = re.compile(r"^/api/v1/(?:dashboard|dataset)(?:/[^/]+)?/?$")
 
 
 class CivitasSupersetSecurityManager(SupersetSecurityManager):
@@ -27,6 +30,21 @@ class CivitasSupersetSecurityManager(SupersetSecurityManager):
     def create_login_manager(self, app):
         """Load Superset users for API requests authenticated with a Bearer token."""
         login_manager = super().create_login_manager(app)
+
+        @app.before_request
+        def restrict_dashboard_and_dataset_deletion():
+            if request.method != "DELETE" or not _PROTECTED_DELETE_PATH.fullmatch(
+                request.path
+            ):
+                return
+
+            service_username = os.getenv("SUPERSET_SERVICE_USERNAME")
+            if (
+                not service_username
+                or not current_user.is_authenticated
+                or current_user.username != service_username
+            ):
+                abort(403)
 
         @app.before_request
         def install_public_dashboard_filter():
