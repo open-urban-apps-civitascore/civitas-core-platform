@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
-import de.civitascore.portal.model.embedded.DataStructureStatus;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.Installation;
@@ -136,8 +135,14 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
         .contains(shellId.toString())
         .doesNotContain(FOREIGN_UUID);
     assertThat(line.get("versionedUrn").asString()).startsWith(line.get("urn").asString());
-    assertThat(dataStructureRepository.findById(shellId).orElseThrow().getDataStructureStatus())
-        .isEqualTo(DataStructureStatus.DRAFT);
+    JsonNode structure = json(get("/datastructures/" + shellId).getBody());
+    assertThat(
+            structure
+                .get("dataStructureVersions")
+                .get(0)
+                .get("dataStructureVersionStatus")
+                .asString())
+        .isEqualTo("DRAFT");
     assertThat(get("/installations/" + body.get("id").asString()).getStatusCode())
         .isEqualTo(HttpStatus.OK);
   }
