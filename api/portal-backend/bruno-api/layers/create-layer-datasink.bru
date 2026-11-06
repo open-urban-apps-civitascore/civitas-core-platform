@@ -1,0 +1,43 @@
+meta {
+  name: Create PostGIS DataSink for the Layer
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/datasinks
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+}
+
+body:json {
+  {
+    "dataSinkType": "POSTGIS",
+    "configuration": {
+      "tableName": "layer_observations",
+      "element": "{{setupModelUrn}}"
+    }
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('postgisDataSinkId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+}
+
+docs {
+  Creates the PostGIS DataSink the Layer is derived from. The `datasinks` folder deletes its own DataSink, so this folder brings its own.
+
+  **Expected Response:** 201 Created. **Post-condition:** Save `postgisDataSinkId`.
+}

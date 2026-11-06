@@ -1,0 +1,40 @@
+meta {
+  name: Create alternative Style for the Layer
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/styles
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+}
+
+body:json {
+  {
+    "name": "layer_alternative_style",
+    "sldContent": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><StyledLayerDescriptor xmlns=\"http://www.opengis.net/sld\" xmlns:ogc=\"http://www.opengis.net/ogc\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" version=\"1.0.0\"><NamedLayer><Name>layer_alternative_style</Name><UserStyle><FeatureTypeStyle><Rule><PointSymbolizer><Graphic><Mark><WellKnownName>square</WellKnownName><Fill><CssParameter name=\"fill\">#a8501e</CssParameter></Fill></Mark><Size>10</Size></Graphic></PointSymbolizer></Rule></FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('alternativeStyleId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+}
+
+docs {
+  Creates the Layer's alternative Style.
+
+  **Expected Response:** 201 Created. **Post-condition:** Save `alternativeStyleId`.
+}

@@ -1,0 +1,40 @@
+meta {
+  name: Create default Style for the Layer
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/datasets/:dataSetId/styles
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+}
+
+body:json {
+  {
+    "name": "layer_default_style",
+    "sldContent": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><StyledLayerDescriptor xmlns=\"http://www.opengis.net/sld\" xmlns:ogc=\"http://www.opengis.net/ogc\" xmlns:xlink=\"http://www.w3.org/1999/xlink\" version=\"1.0.0\"><NamedLayer><Name>layer_default_style</Name><UserStyle><FeatureTypeStyle><Rule><PointSymbolizer><Graphic><Mark><WellKnownName>circle</WellKnownName><Fill><CssParameter name=\"fill\">#1e5ba8</CssParameter></Fill></Mark><Size>8</Size></Graphic></PointSymbolizer></Rule></FeatureTypeStyle></UserStyle></NamedLayer></StyledLayerDescriptor>"
+  }
+}
+
+script:post-response {
+  if (res.body && res.body.id) {
+    bru.setVar('defaultStyleId', res.body.id);
+  }
+}
+
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+}
+
+docs {
+  Creates the Layer's default Style. The `styles` folder runs after this one.
+
+  **Expected Response:** 201 Created. **Post-condition:** Save `defaultStyleId`.
+}
