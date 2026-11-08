@@ -584,7 +584,10 @@ public class DataSetSagaPublisher {
         entity.getExternalDashboardId(),
         groupIdsWithPermission(dataset, "DATASET_UPDATE"),
         groupIdsWithPermission(dataset, "DATASET_READ"),
-        Boolean.TRUE.equals(dataset.getOpenDataAccess()));
+        Boolean.TRUE.equals(dataset.getOpenDataAccess()),
+        // The engine imports the bundle only when it first creates the dashboard, so later
+        // triggers leave it out and keep the messages small.
+        entity.getExternalDashboardId() == null ? entity.getSupersetBundle() : null);
   }
 
   /**

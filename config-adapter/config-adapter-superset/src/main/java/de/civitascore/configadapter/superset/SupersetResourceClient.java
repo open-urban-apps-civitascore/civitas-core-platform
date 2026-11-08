@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.superset;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.civitascore.configadapter.adapter.AbstractSagaCommandHandler.SagaApiException;
@@ -18,6 +19,7 @@ import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -446,7 +448,8 @@ final class SupersetResourceClient {
                         "metadata_params", Map.of(),
                         "engine_params", Map.of("connect_args", connectArgs),
                         "metadata_cache_timeout", Map.of(),
-                        "schemas_allowed_for_file_upload", List.of()));
+                        "schemas_allowed_for_file_upload", List.of(),
+                        "allow_multi_catalog", true));
       } catch (Exception e) {
         throw new SagaApiException("Could not encode Superset Trino connection settings", 500);
       }
@@ -1338,6 +1341,118 @@ final class SupersetResourceClient {
     return byView;
   }
 
+  // ── Dashboard bundle import ──────────────────────────────────────────────
+
+  /** The fields of a registered dataset that a dashboard bundle is bound to. */
+  SupersetBundleBinder.DatasetTarget getDatasetTarget(int datasetId) {
+    Response response = null;
+    try {
+      response = getJson("/api/v1/dataset/" + datasetId, Map.of());
+      if (response.getStatus() == 401) {
+        response =
+            closeAndReauth(response, () -> getJson("/api/v1/dataset/" + datasetId, Map.of()));
+      }
+      checkStatus(response, "get dataset");
+      JsonNode result = readTree(response).path("result");
+      String uuid = result.path("uuid").asText("");
+      if (uuid.isBlank()) {
+        throw new SagaApiException(
+            "Superset does not report the UUID of dataset id=" + datasetId, 502);
+      }
+      return new SupersetBundleBinder.DatasetTarget(
+          uuid,
+          textOrNull(result, "schema"),
+          textOrNull(result, "catalog"),
+          textOrNull(result, "table_name"),
+          textOrNull(result, "sql"),
+          extraAsMap(result.path("extra")));
+    } finally {
+      closeQuietly(response);
+    }
+  }
+
+  /** UUID of a Superset database connection, which a bundle's datasets refer to. */
+  String getDatabaseUuid(int databaseId) {
+    String uuid = getDatabase(databaseId).path("result").path("uuid").asText("");
+    if (uuid.isBlank()) {
+      throw new SagaApiException(
+          "Superset does not report the UUID of database id=" + databaseId, 502);
+    }
+    return uuid;
+  }
+
+  /**
+   * Imports a dashboard export ZIP and overwrites the objects whose UUIDs it carries. The bundle is
+   * bound beforehand ({@link SupersetBundleBinder}), so it overwrites only this dashboard's shell,
+   * its own charts and the datasets of its CORE dataset.
+   */
+  void importDashboardBundle(byte[] zip) {
+    String boundary = "civitas-" + UUID.randomUUID();
+    byte[] body = multipartBody(boundary, zip);
+    Response response = null;
+    try {
+      response = postMultipart("/api/v1/dashboard/import/", boundary, body);
+      if (response.getStatus() == 401) {
+        response =
+            closeAndReauth(
+                response, () -> postMultipart("/api/v1/dashboard/import/", boundary, body));
+      }
+      int status = response.getStatus();
+      if (status < 200 || status >= 300) {
+        String reason = response.readEntity(String.class);
+        throw new SagaApiException(
+            "Superset dashboard import failed: HTTP "
+                + status
+                + " "
+                + (reason == null ? "" : reason.substring(0, Math.min(reason.length(), 300))),
+            status);
+      }
+      LOG.info("Imported Superset dashboard bundle ({} bytes)", zip.length);
+    } finally {
+      closeQuietly(response);
+    }
+  }
+
+  private static byte[] multipartBody(String boundary, byte[] zip) {
+    String head =
+        "--"
+            + boundary
+            + "\r\n"
+            + "Content-Disposition: form-data; name=\"formData\"; filename=\"dashboard.zip\"\r\n"
+            + "Content-Type: application/zip\r\n\r\n";
+    String tail =
+        "\r\n--"
+            + boundary
+            + "\r\n"
+            + "Content-Disposition: form-data; name=\"overwrite\"\r\n\r\n"
+            + "true\r\n--"
+            + boundary
+            + "--\r\n";
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    out.writeBytes(head.getBytes(StandardCharsets.UTF_8));
+    out.writeBytes(zip);
+    out.writeBytes(tail.getBytes(StandardCharsets.UTF_8));
+    return out.toByteArray();
+  }
+
+  private static String textOrNull(JsonNode node, String field) {
+    JsonNode value = node.path(field);
+    return value.isMissingNode() || value.isNull() ? null : value.asText();
+  }
+
+  /** Superset reports a dataset's {@code extra} as a JSON string. */
+  private Map<String, Object> extraAsMap(JsonNode extra) {
+    try {
+      JsonNode node = extra.isTextual() ? objectMapper.readTree(extra.asText()) : extra;
+      if (node == null || !node.isObject()) {
+        return Map.of();
+      }
+      return objectMapper.convertValue(node, new TypeReference<LinkedHashMap<String, Object>>() {});
+    } catch (Exception e) {
+      return Map.of();
+    }
+  }
+
   private List<JsonNode> listDatasets(String filterQuery) {
     List<JsonNode> datasets = new ArrayList<>();
     for (int page = 0; ; page++) {
@@ -1432,6 +1547,17 @@ final class SupersetResourceClient {
         .header(CSRF_HEADER, session.getCsrfToken())
         .header("Cookie", session.getSessionCookie())
         .put(Entity.json(body));
+  }
+
+  private Response postMultipart(String path, String boundary, byte[] body) {
+    return client
+        .target(baseUrl)
+        .path(path)
+        .request(MediaType.APPLICATION_JSON)
+        .header(AUTH_HEADER, "Bearer " + session.getAccessToken())
+        .header(CSRF_HEADER, session.getCsrfToken())
+        .header("Cookie", session.getSessionCookie())
+        .post(Entity.entity(body, "multipart/form-data; boundary=" + boundary));
   }
 
   private Response deleteJson(String path) {

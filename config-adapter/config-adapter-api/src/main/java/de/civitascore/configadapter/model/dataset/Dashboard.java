@@ -11,7 +11,10 @@ package de.civitascore.configadapter.model.dataset;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Saga-contract shape of a dashboard, carried alongside the dataset on {@code DATASET_CREATE} and
@@ -42,6 +45,10 @@ import java.util.List;
  * @param editorGroupIds CORE group IDs allowed to edit the engine dashboard
  * @param viewerGroupIds CORE group IDs allowed to view the published dashboard
  * @param publicAccess whether the parent CORE dataset is public
+ * @param supersetBundle optional Superset export of the dashboard content (file path without the
+ *     export's root folder mapped to the parsed file); the engine imports it once, when it first
+ *     creates the dashboard, so the platform sends it only while {@code externalDashboardId} is
+ *     {@code null}
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -51,9 +58,26 @@ public record Dashboard(
     String externalDashboardId,
     List<String> editorGroupIds,
     List<String> viewerGroupIds,
-    boolean publicAccess) {
+    boolean publicAccess,
+    Map<String, Object> supersetBundle) {
   public Dashboard {
     editorGroupIds = editorGroupIds == null ? List.of() : List.copyOf(editorGroupIds);
     viewerGroupIds = viewerGroupIds == null ? List.of() : List.copyOf(viewerGroupIds);
+    // Not Map.copyOf: the parsed export may hold null values.
+    supersetBundle =
+        supersetBundle == null
+            ? null
+            : Collections.unmodifiableMap(new LinkedHashMap<>(supersetBundle));
+  }
+
+  /** A dashboard without content to import. */
+  public Dashboard(
+      String id,
+      String modelUrn,
+      String externalDashboardId,
+      List<String> editorGroupIds,
+      List<String> viewerGroupIds,
+      boolean publicAccess) {
+    this(id, modelUrn, externalDashboardId, editorGroupIds, viewerGroupIds, publicAccess, null);
   }
 }

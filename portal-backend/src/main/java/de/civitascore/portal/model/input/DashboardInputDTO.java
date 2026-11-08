@@ -7,6 +7,7 @@ import de.civitascore.portal.model.embedded.VisualizationType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.util.Map;
 import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -30,6 +31,13 @@ public final class DashboardInputDTO extends VisualizationInputDTO {
 
   @Schema(description = "Initial filter bar state: DEFAULT, COLLAPSED or EXPANDED")
   private DashboardFilterExpansion filterExpansion;
+
+  @Schema(
+      description =
+          "Optional Superset export of the dashboard content: each file path without the export's"
+              + " root folder, mapped to the parsed file. The dashboard engine imports it once,"
+              + " when it first creates the dashboard")
+  private Map<String, Object> supersetBundle;
 
   @Override
   @JsonProperty("visualizationType")

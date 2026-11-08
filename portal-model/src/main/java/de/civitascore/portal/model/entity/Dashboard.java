@@ -11,11 +11,14 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
+import java.util.Map;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * The Dashboard model in Model Forge is authoritative for user-controlled configuration. This
@@ -73,4 +76,13 @@ public class Dashboard extends NamedEntity {
   @Enumerated(EnumType.STRING)
   @Column(name = "filter_expansion", nullable = false, length = 16)
   private DashboardFilterExpansion filterExpansion = DashboardFilterExpansion.DEFAULT;
+
+  /**
+   * Superset export of the dashboard content: each file path without the export's root folder,
+   * mapped to the parsed file. The engine imports it once, when it first creates the dashboard.
+   * Prototype storage outside Model Forge.
+   */
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(name = "superset_bundle", columnDefinition = "jsonb")
+  private Map<String, Object> supersetBundle;
 }

@@ -220,6 +220,9 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
     Map<String, Object> resultData = new LinkedHashMap<>();
     Map<String, Object> compensationData = new LinkedHashMap<>();
     List<Integer> datasetIds = new ArrayList<>();
+    // Registered datasets by table name and by FROST view: a dashboard bundle binds to these.
+    Map<String, Integer> postgisDatasetIds = new LinkedHashMap<>();
+    Map<String, Integer> frostDatasetIds = new LinkedHashMap<>();
 
     if (!tables.isEmpty()) {
       String datasetName = requireString(command, "datasetName");
@@ -266,6 +269,7 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
               "Superset dataset id=" + supersetDatasetId + " disappeared during editor sync", 404);
         }
         datasetIds.add(supersetDatasetId);
+        postgisDatasetIds.put(table, supersetDatasetId);
       }
       log.info(
           "Registered {} Superset PostGIS dataset(s) for datasetId={}, saga={}",
@@ -329,6 +333,7 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
               "Superset dataset id=" + supersetDatasetId + " disappeared during editor sync", 404);
         }
         datasetIds.add(supersetDatasetId);
+        frostDatasetIds.put(view.schemaName(), supersetDatasetId);
       }
       log.info(
           "Registered {} Superset FROST dataset(s) for datasetId={}, saga={}",
@@ -346,6 +351,12 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
       List<Map<String, Object>> dashboardResults = new ArrayList<>();
       for (DashboardEntry entry : dashboards) {
         int supersetDashboardId = syncDashboard(entry);
+        // Only when the engine first creates the dashboard: afterwards it belongs to its users,
+        // and a later CORE update must not overwrite what they built in Superset.
+        if (entry.externalDashboardId() == null && entry.supersetBundle() != null) {
+          importBundle(
+              entry, supersetDashboardId, trinoDatabaseId, postgisDatasetIds, frostDatasetIds);
+        }
         dashboardIds.add(supersetDashboardId);
         dashboardResults.add(
             Map.of(
@@ -419,6 +430,62 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
         entry.viewerGroupIds(),
         entry.publicAccess(),
         entry.released());
+  }
+
+  /**
+   * Imports the dashboard's Superset export over the shell just created, bound to this instance:
+   * the CORE dashboard ID as dashboard UUID, the datasets this step registered and the CORE
+   * connection. A failure leaves the empty shell and only logs, so the release does not depend on
+   * the dashboard content.
+   */
+  @SuppressWarnings("PMD.AvoidCatchingGenericException") // any failure must leave the release
+  private void importBundle(
+      DashboardEntry entry,
+      int supersetDashboardId,
+      int trinoDatabaseId,
+      Map<String, Integer> postgisDatasetIds,
+      Map<String, Integer> frostDatasetIds) {
+    try {
+      Map<String, SupersetBundleBinder.DatasetTarget> tableTargets = new LinkedHashMap<>();
+      for (Map.Entry<String, Integer> dataset : postgisDatasetIds.entrySet()) {
+        tableTargets.put(dataset.getKey(), resourceClient.getDatasetTarget(dataset.getValue()));
+      }
+      Map<String, SupersetBundleBinder.DatasetTarget> viewTargets = new LinkedHashMap<>();
+      for (Map.Entry<String, Integer> dataset : frostDatasetIds.entrySet()) {
+        viewTargets.put(dataset.getKey(), resourceClient.getDatasetTarget(dataset.getValue()));
+      }
+      SupersetBundleBinder.Binding binding =
+          new SupersetBundleBinder.Binding(
+              entry.id(),
+              entry.title(),
+              entry.released(),
+              resourceClient.getDatabaseUuid(trinoDatabaseId),
+              trinoDatabaseConfig == null ? null : trinoDatabaseConfig.databaseName(),
+              tableTargets,
+              viewTargets);
+      Map<String, Object> bound = SupersetBundleBinder.bind(entry.supersetBundle(), binding);
+      resourceClient.importDashboardBundle(SupersetBundleBinder.toZip(bound));
+      // The bundle's database file may have touched the CORE connection: write it back.
+      resourceClient.ensureTrinoDatabase();
+      // The import replaces the dashboard's editors and viewers with those of the export.
+      resourceClient.syncDashboardAccess(
+          supersetDashboardId,
+          entry.title(),
+          entry.description(),
+          entry.editorGroupIds(),
+          entry.viewerGroupIds(),
+          entry.publicAccess(),
+          entry.released());
+      log.info(
+          "Imported the Superset bundle of dashboard {} into Superset dashboard id={}",
+          Encode.forJava(entry.id()),
+          supersetDashboardId);
+    } catch (RuntimeException e) {
+      log.warn(
+          "Superset bundle import failed for dashboard {}, the dashboard stays empty: {}",
+          Encode.forJava(entry.id()),
+          Encode.forJava(String.valueOf(e.getMessage())));
+    }
   }
 
   private static Integer parseSupersetId(String externalId) {
@@ -525,7 +592,8 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
       List<String> editorGroupIds,
       List<String> viewerGroupIds,
       boolean publicAccess,
-      Map<?, ?> model) {
+      Map<?, ?> model,
+      Map<?, ?> supersetBundle) {
     String title() {
       return requiredModelString("title");
     }
@@ -573,7 +641,8 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
                 stringList(dash, "editorGroupIds"),
                 stringList(dash, "viewerGroupIds"),
                 Boolean.TRUE.equals(dash.get("publicAccess")),
-                model));
+                model,
+                dash.get("supersetBundle") instanceof Map<?, ?> bundle ? bundle : null));
       }
     }
     return entries;
