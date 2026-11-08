@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useGetDataSinks } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { API_STANDARDS, NamedApi } from '@/types/namedApis'
@@ -8,7 +8,9 @@ import { API_STANDARDS, NamedApi } from '@/types/namedApis'
 import { ApiList } from './ApiList'
 
 vi.mock('./ApiCard', () => ({
-  ApiCard: ({ api }: { api: { slug: string } }) => <div data-testid={`apiCard-${api.slug}`} />,
+  ApiCard: ({ api, canEdit }: { api: { slug: string }; canEdit: boolean }) => (
+    <div data-testid={`apiCard-${api.slug}`} data-can-edit={String(canEdit)} />
+  ),
 }))
 
 vi.mock('@/components/guarded-link/GuardedLink', () => ({
@@ -49,6 +51,17 @@ const defaultProps = {
 const renderComponent = (props: Partial<typeof defaultProps> = {}) => render(<ApiList {...defaultProps} {...props} />)
 
 describe('ApiList', () => {
+  beforeEach(() => {
+    vi.mocked(useGetDataSinks).mockReturnValue({
+      data: {
+        data: [
+          { id: 'sink-1', dataSinkType: 'POSTGIS', pipelineId: 'pipeline-1' },
+          { id: 'sink-2', dataSinkType: 'FROST', pipelineId: 'pipeline-1' },
+        ],
+      },
+    } as ReturnType<typeof useGetDataSinks>)
+  })
+
   describe('Empty state', () => {
     it('shows the empty message when there are no apis', () => {
       renderComponent({ apis: [] })
@@ -76,14 +89,32 @@ describe('ApiList', () => {
   })
 
   describe('Add API dropdown', () => {
-    it('opens the add-api dropdown when the button is clicked', async () => {
+    it('keeps the dropdown available but disables API types without data sinks', async () => {
+      vi.mocked(useGetDataSinks).mockReturnValueOnce({ data: { data: [] } } as never)
+      renderComponent()
+      await userEvent.click(screen.getByText('addButton'))
+      expect(screen.getByText('sensorThings').closest('[role="menuitem"]')).toHaveAttribute('data-disabled')
+      expect(screen.getByText('ows').closest('[role="menuitem"]')).toHaveAttribute('data-disabled')
+    })
+
+    it('opens the add-api dropdown when compatible data sinks exist', async () => {
       renderComponent()
       await userEvent.click(screen.getByText('addButton'))
       expect(screen.getByText('sensorThings')).toBeInTheDocument()
       expect(screen.getByText('ows')).toBeInTheDocument()
     })
 
-    it('SensorThings link points to the sensorthings type route', async () => {
+    it('SensorThings item is disabled when no FROST pipeline exists', async () => {
+      vi.mocked(useGetDataSinks).mockReturnValueOnce({
+        data: { data: [{ id: 'sink-1', dataSinkType: 'POSTGIS', pipelineId: 'pipeline-1' }] },
+      } as never)
+      renderComponent()
+      await userEvent.click(screen.getByText('addButton'))
+      const item = screen.getByText('sensorThings').closest('[role="menuitem"]')
+      expect(item).toHaveAttribute('data-disabled')
+    })
+
+    it('SensorThings link points to the sensorthings type route when a FROST pipeline exists', async () => {
       renderComponent({ datasetId: 'ds-1' })
       await userEvent.click(screen.getByText('addButton'))
       const link = screen.getByText('sensorThings').closest('a')
@@ -131,6 +162,23 @@ describe('ApiList', () => {
       const item = screen.getByText('ows').closest('[role="menuitem"]')
       expect(item).toHaveAttribute('data-disabled')
       expect(screen.getByText('ows').closest('a')).toBeNull()
+    })
+
+    it('hides the add button when the parent denies editing', () => {
+      renderComponent({ canEdit: false })
+      expect(screen.queryByText('addButton')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('Edit permissions', () => {
+    it('passes canEdit=false to ApiCards when the parent denies editing', () => {
+      renderComponent({ apis: [makeApi()], canEdit: false })
+      expect(screen.getByTestId('apiCard-my-api')).toHaveAttribute('data-can-edit', 'false')
+    })
+
+    it('passes canEdit normally to ApiCards when the parent grants editing', () => {
+      renderComponent({ apis: [makeApi()], canEdit: true })
+      expect(screen.getByTestId('apiCard-my-api')).toHaveAttribute('data-can-edit', 'true')
     })
   })
 })

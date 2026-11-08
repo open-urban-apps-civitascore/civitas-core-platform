@@ -144,6 +144,22 @@ public class PostgresArtifactRegistryClient implements ArtifactRegistry {
     }
 
     @Override
+    public String storeDashboard(String id, JsonNode dashboard, VersionBump bump) {
+        return writeArtifact(
+            id,
+            RegistryMapping.TYPE_DASHBOARD,
+            RegistryMapping.FORMAT_CORE_JSON,
+            RegistryMapping.CONTENT_TYPE_JSON,
+            writeJson(dashboard),
+            null,
+            List.of(),
+            bump,
+            null,
+            null,
+            null);
+    }
+
+    @Override
     public String storeDataSet(String urn, JsonNode manifest, VersionBump bump) {
         return writeArtifact(UrnParser.logicalUrn(urn), RegistryMapping.TYPE_DATASET, RegistryMapping.FORMAT_CORE_JSON,
             RegistryMapping.CONTENT_TYPE_JSON, writeJson(manifest), null, ReferenceExtraction.dataSetRefs(manifest), bump, null, null, null);

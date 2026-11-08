@@ -49,7 +49,7 @@ if docker run --rm \
   -v "${SCRIPT_DIR}/lib:/rego/lib:ro" \
   -v "${SCRIPT_DIR}/providers:/rego/providers:ro" \
   ${OPA_IMAGE} \
-  fmt --diff /rego/policy /rego/lib /rego/providers > /dev/null 2>&1; then
+  fmt --fail --diff /rego/policy /rego/lib /rego/providers > /dev/null 2>&1; then
     echo "OK"
 else
     echo "FAILED"

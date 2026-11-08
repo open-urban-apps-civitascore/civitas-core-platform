@@ -1,6 +1,7 @@
 package de.civitascore.portal.messaging.saga;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import de.civitascore.configadapter.model.dataset.Dashboard;
 import de.civitascore.configadapter.model.dataset.DataPipeline;
 import de.civitascore.configadapter.model.dataset.NamedApi;
 import de.civitascore.configadapter.model.saga.SagaType;
@@ -55,6 +56,8 @@ public sealed interface SagaTrigger
       List<StylePayload> styles,
       List<DataPipeline> dataPipelines,
       List<NamedApi> namedApis,
+      List<Dashboard> dashboards,
+      List<String> editorGroupIds,
       Map<String, Map<String, Object>> artifacts)
       implements SagaTrigger {
 
@@ -75,6 +78,8 @@ public sealed interface SagaTrigger
         List<StylePayload> styles,
         List<DataPipeline> dataPipelines,
         List<NamedApi> namedApis,
+        List<Dashboard> dashboards,
+        List<String> editorGroupIds,
         Map<String, Map<String, Object>> artifacts) {
       return new DatasetCreate(
           SagaType.DATASET_CREATE,
@@ -86,6 +91,8 @@ public sealed interface SagaTrigger
           styles,
           dataPipelines,
           namedApis,
+          dashboards,
+          editorGroupIds,
           artifacts);
     }
   }
@@ -105,6 +112,9 @@ public sealed interface SagaTrigger
       List<StylePayload> styles,
       List<DataPipeline> dataPipelines,
       List<NamedApi> namedApis,
+      List<Dashboard> dashboards,
+      List<String> deletedDashboardIds,
+      List<String> editorGroupIds,
       Map<String, Map<String, Object>> artifacts)
       implements SagaTrigger {
 
@@ -129,6 +139,9 @@ public sealed interface SagaTrigger
         List<StylePayload> styles,
         List<DataPipeline> dataPipelines,
         List<NamedApi> namedApis,
+        List<Dashboard> dashboards,
+        List<String> deletedDashboardIds,
+        List<String> editorGroupIds,
         Map<String, Map<String, Object>> artifacts) {
       return new DatasetUpdate(
           SagaType.DATASET_UPDATE,
@@ -144,6 +157,9 @@ public sealed interface SagaTrigger
           styles,
           dataPipelines,
           namedApis,
+          dashboards,
+          deletedDashboardIds,
+          editorGroupIds,
           artifacts);
     }
   }
@@ -181,13 +197,15 @@ public sealed interface SagaTrigger
   record DatasetDelete(
       SagaType sagaType,
       String datasetId,
+      String datasetName,
       String projectId,
       String frostBaseUrl,
       Map<String, String> routeIds,
       String serviceId,
       List<String> pipelineIds,
       List<DataSinkPayload> datasinks,
-      List<NamedApi> namedApis)
+      List<NamedApi> namedApis,
+      List<String> dashboardIds)
       implements SagaTrigger {
 
     public DatasetDelete {
@@ -200,23 +218,27 @@ public sealed interface SagaTrigger
 
     public static DatasetDelete of(
         String datasetId,
+        String datasetName,
         String projectId,
         String frostBaseUrl,
         Map<String, String> routeIds,
         String serviceId,
         List<String> pipelineIds,
         List<DataSinkPayload> datasinks,
-        List<NamedApi> namedApis) {
+        List<NamedApi> namedApis,
+        List<String> dashboardIds) {
       return new DatasetDelete(
           SagaType.DATASET_DELETE,
           datasetId,
+          datasetName,
           projectId,
           frostBaseUrl,
           routeIds,
           serviceId,
           pipelineIds,
           datasinks,
-          namedApis);
+          namedApis,
+          dashboardIds);
     }
   }
 }

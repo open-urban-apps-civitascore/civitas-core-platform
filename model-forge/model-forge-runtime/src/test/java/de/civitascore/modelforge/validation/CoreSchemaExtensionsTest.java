@@ -26,6 +26,7 @@ class CoreSchemaExtensionsTest {
 
     private static final List<String> CORE_SCHEMA_RESOURCES = List.of(
         "dataset.schema.json",
+        "dashboard.schema.json",
         "datasource.schema.json",
         "datasink.schema.json",
         "mapping.schema.json",

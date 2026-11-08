@@ -35,6 +35,7 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
       KAFKA_JMX_PORT: 9094
       KAFKA_JMX_HOSTNAME: localhost
+      KAFKA_HEAP_OPTS: "-Xms256M -Xmx512M"
     networks:
       - civitas-network
     healthcheck:
@@ -82,4 +83,3 @@ networks:
   civitas-network:
     name: civitas-network
     external: true
-

@@ -16,6 +16,7 @@ import {
   useUpdateReadyDatasetMeta,
   useUpdateReleasedDatasetMeta,
 } from '@/app/services/api/datasets/clientRequests'
+import { useGetVisualizations } from '@/app/services/api/visualizations/clientRequests'
 import { ContentCard } from '@/components/content-card/ContentCard'
 import { FooterElement } from '@/components/form/FooterElement'
 import { ExitWarningModal } from '@/components/modals/exit-warning-modal/ExitWarningModal'
@@ -30,9 +31,12 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form'
 import { useDatasetPermissions } from '@/hooks/use-dataset-permissions'
 import { useError } from '@/hooks/use-error'
+import { usePermissions } from '@/hooks/use-permissions'
 import { useRegisterUnsavedChanges } from '@/hooks/use-register-unsaved-changes'
 import { cn } from '@/lib/utils'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
 import { SelectOption } from '@/types/common'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import {
   CompletionStepData,
   Dataset,
@@ -44,6 +48,7 @@ import {
   DatasetUpdateApiData,
   DatasetUpdateApiSchema,
 } from '@/types/datasets'
+import { toVisualization } from '@/types/visualizations'
 import { isDatapoolScopeViolationError, isPipelineClosureInvalidError, isSagaInFlightError } from '@/utils/errors'
 import { pickDirtyValues } from '@/utils/form'
 
@@ -52,6 +57,7 @@ import { BaseInfoForm } from '../../components/BaseInfoForm'
 import { CompletionStep } from '../../components/CompletionStep'
 import { ApiList } from './ApiList'
 import { PipelineList } from './PipelineList'
+import { VisualizationList } from './VisualizationList'
 
 interface DatasetOverviewProps {
   dataset: Dataset
@@ -59,9 +65,10 @@ interface DatasetOverviewProps {
   roleCount: number
   testId?: string
   datapoolOptions: SelectOption[]
+  supersetPublicUrl?: string
 }
 export const DatasetOverview = (props: DatasetOverviewProps) => {
-  const { dataset, groupCount, roleCount, testId, datapoolOptions } = props
+  const { dataset, groupCount, roleCount, testId, datapoolOptions, supersetPublicUrl = '' } = props
   const t = useTranslations('datasets')
   const tCommon = useTranslations('common')
 
@@ -77,6 +84,13 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
 
   const { canEditMetadata, canRelease, canViewApis, canEditApis, canCreatePipeline, canDeletePipeline } =
     useDatasetPermissions(dataset)
+  const { hasScopedPermission } = usePermissions()
+  const canManageVisualizations = hasScopedPermission(
+    PERMISSION_NAMES.DATASET_UPDATE,
+    ASSIGNMENT_SCOPE_TYPES.DATASET,
+    dataset.id,
+    dataset.datapool?.id,
+  )
 
   const searchParams = useSearchParams()
   const mode = searchParams.get('mode')
@@ -84,6 +98,11 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
   const { pipelines, namedApis } = dataset
   const pipelineList = pipelines ?? []
   const namedApiList = namedApis ?? []
+  const { data: visualizationsData } = useGetVisualizations(dataset.id)
+  const visualizationList = useMemo(
+    () => (visualizationsData?.data ?? []).map(toVisualization),
+    [visualizationsData?.data],
+  )
 
   const [isReadOnly, setIsReadOnly] = useState(mode !== 'edit' || !canEditMetadata)
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
@@ -339,6 +358,23 @@ export const DatasetOverview = (props: DatasetOverviewProps) => {
             isOpenDataAccess={dataset.openDataAccess}
           />
         </>
+      ),
+    },
+    {
+      title: t('overview.completion.visualizations.title'),
+      showSeparator: true,
+      isCompleted: visualizationList.length > 0,
+      buttons: [],
+      content: (
+        <VisualizationList
+          supersetPublicUrl={supersetPublicUrl}
+          datasetId={dataset.id}
+          visualizations={visualizationList}
+          canEdit={canManageVisualizations}
+          canCreate={canManageVisualizations && isServerDraftState && isSelectedDraftState}
+          isEditing={!isReadOnly}
+          isOpenDataAccess={dataset.openDataAccess}
+        />
       ),
     },
     {

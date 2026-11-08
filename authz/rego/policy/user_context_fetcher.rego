@@ -124,11 +124,12 @@ external_id := decoded_userinfo.sub if {
 # When cache_duration_seconds > 0, OPA also caches across evaluations
 # using force_cache/force_cache_duration_seconds.
 
-# Uncached path (default): fresh fetch every evaluation
-fetched_user_context := response.body if {
+# Parameterized fetch — supply any Keycloak sub UUID as ext_id.
+# Used by the APISIX path (external_id from X-Userinfo) and the Trino path
+# (trino_user from input.context.identity.user) so both share one code path.
+fetch_context(ext_id) := response.body if {
 	cache_duration_seconds == 0
-	external_id
-	url := concat("", [authz_repository_url, "/", external_id])
+	url := concat("", [authz_repository_url, "/", ext_id])
 	response := http.send({
 		"method": "GET",
 		"url": url,
@@ -138,11 +139,9 @@ fetched_user_context := response.body if {
 	response.status_code == 200
 }
 
-# Cached path: reuse response across evaluations for cache_duration_seconds
-fetched_user_context := response.body if {
+fetch_context(ext_id) := response.body if {
 	cache_duration_seconds > 0
-	external_id
-	url := concat("", [authz_repository_url, "/", external_id])
+	url := concat("", [authz_repository_url, "/", ext_id])
 	response := http.send({
 		"method": "GET",
 		"url": url,
@@ -152,6 +151,10 @@ fetched_user_context := response.body if {
 		"force_cache_duration_seconds": cache_duration_seconds,
 	})
 	response.status_code == 200
+}
+
+fetched_user_context := fetch_context(external_id) if {
+	external_id
 }
 
 # =============================================================================

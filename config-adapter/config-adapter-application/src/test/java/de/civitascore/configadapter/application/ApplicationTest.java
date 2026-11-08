@@ -11,9 +11,12 @@ package de.civitascore.configadapter.application;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import de.civitascore.configadapter.Topics;
 import de.civitascore.configadapter.configuration.AppConfig;
 import de.civitascore.configadapter.exception.FatalAdapterException;
+import java.io.InputStream;
 import java.util.Optional;
+import java.util.Properties;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -58,6 +61,23 @@ class ApplicationTest {
     assertDoesNotThrow(
         () -> applicationWithoutSagaBootstrap("application.properties"),
         "Application should initialize successfully with valid multiple adapters configuration");
+  }
+
+  @Test
+  @DisplayName("Default Keycloak topics should include group sync events")
+  void testDefaultKeycloakTopicsIncludeGroups() throws Exception {
+    Properties properties = new Properties();
+    try (InputStream input =
+        ApplicationTest.class.getClassLoader().getResourceAsStream("application.properties")) {
+      assertNotNull(input, "application.properties should be available on the test classpath");
+      properties.load(input);
+    }
+
+    String topics = properties.getProperty("keycloak.topics", "");
+    assertAll(
+        () -> assertTrue(topics.contains(Topics.GROUP_CREATED.toString())),
+        () -> assertTrue(topics.contains(Topics.GROUP_UPDATED.toString())),
+        () -> assertTrue(topics.contains(Topics.GROUP_DELETED.toString())));
   }
 
   @Test

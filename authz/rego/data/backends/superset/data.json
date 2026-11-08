@@ -1,0 +1,9 @@
+{
+  "_comment": "Superset backend enforcement marker. The real per-dataset/per-dashboard permission model isn't implemented yet (see policy/superset.rego) — data_permissions is a bare allow-all/deny-all switch, nulled by generate-allowall.sh.",
+  "_version": "0.2.0",
+  "_backend_id": "superset",
+
+  "data_permissions": [
+    "DATASET_PAYLOAD_READ"
+  ]
+}

@@ -97,6 +97,9 @@ class GeoDataSetSagaIntegrationTest extends AbstractSagaIntegrationTest {
     try (Connection connection = DriverManager.getConnection(sinkDb.getJdbcUrl(), "geo", "geo");
         Statement statement = connection.createStatement()) {
       statement.execute("CREATE DATABASE flowable");
+      // PostGIS grants each provisioned Dataset schema to the Trino reader role. The isolated
+      // Testcontainers database must provide the same role as the local and deployed databases.
+      statement.execute("CREATE ROLE geoserver");
     }
     String flowableJdbcUrl = sinkDb.getJdbcUrl().replace("/geosink", "/flowable");
     sagaHelper =

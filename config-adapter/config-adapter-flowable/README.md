@@ -11,8 +11,8 @@ One BPMN process per saga type; the trigger's `sagaType` selects it.
 
 | `sagaType` | Process | Step order | On step failure |
 |---|---|---|---|
-| `DATASET_CREATE` | `dataset-create` | FROST branch → APISIX `CREATE_ROUTE` → geo branch → pipeline branch → GeoServer `PRUNE_FEATURE_TYPES` when `hasGeoSink` | reverse-order compensation; a failing prune triggers it too |
-| `DATASET_UPDATE` | `dataset-update` | FROST branch → APISIX `UPDATE_ROUTE` → geo branch → pipeline branch → GeoServer `PRUNE_FEATURE_TYPES` when `hasGeoSink` | reverse-order compensation; a failing prune is absorbed and the saga still succeeds |
+| `DATASET_CREATE` | `dataset-create` | FROST branch → APISIX `CREATE_ROUTE` → geo branch → pipeline branch → GeoServer `PRUNE_FEATURE_TYPES` when `hasGeoSink` → Superset registration when `hasDashboards` | reverse-order compensation; a failing prune triggers it too |
+| `DATASET_UPDATE` | `dataset-update` | FROST branch → APISIX `UPDATE_ROUTE` → Superset sync when `hasDashboards` → geo branch → pipeline branch → GeoServer `PRUNE_FEATURE_TYPES` when `hasGeoSink` | reverse-order compensation; a failing prune is absorbed and the saga still succeeds |
 | `DATASET_DELETE` | `dataset-delete` | pipeline branch → APISIX `DELETE_ROUTE` → geo teardown → FROST `DELETE_PROJECT` | best-effort: the chain continues, no compensation |
 | `DATASET_UNRELEASE` | `dataset-unrelease` | pipeline branch → APISIX `DELETE_ROUTE` | best-effort: the chain continues, no compensation |
 

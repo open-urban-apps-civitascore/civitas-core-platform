@@ -41,11 +41,11 @@ Fixed, non-configurable settings: `auto.offset.reset=earliest`, `enable.auto.com
 
 ### 1.3 Flowable State Database
 
-The saga orchestrator keeps its state in a dedicated PostgreSQL database. Only the password fails fast: url and username ship with packaged values, so an unset `FLOWABLE_JDBC_URL` connects to `localhost:5433` instead of failing.
+The saga orchestrator keeps its state in a dedicated PostgreSQL database. Only the password fails fast: url and username ship with packaged values, so an unset `FLOWABLE_JDBC_URL` connects to `localhost:5432` instead of failing.
 
 | Property | Env var | Default | Description |
 |---|---|---|---|
-| `flowable.jdbc.url` | `FLOWABLE_JDBC_URL` | `jdbc:postgresql://localhost:5433/flowable` | JDBC URL of the Flowable database. |
+| `flowable.jdbc.url` | `FLOWABLE_JDBC_URL` | `jdbc:postgresql://localhost:5432/flowable` | JDBC URL of the Flowable database. |
 | `flowable.jdbc.username` | `FLOWABLE_JDBC_USERNAME` | `flowable` | Database user. |
 | `flowable.jdbc.password` | `FLOWABLE_JDBC_PASSWORD` | *(required)* | Database password. An empty string is accepted; null is not. |
 
@@ -205,13 +205,32 @@ The datastore schema is derived per dataset and is not configurable. Enabling th
 |---|---|
 | `postgis.jdbc.url` | `POSTGIS_JDBC_URL` |
 | `postgis.jdbc.user` | `POSTGIS_JDBC_USER` |
+| `postgis.trino.reader-role` | `POSTGIS_TRINO_READER_ROLE` | Optional existing role used by Trino's Postgres connector. When set, the adapter grants it access to readable dataset views. Keep it equal to `GEODATA_DB_USER`. |
 | `postgis.jdbc.password` | `POSTGIS_JDBC_PASSWORD` |
 | `postgis.jdbc.maxPoolSize` | `POSTGIS_JDBC_MAXPOOLSIZE` |
 | `postgis.jdbc.connectionTimeoutMs` | `POSTGIS_JDBC_CONNECTIONTIMEOUTMS` |
 
 The PostGIS extension must already be installed in the target database; the adapter does not create it. The pool does not fail startup when the database is unreachable — failures surface per event as retryable.
 
-> **Three database identities must resolve to the same owning role.** Grants are emitted only for the optional per-dataset `readRole` carried in the sink payload, and only as schema privileges plus `SELECT` on the table — no write privilege is grantable at all. `postgis.jdbc.user`, `geoserver.postgis.user` and `nifi.postgis.user` never receive a grant, so all three must resolve to the schema-owning role. Splitting them silently breaks reads and writes rather than failing loudly.
+> **Database identities:** The optional per-dataset `readRole` receives schema privileges and `SELECT` on the physical table. When `postgis.trino.reader-role` is set, that existing role receives `USAGE` and `SELECT` on the readable view schema. `postgis.jdbc.user`, `geoserver.postgis.user` and `nifi.postgis.user` must have the privileges required for their own operations.
+
+**Superset**
+
+| Property | Env var | Purpose |
+|---|---|---|
+| `superset.url` | `SUPERSET_URL` | Superset REST API base URL. |
+| `superset.admin.username` | `SUPERSET_ADMIN_USERNAME` | Local Superset service account for adapter API calls. |
+| `superset.admin.password` | `SUPERSET_ADMIN_PASSWORD` | Password for that account; supply from a secret. |
+| `superset.trino.database-name` | `SUPERSET_TRINO_DATABASE_NAME` | Connection name managed by CORE, normally `CORE`. |
+| `superset.trino.url` | `SUPERSET_TRINO_URL` | Internal Trino URL used to create or reconcile that connection. |
+| `superset.trino.username` | `SUPERSET_TRINO_USERNAME` | Trino service identity stored in the Superset connection. |
+| `superset.trino.password` | `SUPERSET_TRINO_PASSWORD` | Trino service password; supply from a secret. |
+| `superset.trino.catalog` | `SUPERSET_TRINO_CATALOG` | Default catalog, normally `geodata`. |
+| `superset.trino.schema` | `SUPERSET_TRINO_SCHEMA` | Default schema, normally `information_schema`. |
+| `superset.trino.http-scheme` | `SUPERSET_TRINO_HTTP_SCHEME` | HTTP scheme used by the Trino driver. |
+| `superset.trino.tls-verify` | `SUPERSET_TRINO_TLS_VERIFY` | Whether the driver verifies Trino's TLS certificate. |
+
+The Superset adapter creates or updates the `CORE` connection through Superset's REST API when it handles a dataset registration. It resolves the connection ID by name. Do not configure a second `CORE` connection through Superset startup imports or a fixed numeric ID. The adapter also ensures the narrow dataset-creator role for dashboard editor groups. Trino and OPA remain responsible for data-plane access checks.
 
 **NiFi**
 

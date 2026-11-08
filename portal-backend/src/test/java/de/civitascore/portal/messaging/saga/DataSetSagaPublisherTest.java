@@ -3,6 +3,7 @@ package de.civitascore.portal.messaging.saga;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -16,6 +17,7 @@ import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.PipelineRuntimeState;
+import de.civitascore.portal.model.entity.Dashboard;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
@@ -25,6 +27,8 @@ import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.PipelineRuntimeStatus;
 import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.repository.AssignmentRepository;
+import de.civitascore.portal.repository.DashboardRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import java.nio.charset.StandardCharsets;
@@ -66,12 +70,15 @@ class DataSetSagaPublisherTest {
 
   @Mock private KafkaTemplate<String, String> kafkaTemplate;
   @Mock private DataSinkRepository dataSinkRepository;
+  @Mock private DashboardRepository dashboardRepository;
+  @Mock private AssignmentRepository assignmentRepository;
   @Mock private ModelRegistryGateway modelRegistryGateway;
 
   private DataSetSagaPublisher publisher;
 
   @BeforeEach
   void setUp() {
+    lenient().when(dashboardRepository.findByDataSetId(any())).thenReturn(List.of());
     publisher = publisher(10);
   }
 
@@ -81,6 +88,8 @@ class DataSetSagaPublisherTest {
         new JsonMapper(),
         new SagaProperties("test.saga.trigger", 5),
         dataSinkRepository,
+        dashboardRepository,
+        assignmentRepository,
         modelRegistryGateway,
         new PipelineClosureValidationProperties(maxDepth));
   }
@@ -332,6 +341,20 @@ class DataSetSagaPublisherTest {
       assertThat(ds.get("type").asString()).isEqualTo("POSTGIS");
       assertThat(ds.get("configuration").get("tableName").asString())
           .isEqualTo("sensor_observations");
+    }
+
+    @Test
+    void publishDeleteRequested_withDashboard_includesExternalDashboardId() {
+      DataSet dataSet = datasetWithPipeline(pipeline(UUID.randomUUID()));
+      Dashboard dashboard = new Dashboard();
+      dashboard.setExternalDashboardId("42");
+      when(dashboardRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(dashboard));
+      var jsonCaptor = stubKafkaSend();
+
+      publisher.publishDeleteRequested(dataSet);
+
+      var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      assertThat(payload.get("dashboardIds").get(0).asString()).isEqualTo("42");
     }
   }
 
@@ -1325,6 +1348,7 @@ class DataSetSagaPublisherTest {
 
       assertNamedApisInPayload(jsonCaptor.getValue());
       var payload = new JsonMapper().readTree(jsonCaptor.getValue());
+      assertThat(payload.get("datasetName").asString()).isEqualTo(dataSet.getName());
       var routeIds = payload.get("routeIds");
       assertThat(routeIds).isNotNull();
       assertThat(routeIds.size()).isEqualTo(2);

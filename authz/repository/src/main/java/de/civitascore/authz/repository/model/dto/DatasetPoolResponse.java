@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
  * DTO describing the authorization-relevant attributes of a single dataset.
  *
  * <p>Returned by the {@code /api/v1/dataset-pool/{datasetId}} endpoint and consumed by OPA. It
- * answers two questions in one round-trip:
+ * answers the dataset's pool membership and public-read state in one round-trip:
  *
  * <ul>
  *   <li>{@link #poolId} — the datapool the dataset belongs to (Epic 1 union inheritance: a
@@ -20,6 +20,8 @@ import lombok.NoArgsConstructor;
  *       (including anonymous callers) may read its <b>payload</b> (ABAC, see OPA open_data policy).
  *       Open data is payload-only; metadata/discovery stay authenticated. Never {@code null} —
  *       defaults to {@code false} (secure default).
+ *   <li>{@link #available} — whether the dataset is released and available. Anonymous dashboard
+ *       access requires this in addition to the open-data flag.
  * </ul>
  */
 @Data
@@ -27,6 +29,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class DatasetPoolResponse {
+  private UUID datasetId;
   private UUID poolId;
+  private String schemaName;
   private boolean openDataAccess;
+  private boolean available;
 }

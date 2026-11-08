@@ -47,8 +47,8 @@ test-authz-rego:
     - opa test policy lib providers test data -v || FAILED=1
     - test -z "$FAILED"
     - echo "Building OPA bundle (revision ${REVISION:-$CI_COMMIT_SHORT_SHA})..."
-    # Create bundle directory structure at /bundle (not /tmp/bundle) so that
-    # opa build embeds "bundle/" as prefix — matching the Dockerfile COPY paths.
+    # Use /tmp because the shell-enabled OPA CI image runs as non-root.
+    # opa build archives paths relative to this directory, matching the Dockerfile COPY paths.
     # Note: backends go at /bundle/backends/ (not data/backends/) because
     # OPA bundles treat data/ as a special prefix that conflicts with manifest roots
     - mkdir -p /bundle/backends

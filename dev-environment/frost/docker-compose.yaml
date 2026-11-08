@@ -31,6 +31,52 @@ services:
     ports:
       - 1883:1883
       - 8085:8080
+    healthcheck:
+      # FROST creates its schema during startup. Gate scoped-view creation on the API being ready.
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/FROST-Server/v1.1/ >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    networks:
+      - civitas-network
+
+
+  # Create the scoped views and least-privilege role used by Trino's frost catalog.
+  frost-migrations:
+    image: postgres:18.1-alpine
+    mem_limit: 256m
+    container_name: civitas-frost-migrations
+    restart: "no"
+    environment:
+      - FROST_DB_PASSWORD=${FROST_DB_PASSWORD:-changeme-generate-a-strong-password}
+      - FROST_DB_NAME=${FROST_DB_NAME:-sensorthings}
+      - FROST_TRINO_READER_PASSWORD=${FROST_TRINO_READER_PASSWORD:-dev-only-frost-trino-reader-password}
+      - FROST_DB_MIGRATION_USER=${FROST_DB_MIGRATION_USER:-admin}
+      - FROST_DB_MIGRATION_PASSWORD=${FROST_DB_MIGRATION_PASSWORD:-admin}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        attempt=0
+        until PGPASSWORD="$$FROST_DB_MIGRATION_PASSWORD" psql -v ON_ERROR_STOP=1 \
+            -h postgis-dev-env -U "$$FROST_DB_MIGRATION_USER" -d "$$FROST_DB_NAME" \
+            -v frost_trino_reader_password="$$FROST_TRINO_READER_PASSWORD" \
+            -f /migrations/01-create-scoped-views.sql; do
+          attempt=$$((attempt + 1))
+          if [ "$$attempt" -ge 10 ]; then
+            echo "frost-migrations: giving up after $$attempt attempts" >&2
+            exit 1
+          fi
+          echo "frost-migrations: attempt $$attempt failed, retrying in 3s..." >&2
+          sleep 3
+        done
+    volumes:
+      - ./migrations:/migrations:ro
+    depends_on:
+      web:
+        condition: service_healthy
     networks:
       - civitas-network
 

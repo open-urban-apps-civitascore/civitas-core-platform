@@ -1,3 +1,6 @@
+include:
+  - path: ../dev-environment/postgres/docker-compose.yml
+
 services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.3
@@ -33,28 +36,13 @@ services:
     networks:
       - civitas-network
 
-  postgres:
-    image: postgres:16-alpine
-    container_name: keycloak-db
-    environment:
-      POSTGRES_DB: keycloak
-      POSTGRES_USER: keycloak
-      POSTGRES_PASSWORD: keycloak
-    ports:
-      - "5433:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres/init-flowable.sql:/docker-entrypoint-initdb.d/init-flowable.sql:ro
-    networks:
-      - civitas-network
-
   keycloak:
     image: quay.io/keycloak/keycloak:23.0.3
     container_name: keycloak
     command: start-dev
     environment:
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_URL: jdbc:postgresql://postgis-dev-env:5432/keycloak
       KC_DB_USERNAME: keycloak
       KC_DB_PASSWORD: keycloak
       KEYCLOAK_ADMIN: admin
@@ -64,14 +52,12 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - postgres
+      postgis-dev-env:
+        condition: service_healthy
     networks:
       - civitas-network
 
 networks:
   civitas-network:
     name: civitas-network
-    driver: bridge
-
-volumes:
-  postgres_data:
+    external: true

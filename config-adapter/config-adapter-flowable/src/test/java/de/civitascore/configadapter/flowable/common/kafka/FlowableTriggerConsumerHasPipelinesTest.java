@@ -213,6 +213,46 @@ class FlowableTriggerConsumerHasPipelinesTest {
         Arguments.of(null, false));
   }
 
+  @Test
+  void deriveHasDashboards_whenLastDashboardWasDeleted_setsTrue() throws Exception {
+    byte[] trigger =
+        objectMapper.writeValueAsBytes(
+            Map.of(
+                "sagaType",
+                "DATASET_UPDATE",
+                "datasetId",
+                "ds-1",
+                "dashboards",
+                List.of(),
+                "deletedDashboardIds",
+                List.of("10")));
+
+    TriggerTestSupport.processTrigger(consumer, trigger);
+
+    assertEquals(Boolean.TRUE, capturedVariables().get("hasDashboards"));
+  }
+
+  @Test
+  void deriveHasDashboards_whenNoDashboardChanges_setsFalse() throws Exception {
+    byte[] trigger =
+        objectMapper.writeValueAsBytes(
+            Map.of(
+                "sagaType",
+                "DATASET_UPDATE",
+                "datasetId",
+                "ds-1",
+                "dashboards",
+                List.of(),
+                "deletedDashboardIds",
+                List.of(),
+                "hasDashboards",
+                true));
+
+    TriggerTestSupport.processTrigger(consumer, trigger);
+
+    assertEquals(Boolean.FALSE, capturedVariables().get("hasDashboards"));
+  }
+
   /**
    * Builds a minimal DATASET_CREATE trigger, including {@code field} only when {@code value} is
    * set.

@@ -10,6 +10,7 @@ import { PermissionItem } from '@/types/permissions'
 const DATA_PERMISSION_ROWS = [
   { key: 'dataset', prefix: 'DATASET' },
   { key: 'datasetPayload', prefix: 'DATASET_PAYLOAD' },
+  { key: 'datasetDashboard', prefix: 'DATASET_DASHBOARD' },
   { key: 'datasource', prefix: 'DATASOURCE' },
   { key: 'datastructure', prefix: 'DATASTRUCTURE' },
   { key: 'datapool', prefix: 'DATAPOOL' },

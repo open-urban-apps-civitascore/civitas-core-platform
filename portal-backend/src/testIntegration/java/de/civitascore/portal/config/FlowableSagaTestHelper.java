@@ -30,7 +30,7 @@ import org.apache.kafka.clients.admin.NewTopic;
 
 /**
  * In-process helper that runs the production saga stack — the Flowable orchestrator with real
- * FROST, APISIX, and PostGIS handlers — for E2E integration tests.
+ * FROST, APISIX, PostGIS, and Superset handlers — for E2E integration tests.
  *
  * <p>The pipeline-engine step ({@code nifi}) and the GeoServer steps are stubbed with
  * always-success handlers: pipeline deployment awaits the new engine handler, and GeoServer
@@ -107,6 +107,7 @@ public class FlowableSagaTestHelper implements AutoCloseable {
     handlers.put("frost", frostHandler);
     handlers.put("apisix", apisixHandler);
     handlers.put("postgis", postgisHandler);
+    handlers.put("superset", stubSuccess("superset"));
     handlers.put("geoserver", stubSuccess("geoserver"));
     handlers.put("nifi", stubSuccess("nifi"));
 

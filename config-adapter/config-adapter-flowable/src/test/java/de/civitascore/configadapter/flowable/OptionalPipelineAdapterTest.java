@@ -40,19 +40,21 @@ class OptionalPipelineAdapterTest {
   private FlowableResultPublisher resultPublisher;
   private SagaCommandHandler frostHandler;
   private SagaCommandHandler apisixHandler;
+  private SagaCommandHandler supersetHandler;
 
-  /** Builds an engine with ONLY frost + apisix registered — no pipeline/pipeline handler. */
+  /** Builds an engine with frost + apisix + superset registered — no pipeline/pipeline handler. */
   @BeforeEach
   void setUp() {
     frostHandler = FlowableTestSupport.mockHandler("frost");
     apisixHandler = FlowableTestSupport.mockHandler("apisix");
+    supersetHandler = FlowableTestSupport.mockHandler("superset");
     resultPublisher = mock(FlowableResultPublisher.class);
 
     processEngine =
         FlowableTestSupport.createTestEngine(
             Map.of(
                 "sagaHandlerRegistry",
-                FlowableTestSupport.registry(frostHandler, apisixHandler),
+                FlowableTestSupport.registry(frostHandler, apisixHandler, supersetHandler),
                 "resultPublisher",
                 resultPublisher));
 
@@ -70,6 +72,7 @@ class OptionalPipelineAdapterTest {
   void noPipelineSaga_completesWithoutPipelineHandler() {
     stubSuccess(frostHandler, "create-project", Map.of("projectId", "p1", "baseUrl", "http://f"));
     stubSuccess(apisixHandler, "create-route", Map.of("routeId", "r1"));
+    stubSuccess(supersetHandler, "register-superset", Map.of());
 
     start("dataset-create", createVars("saga-nopipe", false));
 
@@ -81,6 +84,7 @@ class OptionalPipelineAdapterTest {
   void pipelineSaga_withoutPipelineHandler_failsGracefully() {
     stubSuccess(frostHandler, "create-project", Map.of("projectId", "p1", "baseUrl", "http://f"));
     stubSuccess(apisixHandler, "create-route", Map.of("routeId", "r1"));
+    stubSuccess(supersetHandler, "register-superset", Map.of());
     // compensations succeed so the rollback path can complete
     when(frostHandler.handle(argThat(c -> c != null && "COMPENSATE_STEP".equals(c.type()))))
         .thenReturn(SagaCommandResult.compensationSuccess("saga-pipe", "create-project"));

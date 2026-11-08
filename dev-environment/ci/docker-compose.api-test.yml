@@ -98,7 +98,58 @@ services:
       timeout: 2s
       retries: 10
 
-  # Dedicated PostGIS sink for the NiFi pipeline adapter (mirrors the dev `civitas-geoserver-db`).
+  # Superset must use the same Trino data plane as the application stack. The two catalogs expose
+  # the PostGIS sink database and FROST's scoped views. This CI-only Trino has no host port and is
+  # reachable only inside api-test-net.
+  trino:
+    image: trinodb/trino:484@sha256:2704eb53935af5e582d63d6033e9bf99d20c325e9b0e30b1016ef59a4773979f
+    volumes:
+      - ./trino/catalog:/etc/trino/catalog:ro
+    depends_on:
+      postgres-sink:
+        condition: service_healthy
+      postgres-frost:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -lc 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  # FROST creates its schema lazily on startup. Add the scoped views before Superset registers
+  # virtual datasets that query them through Trino.
+  trino-frost-bootstrap:
+    # This is a one-shot migration. Keep it out of the normal `up --wait` stack;
+    # CI runs it explicitly after the persistent services are healthy.
+    profiles: [seed]
+    image: postgres:16-alpine@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
+    environment:
+      PGPASSWORD: frost-ci-password
+      FROST_TRINO_READER_PASSWORD: frost-ci-trino-reader
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        attempt=0
+        until psql -v ON_ERROR_STOP=1 -h postgres-frost -U sensorthings -d sensorthings \
+          -v frost_trino_reader_password="$${FROST_TRINO_READER_PASSWORD}" \
+          -f /migrations/01-create-scoped-views.sql; do
+          attempt=$$((attempt + 1))
+          if [ "$$attempt" -ge 10 ]; then
+            echo "FROST scoped-view migration failed after $$attempt attempts" >&2
+            exit 1
+          fi
+          sleep 3
+        done
+    volumes:
+      - ../frost/migrations/01-create-scoped-views.sql:/migrations/01-create-scoped-views.sql:ro
+    depends_on:
+      frost:
+        condition: service_healthy
+    restart: "no"
+
+  # Dedicated PostGIS sink for the NiFi pipeline adapter (the CI stack is isolated from local dev).
   # The PostGIS saga handler provisions the typed sink table here; the deployed NiFi flow's
   # PutDatabaseRecord writes rows into it. The postgis image auto-creates the PostGIS extension in
   # the default database, so geometry columns work out of the box.
@@ -113,6 +164,20 @@ services:
       test: ["CMD-SHELL", "pg_isready -d geosink -U geosink"]
       interval: 2s
       timeout: 2s
+      retries: 10
+
+  # Superset's own metadata DB (dashboards/datasets/users) — separate from postgres-sink, the
+  # data DB Superset's registered connection actually queries.
+  superset-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: superset
+      POSTGRES_USER: superset
+      POSTGRES_PASSWORD: superset
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U superset -d superset"]
+      interval: 5s
+      timeout: 5s
       retries: 10
 
   # ── Identity ───────────────────────────────────────────────
@@ -262,7 +327,7 @@ services:
         COPY providers /staging/providers
         COPY data/backends /staging/data/backends
         RUN mkdir -p /staging/data/config && \
-            printf '{"authz_repository_url":"http://authz-repository:8091/api/v1/user-context","dataset_pool_membership_url":"http://authz-repository:8091/api/v1/dataset-pool","authz_cache_duration_seconds":0}\n'\
+            printf '{"authz_repository_url":"http://authz-repository:8091/api/v1/user-context","dataset_pool_membership_url":"http://authz-repository:8091/api/v1/dataset-pool","dashboard_dataset_url":"http://authz-repository:8091/api/v1/dashboard-dataset","authz_cache_duration_seconds":0}\n'\
             > /staging/data/config/config.json
         FROM openpolicyagent/opa:1.21.1-static
         COPY --from=prep /staging/policies /policies
@@ -463,6 +528,45 @@ services:
     depends_on: *gs_dependencies
     healthcheck: *gs_healthcheck
 
+  # ── Superset 7 (dataset/dashboard registration through the shared Trino layer) ──────────
+  # config-adapter's "superset" saga handler registers PostGIS and FROST datasets against Trino.
+  superset:
+    build:
+      context: ./superset
+      args:
+        SUPERSET_BASE_IMAGE: ${SUPERSET_BASE_IMAGE:-apache/superset:7.0.0rc2@sha256:4256ab7d7e8e72e351896297fe25610d137ab56163b6ca360379b8c30c57fa64}
+      dockerfile_inline: |
+        ARG SUPERSET_BASE_IMAGE=apache/superset:7.0.0rc2@sha256:4256ab7d7e8e72e351896297fe25610d137ab56163b6ca360379b8c30c57fa64
+        FROM $${SUPERSET_BASE_IMAGE}
+        USER root
+        ENV PATH="/app/.venv/bin:${PATH}"
+        RUN uv pip install --python /app/.venv/bin/python 'trino[sqlalchemy]==0.337.0'
+        COPY superset_config.py /app/pythonpath/superset_config.py
+        COPY bootstrap-superset-ci.py start-superset-ci.sh /app/civitas/
+        RUN chmod 755 /app/civitas/start-superset-ci.sh \
+          && chown -R superset:superset /app/civitas /app/pythonpath
+        USER superset
+    entrypoint: ["/bin/bash", "/app/civitas/start-superset-ci.sh"]
+    environment:
+      PYTHONPATH: /app/pythonpath
+      SUPERSET_SECRET_KEY: dev-only-ci-superset-secret-key
+      SUPERSET_DB_HOST: superset-db
+      SUPERSET_DB_PORT: "5432"
+      SUPERSET_DB_NAME: superset
+      SUPERSET_DB_USER: superset
+      SUPERSET_DB_PASSWORD: superset
+      SUPERSET_ADMIN_USERNAME: admin
+      SUPERSET_ADMIN_PASSWORD: admin
+    depends_on:
+      superset-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8088/health >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
+
   # ── Application ──────────────────────────────────────────
 
   portal-backend:
@@ -503,8 +607,8 @@ services:
     image: ${CI_REGISTRY_IMAGE}/config-adapter:${IMAGE_TAG:-develop}
     environment:
       HEALTHCHECK_PORT: 8088
-      # ConfigAdapter names only — SagaCommandHandlers (nifi among them) are discovered from the
-      # classpath independently, so listing a handler-only module here aborts the boot.
+      # ConfigAdapter names only — SagaCommandHandlers (including NiFi and Superset) are discovered
+      # from the classpath independently, so listing a handler-only module here aborts the boot.
       ADAPTERS: keycloak,apisix,frost,postgis,geoserver
       EVENTHANDLER_NAME: kafka
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
@@ -564,6 +668,8 @@ services:
       POSTGIS_JDBC_URL: jdbc:postgresql://postgres-sink:5432/geosink
       POSTGIS_JDBC_USER: geosink
       POSTGIS_JDBC_PASSWORD: geosink
+      # Must match the database identity Trino uses for the geodata catalog.
+      POSTGIS_TRINO_READER_ROLE: geosink
       FLOWABLE_JDBC_URL: jdbc:postgresql://postgis-dev-env:5432/flowable
       FLOWABLE_JDBC_USERNAME: admin
       FLOWABLE_JDBC_PASSWORD: admin
@@ -578,6 +684,17 @@ services:
       GEOSERVER_POSTGIS_DATABASE: geosink
       GEOSERVER_POSTGIS_USER: geosink
       GEOSERVER_POSTGIS_PASSWORD: geosink
+      # Superset saga step (register-superset): registers a dataset/dashboard per POSTGIS sink.
+      SUPERSET_URL: http://superset:8088
+      SUPERSET_ADMIN_USERNAME: admin
+      SUPERSET_ADMIN_PASSWORD: admin
+      SUPERSET_TRINO_DATABASE_NAME: CORE
+      SUPERSET_TRINO_URL: http://trino:8080
+      SUPERSET_TRINO_USERNAME: trino
+      SUPERSET_TRINO_CATALOG: geodata
+      SUPERSET_TRINO_SCHEMA: information_schema
+      SUPERSET_TRINO_HTTP_SCHEME: http
+      SUPERSET_TRINO_TLS_VERIFY: "false"
     depends_on:
       # Flowable's JDBC URL targets postgis-dev-env — wait until it is healthy before boot.
       postgis-dev-env:
@@ -593,6 +710,9 @@ services:
       gateway:
         condition: service_healthy
       restconfig:
+        condition: service_healthy
+      # The saga's register-superset step (POSTGIS sinks) authenticates against Superset.
+      superset:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8088/health/ready"]

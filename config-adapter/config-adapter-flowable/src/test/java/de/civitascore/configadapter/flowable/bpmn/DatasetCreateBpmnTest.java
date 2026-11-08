@@ -48,6 +48,7 @@ class DatasetCreateBpmnTest {
   private SagaCommandHandler pipelineHandler;
   private SagaCommandHandler geoserverHandler;
   private SagaCommandHandler postgisHandler;
+  private SagaCommandHandler supersetHandler;
 
   @BeforeEach
   void setUp() {
@@ -56,6 +57,14 @@ class DatasetCreateBpmnTest {
     pipelineHandler = FlowableTestSupport.mockHandler("nifi");
     geoserverHandler = FlowableTestSupport.mockHandler("geoserver");
     postgisHandler = FlowableTestSupport.mockHandler("postgis");
+    supersetHandler = FlowableTestSupport.mockHandler("superset");
+    when(supersetHandler.handle(any()))
+        .thenAnswer(
+            invocation -> {
+              SagaCommandMessage command = invocation.getArgument(0);
+              return SagaCommandResult.success(
+                  command.sagaId(), command.stepId(), Map.of(), Map.of());
+            });
     stubGeoserverSuccess();
     stubPostgisSuccess();
 
@@ -65,6 +74,7 @@ class DatasetCreateBpmnTest {
     registry.register(pipelineHandler);
     registry.register(geoserverHandler);
     registry.register(postgisHandler);
+    registry.register(supersetHandler);
 
     processEngine = FlowableTestSupport.createTestEngine(Map.of("sagaHandlerRegistry", registry));
     runtimeService = processEngine.getRuntimeService();
@@ -285,7 +295,7 @@ class DatasetCreateBpmnTest {
     stubFrostSuccess();
     stubApisixSuccess();
 
-    ProcessInstance instance = startProcessWithGeo(false, true, true);
+    ProcessInstance instance = startProcessWithGeo(false, true, true, true, true);
     executeAllJobs();
 
     assertProcessCompleted(instance.getId());
@@ -299,6 +309,7 @@ class DatasetCreateBpmnTest {
     inOrder.verify(apisixHandler).handle(any());
     inOrder.verify(postgisHandler).handle(any());
     inOrder.verify(geoserverHandler, times(4)).handle(any());
+    verify(supersetHandler).handle(any());
 
     ArgumentCaptor<SagaCommandMessage> sink = ArgumentCaptor.forClass(SagaCommandMessage.class);
     verify(postgisHandler).handle(sink.capture());
@@ -309,6 +320,9 @@ class DatasetCreateBpmnTest {
     assertEquals(
         List.of("CREATE_WORKSPACE", "CREATE_DATASTORE", "PROVISION_LAYERS", "PRUNE_FEATURE_TYPES"),
         geo.getAllValues().stream().map(SagaCommandMessage::operation).toList());
+    ArgumentCaptor<SagaCommandMessage> superset = ArgumentCaptor.forClass(SagaCommandMessage.class);
+    verify(supersetHandler).handle(superset.capture());
+    assertEquals("REGISTER_DATASET", superset.getValue().operation());
   }
 
   @Test
@@ -495,6 +509,15 @@ class DatasetCreateBpmnTest {
 
   private ProcessInstance startProcessWithGeo(
       boolean hasPipelines, boolean hasGeoSink, boolean hasLayers, boolean hasFrostSink) {
+    return startProcessWithGeo(hasPipelines, hasGeoSink, hasLayers, hasFrostSink, false);
+  }
+
+  private ProcessInstance startProcessWithGeo(
+      boolean hasPipelines,
+      boolean hasGeoSink,
+      boolean hasLayers,
+      boolean hasFrostSink,
+      boolean hasDashboards) {
     Map<String, Object> variables = new HashMap<>();
     variables.put("sagaId", "saga-test-123");
     variables.put("datasetId", "ds-456");
@@ -504,6 +527,7 @@ class DatasetCreateBpmnTest {
     variables.put("hasGeoSink", hasGeoSink);
     variables.put("hasFrostSink", hasFrostSink);
     variables.put("hasLayers", hasLayers);
+    variables.put("hasDashboards", hasDashboards);
     if (hasPipelines) {
       variables.put("dataPipelines", List.of(Map.of("id", "p-1", "data", "{}")));
       variables.put("artifacts", Map.of());

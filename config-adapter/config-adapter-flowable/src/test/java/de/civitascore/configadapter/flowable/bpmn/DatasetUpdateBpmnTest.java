@@ -46,6 +46,7 @@ class DatasetUpdateBpmnTest {
   private SagaCommandHandler apisixHandler;
   private SagaCommandHandler pipelineHandler;
   private SagaCommandHandler geoserverHandler;
+  private SagaCommandHandler supersetHandler;
 
   @BeforeEach
   void setUp() {
@@ -53,16 +54,19 @@ class DatasetUpdateBpmnTest {
     apisixHandler = mock(SagaCommandHandler.class);
     pipelineHandler = mock(SagaCommandHandler.class);
     geoserverHandler = mock(SagaCommandHandler.class);
+    supersetHandler = mock(SagaCommandHandler.class);
     when(frostHandler.adapter()).thenReturn("frost");
     when(apisixHandler.adapter()).thenReturn("apisix");
     when(pipelineHandler.adapter()).thenReturn("nifi");
     when(geoserverHandler.adapter()).thenReturn("geoserver");
+    when(supersetHandler.adapter()).thenReturn("superset");
 
     SagaHandlerRegistry registry = new SagaHandlerRegistry();
     registry.register(frostHandler);
     registry.register(apisixHandler);
     registry.register(pipelineHandler);
     registry.register(geoserverHandler);
+    registry.register(supersetHandler);
 
     processEngine = FlowableTestSupport.createTestEngine(Map.of("sagaHandlerRegistry", registry));
     runtimeService = processEngine.getRuntimeService();
@@ -86,6 +90,7 @@ class DatasetUpdateBpmnTest {
   void shouldCompleteHappyPathWithPipelines() {
     stubFrostSuccess();
     stubApisixSuccess();
+    stubSupersetSuccess();
     stubPipelineSuccess();
 
     ProcessInstance instance = startProcess(true);
@@ -103,6 +108,7 @@ class DatasetUpdateBpmnTest {
   void shouldPruneFeatureTypesAfterTheLastFailableStep() {
     stubFrostSuccess();
     stubApisixSuccess();
+    stubSupersetSuccess();
     stubPipelineSuccess();
     stubGeoserverSuccess();
 
@@ -130,6 +136,7 @@ class DatasetUpdateBpmnTest {
   void shouldReportSuccessWhenOnlyTheFeatureTypePruneFails() {
     stubFrostSuccess();
     stubApisixSuccess();
+    stubSupersetSuccess();
     stubPipelineSuccess();
     when(geoserverHandler.handle(
             argThat(cmd -> cmd != null && "UPDATE_WORKSPACE".equals(cmd.operation()))))
@@ -156,6 +163,7 @@ class DatasetUpdateBpmnTest {
   void shouldSkipPruneWhenDatasetHasNoGeoSink() {
     stubFrostSuccess();
     stubApisixSuccess();
+    stubSupersetSuccess();
     stubPipelineSuccess();
 
     ProcessInstance instance = startProcess(true, false);
@@ -168,6 +176,7 @@ class DatasetUpdateBpmnTest {
   @Test
   void shouldSkipFrostUpdateWhenDatasetHasNoFrostSink() {
     stubApisixSuccess();
+    stubSupersetSuccess();
 
     ProcessInstance instance = startProcess(false, false, false);
     executeAllJobs();
@@ -175,6 +184,25 @@ class DatasetUpdateBpmnTest {
     assertProcessCompleted(instance.getId());
     verify(frostHandler, never()).handle(any());
     verify(apisixHandler).handle(any());
+  }
+
+  @Test
+  void shouldCallSupersetWhenTheLastDashboardWasDeleted() {
+    stubApisixSuccess();
+    stubSupersetSuccess();
+
+    Map<String, Object> variables = updateVariables(false, false, false);
+    variables.put("hasDashboards", true);
+    variables.put("dashboards", List.of());
+    variables.put("deletedDashboardIds", List.of("10"));
+
+    ProcessInstance instance =
+        runtimeService.startProcessInstanceByKey("dataset-update", variables);
+    executeAllJobs();
+
+    assertProcessCompleted(instance.getId());
+    verify(supersetHandler)
+        .handle(argThat(cmd -> cmd != null && "REGISTER_DATASET".equals(cmd.operation())));
   }
 
   @Test
@@ -195,6 +223,7 @@ class DatasetUpdateBpmnTest {
   void shouldSkipPipelineWhenNoPipelines() {
     stubFrostSuccess();
     stubApisixSuccess();
+    stubSupersetSuccess();
 
     ProcessInstance instance = startProcess(false);
     executeAllJobs();
@@ -237,6 +266,7 @@ class DatasetUpdateBpmnTest {
   void shouldCompensateInReverseOrderWhenPipelineFails() {
     stubFrostSuccess();
     stubApisixSuccess();
+    stubSupersetSuccess();
     stubPipelineFailure("Pipeline update failed");
     when(pipelineHandler.handle(
             argThat(cmd -> cmd != null && "COMPENSATE_STEP".equals(cmd.type()))))
@@ -282,6 +312,12 @@ class DatasetUpdateBpmnTest {
 
   private ProcessInstance startProcess(
       boolean hasPipelines, boolean hasGeoSink, boolean hasFrostSink) {
+    return runtimeService.startProcessInstanceByKey(
+        "dataset-update", updateVariables(hasPipelines, hasGeoSink, hasFrostSink));
+  }
+
+  private Map<String, Object> updateVariables(
+      boolean hasPipelines, boolean hasGeoSink, boolean hasFrostSink) {
     Map<String, Object> variables = new HashMap<>();
     variables.put("sagaId", "saga-test-123");
     variables.put("datasetId", "ds-456");
@@ -298,7 +334,7 @@ class DatasetUpdateBpmnTest {
       variables.put("artifacts", Map.of());
       variables.put("pipelineIds", List.of("p-1"));
     }
-    return runtimeService.startProcessInstanceByKey("dataset-update", variables);
+    return variables;
   }
 
   private void executeAllJobs() {
@@ -335,6 +371,16 @@ class DatasetUpdateBpmnTest {
                 "update-route",
                 Map.of("routeId", "r-1", "serviceId", "s-1"),
                 Map.of("routeId", "r-1", "serviceId", "s-1")));
+  }
+
+  private void stubSupersetSuccess() {
+    when(supersetHandler.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
+        .thenReturn(
+            SagaCommandResult.success(
+                "saga-test-123",
+                "sync-superset",
+                Map.of(),
+                Map.of("datasetIds", List.of(), "dashboardIds", List.of())));
   }
 
   private void stubPipelineSuccess() {

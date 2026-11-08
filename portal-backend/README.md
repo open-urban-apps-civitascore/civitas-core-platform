@@ -71,8 +71,7 @@ mvn spring-boot:run -Dspring-boot.run.profiles=local,postgres
 | Backend API       | localhost:8089/v1 | 8089 | –                 |
 | Config Adapter    | localhost         | 8088 | –                 |
 | Keycloak          | localhost         | 8080 | admin/admin       |
-| App Database      | localhost         | 5432 | admin/admin       |
-| Keycloak Database | localhost         | 5433 | keycloak/keycloak |
+| PostgreSQL/PostGIS | localhost        | 5432 | Separate databases and users |
 | Kafka             | localhost         | 9092 | –                 |
 | Kafka UI          | localhost         | 8090 | –                 |
 

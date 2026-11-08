@@ -43,7 +43,7 @@ COPY authz/rego/bundle.tar.gz /bundle.tar.gz
 RUN mkdir /out && \
     tar -xzf /bundle.tar.gz -C /out && \
     chmod -R a+rX /out && \
-    printf '{\n  "authz_repository_url": "http://civitas-authz-repository:8091/api/v1/user-context",\n  "dataset_pool_membership_url": "http://civitas-authz-repository:8091/api/v1/dataset-pool",\n  "authz_cache_duration_seconds": 0\n}\n' > /out/config.json
+    printf '{\n  "authz_repository_url": "http://civitas-authz-repository:8091/api/v1/user-context",\n  "dataset_pool_membership_url": "http://civitas-authz-repository:8091/api/v1/dataset-pool",\n  "dashboard_dataset_url": "http://civitas-authz-repository:8091/api/v1/dashboard-dataset",\n  "authz_cache_duration_seconds": 0\n}\n' > /out/config.json
 
 
 # Pinned: openpolicyagent/opa:1.21.1-static (the OPA of the cicd image that builds the bundle). Update digest on base image updates.

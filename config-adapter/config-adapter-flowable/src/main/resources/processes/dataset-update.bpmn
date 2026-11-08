@@ -32,14 +32,33 @@
       </extensionElements>
       <incoming>flow-frost-apisix</incoming>
       <incoming>flow-frost-skip</incoming>
-      <outgoing>flow-apisix-geo</outgoing>
+      <outgoing>flow-apisix-superset</outgoing>
     </serviceTask>
+    <exclusiveGateway id="dashboard-gateway" name="Has Dashboard?" default="flow-dashboard-skip">
+      <incoming>flow-apisix-superset</incoming>
+      <outgoing>flow-dashboard-sync</outgoing>
+      <outgoing>flow-dashboard-skip</outgoing>
+    </exclusiveGateway>
+    <serviceTask id="sync-superset" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate" name="Sync Superset Dashboard">
+      <extensionElements>
+        <flowable:field xsi:type="xs:anyType" name="adapterName" stringValue="superset"/>
+        <flowable:field xsi:type="xs:anyType" name="operation" stringValue="REGISTER_DATASET"/>
+        <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="sync-superset"/>
+      </extensionElements>
+      <incoming>flow-dashboard-sync</incoming>
+      <outgoing>flow-superset-geo</outgoing>
+    </serviceTask>
+    <boundaryEvent id="superset-error" name="Step Failed" attachedToRef="sync-superset">
+      <outgoing>flow-superset-error</outgoing>
+      <errorEventDefinition errorRef="stepFailedError"/>
+    </boundaryEvent>
     <boundaryEvent id="apisix-error" name="Step Failed" attachedToRef="update-route">
       <outgoing>flow-apisix-error</outgoing>
       <errorEventDefinition id="ErrorEventDefinition_2" errorRef="stepFailedError"/>
     </boundaryEvent>
     <exclusiveGateway id="geo-gateway" name="Has Geo Sink?" default="flow-geo-skip">
-      <incoming>flow-apisix-geo</incoming>
+      <incoming>flow-superset-geo</incoming>
+      <incoming>flow-dashboard-skip</incoming>
       <outgoing>flow-geo-workspace</outgoing>
       <outgoing>flow-geo-skip</outgoing>
     </exclusiveGateway>
@@ -107,6 +126,7 @@
       </extensionElements>
       <incoming>flow-comp-geoserver-apisix</incoming>
       <incoming>flow-pipeline-comp-apisix</incoming>
+      <incoming>flow-superset-error</incoming>
       <outgoing>flow-comp-apisix-frost</outgoing>
     </serviceTask>
     <exclusiveGateway id="frost-comp-gateway" name="Compensate FROST Project?" default="flow-frost-comp-skip">
@@ -173,7 +193,13 @@
     </sequenceFlow>
     <sequenceFlow id="flow-frost-skip" name="no" sourceRef="frost-gateway" targetRef="update-route"/>
     <sequenceFlow id="flow-frost-apisix" sourceRef="update-project" targetRef="update-route"/>
-    <sequenceFlow id="flow-apisix-geo" sourceRef="update-route" targetRef="geo-gateway"/>
+    <sequenceFlow id="flow-apisix-superset" sourceRef="update-route" targetRef="dashboard-gateway"/>
+    <sequenceFlow id="flow-dashboard-sync" name="yes" sourceRef="dashboard-gateway" targetRef="sync-superset">
+      <conditionExpression xsi:type="tFormalExpression">${execution.getVariable('hasDashboards') == true}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow-dashboard-skip" name="no" sourceRef="dashboard-gateway" targetRef="geo-gateway"/>
+    <sequenceFlow id="flow-superset-geo" sourceRef="sync-superset" targetRef="geo-gateway"/>
+    <sequenceFlow id="flow-superset-error" sourceRef="superset-error" targetRef="compensate-apisix"/>
     <sequenceFlow id="flow-geo-workspace" name="yes" sourceRef="geo-gateway" targetRef="update-workspace">
       <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_1">${execution.getVariable('hasGeoSink') == true}</conditionExpression>
     </sequenceFlow>
@@ -229,6 +255,24 @@
         <dc:Bounds height="50.0" width="110.0" x="306.0" y="150.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_3" labelStyle="BPMNLabelStyle_1">
           <dc:Bounds height="28.0" width="90.0" x="316.0" y="161.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_SyncSuperset" bpmnElement="sync-superset">
+        <dc:Bounds height="50.0" width="110.0" x="466.0" y="60.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_SyncSuperset" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="28.0" width="110.0" x="466.0" y="71.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_DashboardGateway" bpmnElement="dashboard-gateway" isMarkerVisible="true">
+        <dc:Bounds height="50.0" width="50.0" x="410.0" y="115.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_DashboardGateway" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="28.0" width="72.0" x="399.0" y="165.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_SupersetError" bpmnElement="superset-error">
+        <dc:Bounds height="36.0" width="36.0" x="558.0" y="92.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_SupersetError" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="14.0" width="62.0" x="545.0" y="128.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_ExclusiveGateway_1" bpmnElement="geo-gateway" isMarkerVisible="true">
@@ -398,11 +442,36 @@
         <di:waypoint xsi:type="dc:Point" x="200.0" y="280.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_17"/>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_4" bpmnElement="flow-apisix-geo" sourceElement="BPMNShape_ServiceTask_2" targetElement="BPMNShape_ExclusiveGateway_1">
+      <bpmndi:BPMNEdge id="BPMNEdge_ApisixSuperset" bpmnElement="flow-apisix-superset" sourceElement="BPMNShape_ServiceTask_2" targetElement="BPMNShape_DashboardGateway">
         <di:waypoint xsi:type="dc:Point" x="416.0" y="175.0"/>
-        <di:waypoint xsi:type="dc:Point" x="441.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="410.0" y="140.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_ApisixSuperset"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_DashboardSync" bpmnElement="flow-dashboard-sync" sourceElement="BPMNShape_DashboardGateway" targetElement="BPMNShape_SyncSuperset">
+        <di:waypoint xsi:type="dc:Point" x="435.0" y="115.0"/>
+        <di:waypoint xsi:type="dc:Point" x="435.0" y="85.0"/>
+        <di:waypoint xsi:type="dc:Point" x="466.0" y="85.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_DashboardSync"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_DashboardSkip" bpmnElement="flow-dashboard-skip" sourceElement="BPMNShape_DashboardGateway" targetElement="BPMNShape_ExclusiveGateway_1">
+        <di:waypoint xsi:type="dc:Point" x="460.0" y="140.0"/>
         <di:waypoint xsi:type="dc:Point" x="466.0" y="175.0"/>
-        <bpmndi:BPMNLabel id="BPMNLabel_18"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_DashboardSkip"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SupersetGeo" bpmnElement="flow-superset-geo" sourceElement="BPMNShape_SyncSuperset" targetElement="BPMNShape_ExclusiveGateway_1">
+        <di:waypoint xsi:type="dc:Point" x="576.0" y="85.0"/>
+        <di:waypoint xsi:type="dc:Point" x="610.0" y="85.0"/>
+        <di:waypoint xsi:type="dc:Point" x="610.0" y="175.0"/>
+        <di:waypoint xsi:type="dc:Point" x="516.0" y="175.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_SupersetGeo"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SupersetError" bpmnElement="flow-superset-error" sourceElement="BPMNShape_SupersetError" targetElement="BPMNShape_ServiceTask_6">
+        <di:waypoint xsi:type="dc:Point" x="576.0" y="128.0"/>
+        <di:waypoint xsi:type="dc:Point" x="600.0" y="128.0"/>
+        <di:waypoint xsi:type="dc:Point" x="600.0" y="240.0"/>
+        <di:waypoint xsi:type="dc:Point" x="518.0" y="240.0"/>
+        <di:waypoint xsi:type="dc:Point" x="518.0" y="280.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_SupersetErrorEdge"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_5" bpmnElement="flow-apisix-error" sourceElement="BPMNShape_BoundaryEvent_2" targetElement="BPMNShape_ExclusiveGateway_5">
         <di:waypoint xsi:type="dc:Point" x="360.0" y="218.0"/>

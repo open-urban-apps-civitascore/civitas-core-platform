@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -31,6 +31,10 @@ vi.mock('@/app/services/api/datasets/clientRequests', () => ({
 
 vi.mock('@/app/services/api/users/clientRequests', () => ({
   useGetCurrentUser: vi.fn(),
+}))
+
+vi.mock('@/app/services/api/visualizations/clientRequests', () => ({
+  useGetVisualizations: () => ({ data: undefined }),
 }))
 
 const mockCurrentUser = (permissions: PermissionName[]) => {
@@ -718,8 +722,18 @@ describe('DatasetOverview', () => {
 
     const namedApi = { id: 'api-1', name: 'My API', slug: 'my-api', standard: 'STA' as const }
 
-    const addApiButton = () => screen.queryByRole('button', { name: 'addButton' })
-    const addPipelineLink = () => screen.queryByRole('link', { name: 'addButton' })
+    const getCompletionStep = (title: string) => {
+      const heading = screen.getByRole('heading', { name: title })
+      const step = heading.closest('[data-testid="completionStep"]')
+      if (!step) throw new Error(`Completion step not found: ${title}`)
+      return within(step)
+    }
+
+    const dataFlowStep = () => getCompletionStep('overview.completion.dataFlow.title')
+    const visualizationsStep = () => getCompletionStep('overview.completion.visualizations.title')
+    const addApiButton = () => dataFlowStep().queryByRole('button', { name: 'addButton' })
+    const addPipelineLink = () => dataFlowStep().queryByRole('link', { name: 'addButton' })
+    const addVisualizationButton = () => visualizationsStep().queryByRole('button', { name: 'addButton' })
 
     const openApiCardMenu = () => userEvent.click(screen.getByTestId('apiCardMenu-my-api'))
 
@@ -737,6 +751,7 @@ describe('DatasetOverview', () => {
         renderComponent({ dataset: makeDraftDataset({ dataSetStatus }) })
         expect(addApiButton()).not.toBeInTheDocument()
         expect(addPipelineLink()).not.toBeInTheDocument()
+        expect(addVisualizationButton()).not.toBeInTheDocument()
       },
     )
 
@@ -751,6 +766,7 @@ describe('DatasetOverview', () => {
 
       expect(addApiButton()).not.toBeInTheDocument()
       expect(addPipelineLink()).not.toBeInTheDocument()
+      expect(addVisualizationButton()).not.toBeInTheDocument()
     })
 
     it('keeps the add buttons hidden on a READY dataset even when DRAFT is selected', async () => {
@@ -765,6 +781,7 @@ describe('DatasetOverview', () => {
 
       expect(addApiButton()).not.toBeInTheDocument()
       expect(addPipelineLink()).not.toBeInTheDocument()
+      expect(addVisualizationButton()).not.toBeInTheDocument()
     })
 
     it('shows the view, edit and delete actions on an api card', async () => {

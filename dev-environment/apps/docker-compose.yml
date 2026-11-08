@@ -86,7 +86,24 @@ services:
       # PostGIS adapter DDL connection — same database the GeoServer datastore reads
       POSTGIS_JDBC_URL: jdbc:postgresql://postgis-dev-env:5432/geoserver
       POSTGIS_JDBC_USER: geoserver
+      POSTGIS_TRINO_READER_ROLE: ${GEOSERVER_POSTGIS_USER:-geoserver}
       POSTGIS_JDBC_PASSWORD: ${GEOSERVER_DB_PASSWORD:-geoserver}
+      # Use Superset's container address. localhost:8088 is the adapter itself in this service.
+      SUPERSET_URL: http://civitas-superset:8088
+      # Use the dedicated local Superset service account for saga API calls. Superset forwards
+      # the authenticated username to Trino, where OPA allows this identity for provisioning.
+      SUPERSET_ADMIN_USERNAME: ${SUPERSET_SERVICE_USERNAME:-civitas-config-adapter}
+      SUPERSET_ADMIN_PASSWORD: ${SUPERSET_SERVICE_PASSWORD:-dev-only-civitas-superset-service-password}
+      # The Superset adapter owns the CORE database connection. It reconciles it by name
+      # and resolves the Superset ID instead of relying on a generated numeric ID.
+      SUPERSET_TRINO_DATABASE_NAME: ${SUPERSET_TRINO_DATABASE_NAME:-CORE}
+      SUPERSET_TRINO_URL: ${SUPERSET_TRINO_URL:-https://civitas-trino:8446}
+      SUPERSET_TRINO_USERNAME: ${TRINO_SUPERSET_SERVICE_USER:-superset_trino}
+      SUPERSET_TRINO_PASSWORD: ${TRINO_SUPERSET_SERVICE_PASSWORD:-dev-only-civitas-trino-superset-password}
+      SUPERSET_TRINO_CATALOG: ${SUPERSET_TRINO_CATALOG:-geodata}
+      SUPERSET_TRINO_SCHEMA: ${SUPERSET_TRINO_SCHEMA:-information_schema}
+      SUPERSET_TRINO_HTTP_SCHEME: ${SUPERSET_TRINO_HTTP_SCHEME:-https}
+      SUPERSET_TRINO_TLS_VERIFY: ${SUPERSET_TRINO_TLS_VERIFY:-false}
       # Dev master key for decrypting ENC(...) credentials at deploy time; must match
       # portal-backend's civitas.master-key.
       CIVITAS_MASTER_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
@@ -176,6 +193,7 @@ services:
     environment:
       HOSTNAME: "0.0.0.0"
       PORT: "3000"
+      SUPERSET_PUBLIC_URL: ${SUPERSET_PUBLIC_URL:-http://localhost:8092}
       # Auth.js (NextAuth v5) runs behind the container host; without trusting the host it
       # rejects the auth routes with "UntrustedHost" and renders the "Server error / problem
       # with the server configuration" page. Safe for local dev behind a known host.
@@ -223,10 +241,10 @@ services:
     container_name: civitas-model-forge-admin-ui
     restart: unless-stopped
     ports:
-      - "8092:8092"
+      - "8094:8094"
     environment:
       JAVA_TOOL_OPTIONS: "-XX:InitialRAMPercentage=20 -XX:MaxRAMPercentage=65"
-      SERVER_PORT: 8092
+      SERVER_PORT: 8094
       # Host is the Docker service name (not localhost); read-WRITE console over the real registry.
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgis-dev-env:5432/portal_backend?sslmode=disable
       SPRING_DATASOURCE_USERNAME: admin
@@ -234,7 +252,7 @@ services:
     networks:
       - civitas-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8092/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8094/"]
       interval: 15s
       timeout: 10s
       retries: 5

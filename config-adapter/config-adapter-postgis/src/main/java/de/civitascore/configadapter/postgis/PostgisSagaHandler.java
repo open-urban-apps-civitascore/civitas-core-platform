@@ -16,6 +16,7 @@ import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.model.dataset.DataStructureSchema;
+import de.civitascore.configadapter.model.dataset.DatasetSchemaNames;
 import de.civitascore.configadapter.model.dataset.WorkspaceNames;
 import de.civitascore.configadapter.model.postgis.ColumnConfig;
 import de.civitascore.configadapter.model.postgis.DbRoleConfig;
@@ -231,6 +232,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
     List<SinkSpec> sinks = parseSinks(command, true);
     List<Map<String, Object>> provisioned = new ArrayList<>();
     String schema = datasetSchemaName(command);
+    String readableSchema = readableDatasetSchemaName(command);
     List<String> createdTables = new ArrayList<>();
     AtomicBoolean createdSchema = new AtomicBoolean();
     ddl.runDdl(
@@ -244,6 +246,28 @@ public class PostgisSagaHandler implements SagaCommandHandler {
             }
             // createTable already emits CREATE SCHEMA for the table's schema.
             statements.addAll(dialect().createTable(table));
+            if (readableSchema != null) {
+              String alias = dialect().quoteIdent(readableSchema);
+              String sourceSchema = dialect().quoteIdent(table.getSchema());
+              String tableName = dialect().quoteIdent(table.getName());
+              statements.add("CREATE SCHEMA IF NOT EXISTS " + alias);
+              statements.add(
+                  "CREATE OR REPLACE VIEW "
+                      + alias
+                      + "."
+                      + tableName
+                      + " AS SELECT * FROM "
+                      + sourceSchema
+                      + "."
+                      + tableName);
+              // Trino's Postgres connector reader can inspect the alias view without access to the
+              // physical UUID schema. CORE OPA policy still checks the caller's dataset permission.
+              if (ddl.trinoReaderRole() != null && !ddl.trinoReaderRole().isBlank()) {
+                String readerRole = dialect().quoteIdent(ddl.trinoReaderRole());
+                statements.add("GRANT USAGE ON SCHEMA " + alias + " TO " + readerRole);
+                statements.add("GRANT SELECT ON " + alias + "." + tableName + " TO " + readerRole);
+              }
+            }
             if (sink.role() != null) {
               String password = ddl.resolvePassword(sink.role().getPassword());
               statements.addAll(dialect().createRole(sink.role(), password));
@@ -302,6 +326,14 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       if (sink.role() != null) {
         statements.addAll(dialect().dropRole(sink.role()));
       }
+      String readableSchema = readableDatasetSchemaName(command);
+      if (readableSchema != null) {
+        statements.add(
+            "DROP VIEW IF EXISTS "
+                + dialect().quoteIdent(readableSchema)
+                + "."
+                + dialect().quoteIdent(sink.table().getName()));
+      }
       statements.addAll(dialect().dropTable(sink.table().getSchema(), sink.table().getName()));
       // Collect the per-DataSet schema to drop after its tables (never public or a blank one).
       SchemaConfig schema = sink.schema();
@@ -322,6 +354,12 @@ public class PostgisSagaHandler implements SagaCommandHandler {
       SchemaConfig schema = new SchemaConfig();
       schema.setName(schemaName);
       statements.addAll(dialect().dropSchema(schema));
+    }
+    String readableSchema = readableDatasetSchemaName(command);
+    if (readableSchema != null) {
+      SchemaConfig aliasSchema = new SchemaConfig();
+      aliasSchema.setName(readableSchema);
+      statements.addAll(dialect().dropSchema(aliasSchema));
     }
     ddl.runDdl(statements, false, true);
 
@@ -648,6 +686,19 @@ public class PostgisSagaHandler implements SagaCommandHandler {
     return command.payload().get("datasetId") instanceof String datasetId && !datasetId.isBlank()
         ? WorkspaceNames.fromDatasetId(datasetId)
         : null;
+  }
+
+  /** Readable Trino schema backed by views; the physical PostGIS schema stays UUID based. */
+  private static String readableDatasetSchemaName(SagaCommandMessage command) {
+    Object id = command.payload().get("datasetId");
+    Object name = command.payload().get("datasetName");
+    if (!(id instanceof String datasetId)
+        || datasetId.isBlank()
+        || !(name instanceof String datasetName)
+        || datasetName.isBlank()) {
+      return null;
+    }
+    return DatasetSchemaNames.fromDataset(datasetName, java.util.UUID.fromString(datasetId));
   }
 
   /** A payload boolean; absent or non-{@code Boolean} → false. */

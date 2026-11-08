@@ -83,7 +83,7 @@ export const CompletionStep = (props: CompletionStepProps) => {
               ))}
         </div>
       </div>
-      {step.description && <div className="border-t mt-4" />}
+      {(step.description || step.showSeparator) && <div className="border-t mt-4" />}
       {step.content && (
         <div data-testid="completionStepContent" className="font-semibold mt-6 ml-8.5">
           {step.content}

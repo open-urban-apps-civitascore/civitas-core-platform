@@ -118,6 +118,11 @@
 			<artifactId>awaitility</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>com.squareup.okhttp3</groupId>
+			<artifactId>okhttp-jvm</artifactId>
+			<scope>test</scope>
+		</dependency>
 
 		<!-- E2E integration test: adapter modules for real handler execution -->
 		<dependency>

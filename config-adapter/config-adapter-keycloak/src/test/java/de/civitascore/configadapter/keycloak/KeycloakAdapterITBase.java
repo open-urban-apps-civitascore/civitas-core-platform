@@ -131,7 +131,10 @@ abstract class KeycloakAdapterITBase {
             Topics.REALM_DELETED.toString(),
             Topics.CLIENT_CREATED.toString(),
             Topics.CLIENT_UPDATED.toString(),
-            Topics.CLIENT_DELETED.toString()));
+            Topics.CLIENT_DELETED.toString(),
+            Topics.GROUP_CREATED.toString(),
+            Topics.GROUP_UPDATED.toString(),
+            Topics.GROUP_DELETED.toString()));
     AppConfig config = new AppConfig(new MapConfiguration(props));
 
     adapter = new KeycloakAdapter();
@@ -222,7 +225,10 @@ abstract class KeycloakAdapterITBase {
             Topics.REALM_DELETED.toString(),
             Topics.CLIENT_CREATED.toString(),
             Topics.CLIENT_UPDATED.toString(),
-            Topics.CLIENT_DELETED.toString()));
+            Topics.CLIENT_DELETED.toString(),
+            Topics.GROUP_CREATED.toString(),
+            Topics.GROUP_UPDATED.toString(),
+            Topics.GROUP_DELETED.toString()));
     props.putAll(additionalProps);
     AppConfig config = new AppConfig(new MapConfiguration(props));
     KeycloakAdapter customAdapter = new KeycloakAdapter();

@@ -12,10 +12,13 @@ import rego.v1
 required_config := {
 	"authz_repository_url",
 	"dataset_pool_membership_url",
+	"dashboard_dataset_url",
 }
 
 # Keys with a policy-side default, safe to omit from an environment's config.
 optional_config := {
 	"authz_cache_duration_seconds",
 	"authz_request_timeout",
+	"trino_impersonator_users",
+	"trino_local_admin_user",
 }

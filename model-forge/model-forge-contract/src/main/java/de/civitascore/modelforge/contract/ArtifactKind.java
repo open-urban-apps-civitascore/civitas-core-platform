@@ -15,5 +15,6 @@ public enum ArtifactKind {
     MAPPING,
     PIPELINE,
     DATA_SOURCE,
-    DATA_SINK
+    DATA_SINK,
+    DASHBOARD
 }

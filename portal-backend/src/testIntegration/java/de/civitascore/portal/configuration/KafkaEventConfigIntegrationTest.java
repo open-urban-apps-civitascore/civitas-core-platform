@@ -81,7 +81,11 @@ class KafkaEventConfigIntegrationTest {
     assertThat(deliveries)
         .containsExactly(UNPROCESSABLE, UNPROCESSABLE, UNPROCESSABLE, UNPROCESSABLE, NEXT);
     assertThat(appender.list)
-        .filteredOn(event -> event.getLevel() == Level.ERROR)
+        .filteredOn(
+            event ->
+                event.getLevel() == Level.ERROR
+                    && event.getFormattedMessage().contains("Discarded")
+                    && event.getFormattedMessage().contains(RETRYABLE_TOPIC))
         .singleElement()
         .satisfies(
             event -> {

@@ -16,6 +16,7 @@ dev-environment/
 ├── keycloak/   # Keycloak only
 ├── apisix/     # API Gateway + Authorization (OPA, AuthZ Repository)
 ├── frost/      # FROST IoT Server
+├── trino-superset/ # Dashboard stack (Trino + Superset)
 ├── geoserver/  # GeoServer OGC Services (OWS)
 └── nifi/       # Apache NiFi (data integration / pipeline engine)
 ```
@@ -60,7 +61,7 @@ cd dev-environment
 ```
 
 This script:
-1. Starts all infrastructure services (Kafka, PostgreSQL, Keycloak, APISIX, FROST, NiFi, etc.)
+1. Starts infrastructure services (Kafka, PostgreSQL, Keycloak, APISIX, OPA, FROST, NiFi, Trino and Superset)
 2. Asks how you want to start each backend service:
    - **auto** (recommended): builds JARs and runs as Docker containers — no local JDK required at runtime
    - **ide**: prints IDE setup instructions for debugging in Eclipse/IntelliJ (requires Java 25+ & Maven locally)
@@ -77,6 +78,7 @@ Options:
   --config-adapter=auto|cmd|ide    Config Adapter startup (default: prompt)
   --backend=auto|cmd|ide           Portal Backend startup (default: prompt)
   --frontend=auto|cmd|manual       Portal Frontend startup (default: prompt)
+  --no-dashboard                   Do not start Trino and Superset
   --keycloak-secret=SECRET         Keycloak client secret for portal-frontend
   -h, --help                       Show this help message
 
@@ -100,6 +102,9 @@ Startup modes:
 
 # Provide the Keycloak client secret directly
 ./start-portal-dev.sh --backend=auto --keycloak-secret=<secret>
+
+# Start the platform without the Trino/Superset dashboard stack
+./start-portal-dev.sh --no-dashboard
 ```
 
 ### Keycloak Client Secret
@@ -121,7 +126,7 @@ cd dev-environment
 
 The `/postgres` Compose stack is the only database server in the local development
 environment. It runs PostGIS and creates separate databases and roles for the portal,
-Keycloak, FROST, GeoServer, Model Forge, and the NiFi demo. The services connect
+Keycloak, FROST, GeoServer, Superset, Model Forge, and the NiFi demo. The services connect
 to `postgis-dev-env` on `civitas-network`. Host tools connect to `localhost:5432`.
 
 Start this stack before you start an individual service Compose file. The main
@@ -225,7 +230,24 @@ cd kafka     && docker compose up -d
 cd postgres  && docker compose up -d
 cd keycloak  && docker compose up -d
 cd apisix    && docker compose up -d
+cd trino-superset && docker compose up -d --build
 ```
+
+To start the complete dev environment and then build CIVITAS Superset on the locally
+built `superset-local:latest` image (Superset 7.0rc2), use:
+
+```bash
+./start-trino-superset-local.sh
+```
+
+This accepts the same options as `start-portal-dev.sh`. The regular
+`start-portal-dev.sh` and the direct Compose command continue to use the configured
+registry base image.
+
+The Superset image adds the Trino SQLAlchemy driver. Local Python configuration and
+bootstrap files are mounted into the container. The Config Adapter creates or updates
+Superset's `CORE` Trino connection through the Superset API when it registers a dataset;
+Superset startup does not create a second connection.
 
 ---
 
@@ -236,6 +258,8 @@ cd apisix    && docker compose up -d
 | Keycloak         | http://localhost:8080                           | admin / admin |
 | Portal Backend   | http://localhost:8089                           | Swagger: /v1/swagger-ui.html |
 | Config Adapter   | http://localhost:8088                           | |
+| Trino UI         | https://localhost:8446/ui/                      | OIDC via Keycloak, self-signed dev certificate |
+| Superset         | http://localhost:8092                           | OIDC via Keycloak |
 | APISIX Gateway   | http://localhost:9080                           | Routes to backend via OPA authz |
 | OPA              | http://localhost:8181                           | Policy decision point |
 | AuthZ Repository | http://localhost:8091                           | User authorization context |
@@ -246,6 +270,14 @@ cd apisix    && docker compose up -d
 | Apache NiFi      | https://localhost:8443/nifi                     | OIDC via Keycloak (no single-user login) |
 
 ---
+
+## Dashboard Login
+
+For Trino Web UI and Superset OIDC login, use the central dev user of the
+`civitas-core` realm:
+
+- Username: `dev@civitas.local`
+- Password: `dev123`
 
 ## Stopping
 
@@ -274,6 +306,7 @@ cd kafka     && docker compose down
 cd keycloak  && docker compose down
 cd postgres  && docker compose down
 cd frost     && docker compose down
+cd trino-superset && docker compose down
 cd geoserver && docker compose down
 ```
 

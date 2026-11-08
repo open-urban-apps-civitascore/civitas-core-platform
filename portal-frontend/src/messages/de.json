@@ -247,7 +247,8 @@
     "datastructures": "Datenstrukturen",
     "access-management": "Zugriffsmanagement",
     "apis": "APIs",
-    "datapools": "Datenpools"
+    "datapools": "Datenpools",
+    "visualizations": "Visualisierungen"
   },
   "datasets": {
     "title": "Datensätze",
@@ -446,7 +447,7 @@
               "persistencePlaceholder": "Persistenz auswählen",
               "slug": "Slug",
               "urlPreview": "URL-Vorschau",
-              "name": "Bezeichnung",
+              "name": "Titel",
               "nameHint": "Beschreibt, welche Daten diese API bereitstellt.",
               "description": "Beschreibung",
               "descriptionHint": "max. 150 Zeichen, optional",
@@ -550,6 +551,93 @@
               "layerName": {
                 "tooLong": "Technischer Name darf maximal 80 Zeichen lang sein"
               }
+            }
+          }
+        },
+        "visualizations": {
+          "title": "Visualisierungen",
+          "empty": "Noch keine Visualisierungen vorhanden",
+          "noDescription": "Keine Beschreibung vorhanden",
+          "addButton": "Visualisierung hinzufügen",
+          "dashboard": "Dashboard",
+          "dashboardSubtitle": "Diagramme",
+          "card": {
+            "actions": {
+              "edit": "Bearbeiten",
+              "view": "Anzeigen",
+              "delete": "Löschen",
+              "release": "Dashboard freigeben",
+              "unrelease": "Freigabe aufheben",
+              "openInSuperset": "In Superset öffnen"
+            },
+            "notYetProvisionedTooltip": "Das Dashboard ist in Superset noch nicht verfügbar.",
+            "deleteConfirm": {
+              "title": "Visualisierung löschen",
+              "description": "Bist du sicher, dass du \"{name}\" löschen möchtest? Diese Aktion kann nicht rückgängig gemacht werden.",
+              "confirm": "Löschen"
+            },
+            "messages": {
+              "deleteSuccess": "Visualisierung erfolgreich gelöscht",
+              "deleteError": "Beim Löschen ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+              "releaseSuccess": "Dashboard wurde freigegeben",
+              "unreleaseSuccess": "Freigabe des Dashboards wurde aufgehoben",
+              "releaseError": "Der Veröffentlichungsstatus konnte nicht geändert werden. Bitte versuche es erneut."
+            }
+          },
+          "config": {
+            "title": {
+              "dashboard": "Neues Dashboard"
+            },
+            "type": {
+              "dashboard": "Dashboard"
+            },
+            "releasedBadge": "Veröffentlicht",
+            "unreleasedBadge": "Entwurf",
+            "protectedBadge": "Geschützt",
+            "protectedBadgeTooltip": "Der Zugriff auf diese Dashboard ist eingeschränkt und erfordert entsprechende Berechtigungen.",
+            "openDataBadge": "Open Data",
+            "tabs": {
+              "basicInfo": "Basisinformationen",
+              "options": "Optionen"
+            },
+            "options": {
+              "standalone": {
+                "title": "Darstellung",
+                "description": "Lege fest, welche Elemente Superset um das Dashboard herum anzeigt.",
+                "label": "Dashboard-Ansicht",
+                "values": {
+                  "0": "Normale Dashboard-Ansicht",
+                  "1": "Obere Navigation ausblenden",
+                  "2": "Obere Navigation und Titel ausblenden",
+                  "3": "Obere Navigation, Titel und Tabs ausblenden"
+                }
+              },
+              "filters": {
+                "title": "Filter",
+                "description": "Steuere die Filterleiste und ihren Anfangszustand.",
+                "showLabel": "Filterleiste anzeigen",
+                "showDescription": "Wenn deaktiviert, zeigt Superset das Dashboard ohne Filterleiste.",
+                "expansionLabel": "Anfangszustand der Filterleiste",
+                "expansionValues": {
+                  "DEFAULT": "Superset-Standard",
+                  "COLLAPSED": "Eingeklappt",
+                  "EXPANDED": "Ausgeklappt"
+                }
+              }
+            },
+            "form": {
+              "sectionTitle": "Basisinformationen",
+              "type": "Typ",
+              "title": "Titel",
+              "titlePlaceholder": "",
+              "description": "Beschreibung",
+              "descriptionHint": "max. 150 Zeichen, optional",
+              "descriptionPlaceholder": "Optionale Beschreibung, falls später benötigt."
+            },
+            "messages": {
+              "createSuccess": "Visualisierung erfolgreich erstellt",
+              "updateSuccess": "Visualisierung erfolgreich aktualisiert",
+              "saveError": "Beim Speichern ist ein Fehler aufgetreten. Bitte versuche es erneut."
             }
           }
         }
@@ -912,6 +1000,7 @@
       "dataPermissions": {
         "dataset": "Datensatz",
         "datasetPayload": "Datensatz-Payload",
+        "datasetDashboard": "Datensatz-Dashboard",
         "datasource": "Datenquelle",
         "datastructure": "Datenstruktur",
         "datapool": "Datenpool",

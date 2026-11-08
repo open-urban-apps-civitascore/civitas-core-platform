@@ -28,6 +28,8 @@ import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.Assignment;
+import de.civitascore.portal.model.entity.Dashboard;
+import de.civitascore.portal.model.entity.DashboardSource;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
@@ -39,6 +41,8 @@ import de.civitascore.portal.model.input.DataSetMetaInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.model.input.assignment.AssignmentScopedInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.repository.DashboardRepository;
+import de.civitascore.portal.repository.DashboardSourceRepository;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
@@ -82,6 +86,8 @@ class DataSetServiceTest {
   @Mock private LayerRepository layerRepository;
   @Mock private DataSetMapper dataSetMapper;
   @Mock private DataPoolRepository dataPoolRepository;
+  @Mock private DashboardRepository dashboardRepository;
+  @Mock private DashboardSourceRepository dashboardSourceRepository;
   @Mock private AssignmentFactory assignmentFactory;
   @Mock private AssignmentChangeAuthorizer assignmentChangeAuthorizer;
   @Mock private DataSetSagaPublisher sagaPublisher;
@@ -113,6 +119,8 @@ class DataSetServiceTest {
         layerRepository,
         dataSetMapper,
         dataPoolRepository,
+        dashboardRepository,
+        dashboardSourceRepository,
         assignmentFactory,
         assignmentChangeAuthorizer,
         sagaPublisher,
@@ -2205,6 +2213,28 @@ class DataSetServiceTest {
 
       verify(dataSetRepository).delete(ds);
       verify(sagaPublisher, never()).publishDeleteRequested(any());
+    }
+
+    @Test
+    void deleteById_withDashboard_deletesDashboardBeforeDataset() {
+      UUID id = UUID.randomUUID();
+      DataSet dataset = readyDataSet(id);
+      dataset.setProvisioned(false);
+      Dashboard dashboard = new Dashboard();
+      DashboardSource dashboardSource = new DashboardSource();
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(dataset));
+      when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of());
+      when(dashboardRepository.findByDataSetId(id)).thenReturn(List.of(dashboard));
+      when(dashboardSourceRepository.findByMappedDatasetId(id))
+          .thenReturn(List.of(dashboardSource));
+
+      createService().deleteById(id);
+
+      InOrder order = inOrder(dashboardRepository, dataSetRepository);
+      order.verify(dashboardRepository).deleteAll(List.of(dashboard));
+      order.verify(dashboardRepository).flush();
+      order.verify(dataSetRepository).delete(dataset);
+      verify(dashboardSourceRepository).deleteAll(List.of(dashboardSource));
     }
 
     private static final String PIPELINE_URN =

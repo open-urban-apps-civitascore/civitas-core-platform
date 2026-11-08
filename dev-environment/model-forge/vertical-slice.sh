@@ -44,8 +44,8 @@ KC_USERNAME="${KC_USERNAME:-dev@civitas.local}"
 KC_PASSWORD="${KC_PASSWORD:-dev123}"
 
 # --- Admin UI, pointed at portal-backend's DB / model_forge schema -----------
-# The main stack publishes the Admin UI on 8092; use another port for this
-# by-hand instance. 8090=Kafka UI and 8091=authz-repository.
+# The main stack publishes the Admin UI on 8094; use another port for this
+# by-hand instance. 8090=Kafka UI, 8091=authz-repository and 8092=Superset.
 ADMIN_UI_PORT="${ADMIN_UI_PORT:-8095}"
 PORTAL_DB_URL="${PORTAL_DB_URL:-jdbc:postgresql://localhost:5432/portal_backend?sslmode=disable}"
 PORTAL_DB_USER="${PORTAL_DB_USER:-admin}"

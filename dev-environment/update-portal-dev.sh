@@ -151,7 +151,7 @@ rebuild_image_and_recreate() {
     local service="$1"
     local container="$2"
     echo "  Rebuilding image and recreating container ($service)..."
-    ( cd "$APPS_DIR" && docker compose build "$service" && docker compose up -d --force-recreate --no-deps "$service" )
+    ( cd "$APPS_DIR" && docker compose build "$service" && docker compose --env-file "$PROJECT_ROOT/dev-environment/trino-superset/.env" up -d --force-recreate --no-deps "$service" )
     wait_healthy "$container"
 }
 

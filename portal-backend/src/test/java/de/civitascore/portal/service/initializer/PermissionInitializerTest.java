@@ -144,7 +144,7 @@ class PermissionInitializerTest {
 
     // orElseThrow() below enforces presence, so no separate contains() check is needed.
     for (PermissionName dashboardPermission :
-        List.of(PermissionName.DATASET_DASHBOARD_READ, PermissionName.DATASET_DASHBOARD_WRITE)) {
+        List.of(PermissionName.DATASET_DASHBOARD_READ, PermissionName.DATASET_DASHBOARD_UPDATE)) {
       Permission seeded =
           created.stream()
               .filter(p -> p.getName().equals(dashboardPermission.name()))

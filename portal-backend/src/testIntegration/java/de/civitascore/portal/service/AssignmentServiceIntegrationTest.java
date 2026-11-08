@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
 import de.civitascore.portal.config.PortalTestDataFactory;
+import de.civitascore.portal.model.embedded.RoleDefault;
 import de.civitascore.portal.model.embedded.RoleType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Assignment;
@@ -14,6 +15,7 @@ import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.input.assignment.AssignmentInputDTO;
+import de.civitascore.portal.repository.AssignmentRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.List;
@@ -30,6 +32,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
   @Autowired private AssignmentService assignmentService;
+  @Autowired private AssignmentRepository assignmentRepository;
   @Autowired private PortalTestDataFactory portalData;
 
   private Group testGroup;
@@ -60,6 +63,24 @@ class AssignmentServiceIntegrationTest extends BaseKeycloakIntegrationTest {
   @AfterEach
   void cleanup() {
     portalData.cleanAll();
+  }
+
+  @Test
+  @DisplayName("resolves dashboard editor groups from effective dataset scopes")
+  void resolvesDashboardEditorGroupsFromDatasetScopes() {
+    Role steward = portalData.role(RoleDefault.DATA_STEWARD);
+    Group direct = portalData.group();
+    Group pool = portalData.group();
+    Group unrelated = portalData.group();
+    portalData.assignment(direct, steward, testDataSet);
+    portalData.assignment(pool, steward, testDataPool);
+    portalData.assignment(unrelated, steward, portalData.dataSet());
+
+    List<UUID> editors =
+        assignmentRepository.findGroupIdsWithDatasetPermission(
+            "DATASET_UPDATE", testDataSet.getId(), testDataPool.getId());
+
+    assertThat(editors).containsExactlyInAnyOrder(direct.getId(), pool.getId());
   }
 
   @Nested

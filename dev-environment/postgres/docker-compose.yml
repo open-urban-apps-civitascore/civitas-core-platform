@@ -13,6 +13,9 @@ services:
       FROST_DB_PASSWORD: ${FROST_DB_PASSWORD:-changeme-generate-a-strong-password}
       GEOSERVER_DB_NAME: ${GEOSERVER_DB_NAME:-geoserver}
       GEOSERVER_DB_PASSWORD: ${GEOSERVER_DB_PASSWORD:-geoserver}
+      SUPERSET_DB_NAME: ${SUPERSET_DB_NAME:-superset}
+      SUPERSET_DB_USER: ${SUPERSET_DB_USER:-superset}
+      SUPERSET_DB_PASSWORD: ${SUPERSET_DB_PASSWORD:-dev-only-civitas-superset-db-password}
       MODEL_FORGE_DB_NAME: ${MODEL_FORGE_DB_NAME:-model_forge_admin}
       MODEL_FORGE_DB_USER: ${MODEL_FORGE_DB_USER:-model_forge}
       MODEL_FORGE_DB_PASSWORD: ${MODEL_FORGE_DB_PASSWORD:-model_forge}

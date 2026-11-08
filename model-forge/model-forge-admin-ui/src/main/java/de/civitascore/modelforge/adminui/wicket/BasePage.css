@@ -31,6 +31,7 @@
   --mf-type-pipeline: #4a9b95;
   --mf-type-datasource: #59a14f;
   --mf-type-datasink: #bf9a0f;
+  --mf-type-dashboard: #af7aa1;
   --mf-type-dataset: #b07aa1;
   --mf-type-other: #8a95a1;
 }
@@ -193,6 +194,7 @@ pre {
 .mf-badge--pipeline { background: var(--mf-type-pipeline); }
 .mf-badge--datasource { background: var(--mf-type-datasource); }
 .mf-badge--datasink { background: var(--mf-type-datasink); }
+.mf-badge--dashboard { background: var(--mf-type-dashboard); }
 .mf-badge--dataset { background: var(--mf-type-dataset); }
 
 .mf-copy-btn {
@@ -287,6 +289,7 @@ pre {
 .legend-dot--pipeline { color: var(--mf-type-pipeline); }
 .legend-dot--datasource { color: var(--mf-type-datasource); }
 .legend-dot--datasink { color: var(--mf-type-datasink); }
+.legend-dot--dashboard { color: var(--mf-type-dashboard); }
 .legend-dot--dataset { color: var(--mf-type-dataset); }
 
 /* ── Seed page cards ───────────────────────────────────────────────────────── */

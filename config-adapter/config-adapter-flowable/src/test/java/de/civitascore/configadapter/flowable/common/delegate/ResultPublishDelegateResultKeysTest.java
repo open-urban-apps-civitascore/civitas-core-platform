@@ -37,15 +37,17 @@ class ResultPublishDelegateResultKeysTest {
   private FlowableResultPublisher resultPublisher;
   private SagaCommandHandler frostHandler;
   private SagaCommandHandler apisixHandler;
+  private SagaCommandHandler supersetHandler;
 
   @BeforeEach
   void setUp() {
     frostHandler = FlowableTestSupport.mockHandler("frost");
     apisixHandler = FlowableTestSupport.mockHandler("apisix");
     SagaCommandHandler pipelineHandler = FlowableTestSupport.mockHandler("nifi");
+    supersetHandler = FlowableTestSupport.mockHandler("superset");
 
     SagaHandlerRegistry registry =
-        FlowableTestSupport.registry(frostHandler, apisixHandler, pipelineHandler);
+        FlowableTestSupport.registry(frostHandler, apisixHandler, pipelineHandler, supersetHandler);
     resultPublisher = mock(FlowableResultPublisher.class);
 
     processEngine =
@@ -85,6 +87,8 @@ class ResultPublishDelegateResultKeysTest {
                     "serviceId", "s1",
                     "publicUrl", "https://gateway.example.com/datasets/ds-1"),
                 Map.of("routeId", "r1", "serviceId", "s1")));
+    when(supersetHandler.handle(argThat(cmd -> cmd != null && "EXECUTE_STEP".equals(cmd.type()))))
+        .thenReturn(SagaCommandResult.success("saga-1", "register-superset", Map.of(), Map.of()));
 
     Map<String, Object> vars = new HashMap<>();
     vars.put("sagaId", "saga-1");

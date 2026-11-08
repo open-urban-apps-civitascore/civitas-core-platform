@@ -9,6 +9,7 @@ import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.License;
 import io.swagger.v3.oas.models.media.Content;
+import io.swagger.v3.oas.models.media.Discriminator;
 import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.parameters.Parameter;
@@ -34,7 +35,8 @@ import org.springframework.core.annotation.Order;
 /**
  * OpenAPI/Swagger configuration that customizes the generated API documentation. Adds OAuth2
  * security schemes, normalizes operation IDs, replaces entity name placeholders, provides RFC 9457
- * ProblemDetail examples, and derives PATCH schemas from PUT input DTOs.
+ * ProblemDetail examples, derives PATCH schemas from PUT input DTOs, and exposes the visualization
+ * discriminated union.
  */
 @Configuration
 public class OpenApiConfig {
@@ -453,6 +455,131 @@ public class OpenApiConfig {
     MediaType json = content.get(APPLICATION_JSON);
     if (json == null || json.getSchema() == null) return null;
     return json.getSchema().get$ref();
+  }
+
+  private static final String VISUALIZATION_TAG = "Visualizations";
+  private static final String SCHEMAS_PREFIX = "#/components/schemas/";
+  private static final String DASHBOARD_INPUT_REF = SCHEMAS_PREFIX + "DashboardInputDTO";
+  private static final String DASHBOARD_OUTPUT_REF = SCHEMAS_PREFIX + "DashboardOutputDTO";
+  private static final String VISUALIZATION_INPUT_REF = SCHEMAS_PREFIX + "VisualizationInputDTO";
+  private static final String VISUALIZATION_OUTPUT_REF = SCHEMAS_PREFIX + "VisualizationOutputDTO";
+
+  /**
+   * Documents the visualization endpoints against the discriminated union ({@code
+   * VisualizationInputDTO}/{@code VisualizationOutputDTO}) rather than the concrete {@code
+   * Dashboard*DTO} members. The controller is typed to the concrete members because the generic
+   * CRUD stack can't instantiate the sealed union base, so springdoc never emits the union on its
+   * own — this rebuilds it as {@code oneOf} + {@code discriminator} and repoints the visualization
+   * operation and page-item refs at it. Runs late ({@code @Order(10)}) so it post-processes a fully
+   * built model.
+   */
+  @Bean
+  @Order(10)
+  public OpenApiCustomizer visualizationUnionCustomizer() {
+    return openApi -> {
+      if (openApi.getComponents() == null || openApi.getComponents().getSchemas() == null) {
+        return;
+      }
+      var schemas = openApi.getComponents().getSchemas();
+
+      schemas.put(
+          "VisualizationInputDTO",
+          unionSchema(
+              DASHBOARD_INPUT_REF,
+              "Visualization write payload. Structure depends on visualizationType."));
+      schemas.put(
+          "VisualizationOutputDTO",
+          unionSchema(
+              DASHBOARD_OUTPUT_REF,
+              "Visualization read payload. Structure depends on visualizationType."));
+
+      // OpenAPI 3.1 requires the discriminator property to be required on each union member.
+      addRequired(schemas.get("DashboardInputDTO"), "visualizationType");
+      addRequired(schemas.get("DashboardOutputDTO"), "visualizationType");
+
+      // Repoint the visualization operations' request/response refs at the union.
+      openApi
+          .getPaths()
+          .values()
+          .forEach(
+              pathItem ->
+                  pathItem
+                      .readOperations()
+                      .forEach(
+                          operation -> {
+                            if (operation.getTags() == null
+                                || !operation.getTags().contains(VISUALIZATION_TAG)) {
+                              return;
+                            }
+                            rewriteRequestBodyRef(
+                                operation, DASHBOARD_INPUT_REF, VISUALIZATION_INPUT_REF);
+                            rewriteResponseRefs(
+                                operation, DASHBOARD_OUTPUT_REF, VISUALIZATION_OUTPUT_REF);
+                          }));
+
+      // The list endpoint wraps results in PageDashboardOutputDTO, whose item ref lives in a
+      // component schema (not on an operation), so repoint it explicitly.
+      Schema<?> page = schemas.get("PageDashboardOutputDTO");
+      if (page != null && page.getProperties() != null) {
+        Schema<?> content = page.getProperties().get("content");
+        if (content != null
+            && content.getItems() != null
+            && DASHBOARD_OUTPUT_REF.equals(content.getItems().get$ref())) {
+          content.getItems().set$ref(VISUALIZATION_OUTPUT_REF);
+        }
+      }
+    };
+  }
+
+  /**
+   * Builds a {@code oneOf} union schema with a {@code visualizationType} discriminator. The mapping
+   * is explicit because the discriminator value is the enum name ({@code DASHBOARD}), which would
+   * otherwise not resolve against the differently-named member schema.
+   */
+  private Schema<?> unionSchema(String memberRef, String description) {
+    return new Schema<>()
+        .description(description)
+        .oneOf(List.of(new Schema<>().$ref(memberRef)))
+        .discriminator(
+            new Discriminator().propertyName("visualizationType").mapping("DASHBOARD", memberRef));
+  }
+
+  private void addRequired(Schema<?> schema, String property) {
+    if (schema == null) return;
+    if (schema.getRequired() == null) {
+      schema.setRequired(new ArrayList<>(List.of(property)));
+    } else if (!schema.getRequired().contains(property)) {
+      schema.getRequired().add(property);
+    }
+  }
+
+  private void rewriteRequestBodyRef(
+      io.swagger.v3.oas.models.Operation operation, String fromRef, String toRef) {
+    if (operation.getRequestBody() == null || operation.getRequestBody().getContent() == null) {
+      return;
+    }
+    MediaType json = operation.getRequestBody().getContent().get(APPLICATION_JSON);
+    if (json != null && json.getSchema() != null && fromRef.equals(json.getSchema().get$ref())) {
+      json.getSchema().set$ref(toRef);
+    }
+  }
+
+  private void rewriteResponseRefs(
+      io.swagger.v3.oas.models.Operation operation, String fromRef, String toRef) {
+    if (operation.getResponses() == null) return;
+    operation
+        .getResponses()
+        .values()
+        .forEach(
+            response -> {
+              if (response.getContent() == null) return;
+              MediaType json = response.getContent().get(APPLICATION_JSON);
+              if (json != null
+                  && json.getSchema() != null
+                  && fromRef.equals(json.getSchema().get$ref())) {
+                json.getSchema().set$ref(toRef);
+              }
+            });
   }
 
   private Content newProblemContent() {

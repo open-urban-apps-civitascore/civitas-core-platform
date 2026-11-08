@@ -238,7 +238,12 @@ public class ElementCommandService {
         ObjectNode doc = (ObjectNode) manifest.get().deepCopy();
         boolean changed = false;
         for (String field : List.of(
-                "datastructureRefs", "mappingRefs", "pipelineRefs", "dataSourceRefs", "dataSinkRefs")) {
+                "datastructureRefs",
+                "mappingRefs",
+                "pipelineRefs",
+                "dataSourceRefs",
+                "dataSinkRefs",
+                "dashboardRefs")) {
             if (doc.get(field) instanceof tools.jackson.databind.node.ArrayNode refs) {
                 for (int i = refs.size() - 1; i >= 0; i--) {
                     if (memberLogicalUrn.equals(UrnParser.logicalUrn(refs.get(i).asText()))) {

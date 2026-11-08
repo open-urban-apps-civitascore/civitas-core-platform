@@ -245,6 +245,7 @@ class PostgisSagaHandlerTest {
       ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
       verify(mockStatement, org.mockito.Mockito.atLeast(3)).execute(sql.capture());
       List<String> executed = sql.getAllValues();
+      assertTrue(executed.stream().noneMatch(s -> s.contains("TO \"geoserver\"")));
       assertTrue(executed.stream().anyMatch(s -> s.startsWith("CREATE SCHEMA \"ds_42\"")));
       assertTrue(
           executed.stream()

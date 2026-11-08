@@ -14,12 +14,12 @@ class PermissionNameTest {
   class DashboardPermissions {
 
     @Test
-    @DisplayName("Should expose DATASET_DASHBOARD_READ and DATASET_DASHBOARD_WRITE values")
+    @DisplayName("Should expose DATASET_DASHBOARD_READ and DATASET_DASHBOARD_UPDATE values")
     void shouldExposeDashboardValues() {
       assertThat(PermissionName.valueOf("DATASET_DASHBOARD_READ"))
           .isEqualTo(PermissionName.DATASET_DASHBOARD_READ);
-      assertThat(PermissionName.valueOf("DATASET_DASHBOARD_WRITE"))
-          .isEqualTo(PermissionName.DATASET_DASHBOARD_WRITE);
+      assertThat(PermissionName.valueOf("DATASET_DASHBOARD_UPDATE"))
+          .isEqualTo(PermissionName.DATASET_DASHBOARD_UPDATE);
     }
 
     @Test
@@ -33,9 +33,9 @@ class PermissionNameTest {
     }
 
     @Test
-    @DisplayName("Should classify DATASET_DASHBOARD_WRITE as a data permission")
-    void shouldClassifyDashboardWriteAsData() {
-      PermissionName permission = PermissionName.DATASET_DASHBOARD_WRITE;
+    @DisplayName("Should classify DATASET_DASHBOARD_UPDATE as a data permission")
+    void shouldClassifyDashboardUpdateAsData() {
+      PermissionName permission = PermissionName.DATASET_DASHBOARD_UPDATE;
 
       assertThat(permission.getPermissionType()).isEqualTo(PermissionType.DATA);
       assertThat(permission.getCategory()).isEqualTo(PermissionCategory.DATA);
@@ -47,8 +47,8 @@ class PermissionNameTest {
     void shouldExposeNameAsAuthority() {
       assertThat(PermissionName.DATASET_DASHBOARD_READ.getAuthority())
           .isEqualTo("DATASET_DASHBOARD_READ");
-      assertThat(PermissionName.DATASET_DASHBOARD_WRITE.getAuthority())
-          .isEqualTo("DATASET_DASHBOARD_WRITE");
+      assertThat(PermissionName.DATASET_DASHBOARD_UPDATE.getAuthority())
+          .isEqualTo("DATASET_DASHBOARD_UPDATE");
     }
   }
 }

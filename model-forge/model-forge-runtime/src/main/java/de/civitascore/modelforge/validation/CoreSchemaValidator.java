@@ -15,7 +15,7 @@ import tools.jackson.databind.ObjectMapper;
  * Opt-in validation of an artifact document against the CORE JSON Schema it declares.
  *
  * <p>A document is validated only when its {@code $schema} names a known CORE artifact schema
- * (mapping, pipeline, datasource, datasink, dataset, datastructure); anything else — no
+ * (mapping, pipeline, datasource, datasink, dashboard, dataset, datastructure); anything else — no
  * {@code $schema}, the plain JSON Schema meta-schema, or an unknown URI — is passed through
  * unvalidated. This is deliberately transitional: today host payloads that are not CORE-IR
  * conformant simply omit the {@code $schema} declaration and skip the check. The end state is
@@ -29,7 +29,8 @@ public class CoreSchemaValidator {
         "https://civitasconnect.digital/core/mapping/v1", "mapping.schema.json",
         "https://civitasconnect.digital/core/pipeline/v1", "pipeline.schema.json",
         "https://civitasconnect.digital/core/datasource/v1", "datasource.schema.json",
-        "https://civitasconnect.digital/core/datasink/v1", "datasink.schema.json"
+        "https://civitasconnect.digital/core/datasink/v1", "datasink.schema.json",
+        "https://civitasconnect.digital/core/dashboard/v1", "dashboard.schema.json"
     );
 
     /**
@@ -43,7 +44,8 @@ public class CoreSchemaValidator {
         ArtifactKind.DATA_SOURCE, "datasource.schema.json",
         ArtifactKind.DATA_SINK, "datasink.schema.json",
         ArtifactKind.DATA_STRUCTURE, "datastructure.schema.json",
-        ArtifactKind.DATA_SET, "dataset.schema.json"
+        ArtifactKind.DATA_SET, "dataset.schema.json",
+        ArtifactKind.DASHBOARD, "dashboard.schema.json"
     );
 
     /**
@@ -59,7 +61,8 @@ public class CoreSchemaValidator {
         ArtifactKind.PIPELINE, "https://civitasconnect.digital/core/pipeline/v1",
         ArtifactKind.DATA_SOURCE, "https://civitasconnect.digital/core/datasource/v1",
         ArtifactKind.DATA_SINK, "https://civitasconnect.digital/core/datasink/v1",
-        ArtifactKind.DATA_SET, "https://civitasconnect.digital/core-dataset/v1"
+        ArtifactKind.DATA_SET, "https://civitasconnect.digital/core-dataset/v1",
+        ArtifactKind.DASHBOARD, "https://civitasconnect.digital/core/dashboard/v1"
     );
 
     /** The {@code $schema} URI to stamp for {@code kind}, or {@code null} if it must not be stamped. */

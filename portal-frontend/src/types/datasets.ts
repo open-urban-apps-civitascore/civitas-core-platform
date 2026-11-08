@@ -194,6 +194,7 @@ export type CompletionStepParam = 'access-management' | 'data-flow' | 'apis'
 export type CompletionStepData = {
   title: string
   description?: string
+  showSeparator?: boolean
   isCompleted?: CheckedState
   buttons: {
     text: string

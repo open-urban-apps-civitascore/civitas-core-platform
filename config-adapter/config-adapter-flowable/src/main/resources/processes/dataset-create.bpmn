@@ -128,7 +128,17 @@
       </extensionElements>
       <incoming>flow-pipeline-error</incoming>
       <incoming>flow-prune-comp-pipelines</incoming>
+      <incoming>flow-superset-error</incoming>
       <outgoing>flow-comp-pipelines-gateway</outgoing>
+    </serviceTask>
+    <serviceTask id="compensate-superset" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaCompensationDelegate" name="Compensate: Deregister Superset Dataset">
+      <extensionElements>
+        <flowable:field xsi:type="xs:anyType" name="adapterName" stringValue="superset"/>
+        <flowable:field xsi:type="xs:anyType" name="operation" stringValue="DEREGISTER_DATASET"/>
+        <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="register-superset"/>
+      </extensionElements>
+      <incoming>flow-superset-error</incoming>
+      <outgoing>flow-superset-comp-pipelines</outgoing>
     </serviceTask>
     <exclusiveGateway id="pipeline-comp-gateway" name="Compensate GeoServer?" default="flow-pipeline-comp-apisix">
       <incoming>flow-comp-pipelines-gateway</incoming>
@@ -204,6 +214,7 @@
     </boundaryEvent>
     <exclusiveGateway id="prune-comp-gateway" name="Compensate Pipelines?" default="flow-prune-comp-geo">
       <incoming>flow-prune-error</incoming>
+      <incoming>flow-superset-comp-pipelines</incoming>
       <outgoing>flow-prune-comp-pipelines</outgoing>
       <outgoing>flow-prune-comp-geo</outgoing>
     </exclusiveGateway>
@@ -211,10 +222,29 @@
       <extensionElements>
         <flowable:field xsi:type="xs:anyType" name="resultType" stringValue="success"/>
       </extensionElements>
-      <incoming>flow-prune-skip</incoming>
-      <incoming>flow-prune-success</incoming>
+      <incoming>flow-superset-success</incoming>
+      <incoming>flow-dashboard-skip</incoming>
       <outgoing>flow-publish-success-end</outgoing>
     </serviceTask>
+    <exclusiveGateway id="dashboard-gateway" name="Has Dashboard?" default="flow-dashboard-skip">
+      <incoming>flow-prune-skip</incoming>
+      <incoming>flow-prune-success</incoming>
+      <outgoing>flow-dashboard-register</outgoing>
+      <outgoing>flow-dashboard-skip</outgoing>
+    </exclusiveGateway>
+    <serviceTask id="register-superset" flowable:class="de.civitascore.configadapter.flowable.common.delegate.SagaStepDelegate" name="Register Superset Dataset">
+      <extensionElements>
+        <flowable:field xsi:type="xs:anyType" name="adapterName" stringValue="superset"/>
+        <flowable:field xsi:type="xs:anyType" name="operation" stringValue="REGISTER_DATASET"/>
+        <flowable:field xsi:type="xs:anyType" name="stepId" stringValue="register-superset"/>
+      </extensionElements>
+      <incoming>flow-dashboard-register</incoming>
+      <outgoing>flow-superset-success</outgoing>
+    </serviceTask>
+    <boundaryEvent id="superset-error" name="Step Failed" attachedToRef="register-superset">
+      <outgoing>flow-superset-error</outgoing>
+      <errorEventDefinition errorRef="stepFailedError"/>
+    </boundaryEvent>
     <serviceTask id="publish-failure" flowable:async="true" flowable:class="de.civitascore.configadapter.flowable.common.delegate.ResultPublishDelegate" name="Publish Failure Result">
       <extensionElements>
         <flowable:field xsi:type="xs:anyType" name="resultType" stringValue="failure"/>
@@ -257,8 +287,15 @@
     <sequenceFlow id="flow-prune-featuretypes" name="yes" sourceRef="prune-gateway" targetRef="prune-featuretypes">
       <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_7">${execution.getVariable('hasGeoSink') == true}</conditionExpression>
     </sequenceFlow>
-    <sequenceFlow id="flow-prune-skip" name="no" sourceRef="prune-gateway" targetRef="publish-success"/>
-    <sequenceFlow id="flow-prune-success" sourceRef="prune-featuretypes" targetRef="publish-success"/>
+    <sequenceFlow id="flow-prune-skip" name="no" sourceRef="prune-gateway" targetRef="dashboard-gateway"/>
+    <sequenceFlow id="flow-prune-success" sourceRef="prune-featuretypes" targetRef="dashboard-gateway"/>
+    <sequenceFlow id="flow-dashboard-register" name="yes" sourceRef="dashboard-gateway" targetRef="register-superset">
+      <conditionExpression xsi:type="tFormalExpression">${execution.getVariable('hasDashboards') == true}</conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow-dashboard-skip" name="no" sourceRef="dashboard-gateway" targetRef="publish-success"/>
+    <sequenceFlow id="flow-superset-success" sourceRef="register-superset" targetRef="publish-success"/>
+    <sequenceFlow id="flow-superset-error" sourceRef="superset-error" targetRef="compensate-superset"/>
+    <sequenceFlow id="flow-superset-comp-pipelines" sourceRef="compensate-superset" targetRef="prune-comp-gateway"/>
     <sequenceFlow id="flow-prune-error" sourceRef="prune-error" targetRef="prune-comp-gateway"/>
     <sequenceFlow id="flow-prune-comp-pipelines" name="yes" sourceRef="prune-comp-gateway" targetRef="compensate-pipelines">
       <conditionExpression xsi:type="tFormalExpression" id="FormalExpression_8">${hasPipelines == true}</conditionExpression>
@@ -485,6 +522,30 @@
         <dc:Bounds height="50.0" width="50.0" x="1753.0" y="663.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_72" labelStyle="BPMNLabelStyle_1">
           <dc:Bounds height="28.0" width="60.0" x="1813.0" y="674.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_RegisterSuperset" bpmnElement="register-superset">
+        <dc:Bounds height="50.0" width="110.0" x="1845.0" y="250.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_RegisterSuperset" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="28.0" width="110.0" x="1845.0" y="261.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_DashboardGateway" bpmnElement="dashboard-gateway" isMarkerVisible="true">
+        <dc:Bounds height="50.0" width="50.0" x="1770.0" y="325.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_DashboardGateway" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="28.0" width="72.0" x="1759.0" y="375.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_SupersetError" bpmnElement="superset-error">
+        <dc:Bounds height="36.0" width="36.0" x="1927.0" y="282.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_SupersetError" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="14.0" width="62.0" x="1914.0" y="318.0"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_CompensateSuperset" bpmnElement="compensate-superset">
+        <dc:Bounds height="50.0" width="110.0" x="1400.0" y="570.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_CompensateSuperset" labelStyle="BPMNLabelStyle_1">
+          <dc:Bounds height="42.0" width="110.0" x="1400.0" y="574.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="BPMNShape_BoundaryEvent_7" bpmnElement="prune-error">
@@ -734,20 +795,51 @@
           <dc:Bounds height="14.0" width="19.0" x="1694.0" y="426.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_36" bpmnElement="flow-prune-skip" sourceElement="BPMNShape_ExclusiveGateway_7" targetElement="BPMNShape_ServiceTask_10">
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_36" bpmnElement="flow-prune-skip" sourceElement="BPMNShape_ExclusiveGateway_7" targetElement="BPMNShape_DashboardGateway">
         <di:waypoint xsi:type="dc:Point" x="1658.0" y="400.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1658.0" y="365.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1958.0" y="365.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1958.0" y="400.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1658.0" y="350.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1770.0" y="350.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_69">
-          <dc:Bounds height="14.0" width="14.0" x="1801.0" y="366.0"/>
+          <dc:Bounds height="14.0" width="14.0" x="1740.0" y="276.0"/>
         </bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
-      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_37" bpmnElement="flow-prune-success" sourceElement="BPMNShape_ServiceTask_12" targetElement="BPMNShape_ServiceTask_10">
+      <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_37" bpmnElement="flow-prune-success" sourceElement="BPMNShape_ServiceTask_12" targetElement="BPMNShape_DashboardGateway">
         <di:waypoint xsi:type="dc:Point" x="1833.0" y="425.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1868.0" y="425.0"/>
-        <di:waypoint xsi:type="dc:Point" x="1903.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1833.0" y="350.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1820.0" y="350.0"/>
         <bpmndi:BPMNLabel id="BPMNLabel_70"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_DashboardRegister" bpmnElement="flow-dashboard-register" sourceElement="BPMNShape_DashboardGateway" targetElement="BPMNShape_RegisterSuperset">
+        <di:waypoint xsi:type="dc:Point" x="1795.0" y="325.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1795.0" y="275.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1845.0" y="275.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_DashboardRegister"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_DashboardSkip" bpmnElement="flow-dashboard-skip" sourceElement="BPMNShape_DashboardGateway" targetElement="BPMNShape_ServiceTask_10">
+        <di:waypoint xsi:type="dc:Point" x="1820.0" y="350.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1903.0" y="350.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1903.0" y="425.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_DashboardSkip"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SupersetSuccess" bpmnElement="flow-superset-success" sourceElement="BPMNShape_RegisterSuperset" targetElement="BPMNShape_ServiceTask_10">
+        <di:waypoint xsi:type="dc:Point" x="1955.0" y="275.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1990.0" y="275.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1990.0" y="425.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1903.0" y="425.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_SupersetSuccess"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SupersetError" bpmnElement="flow-superset-error" sourceElement="BPMNShape_SupersetError" targetElement="BPMNShape_CompensateSuperset">
+        <di:waypoint xsi:type="dc:Point" x="1945.0" y="318.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1945.0" y="545.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1455.0" y="545.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1455.0" y="570.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_SupersetErrorEdge"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_SupersetCompensation" bpmnElement="flow-superset-comp-pipelines" sourceElement="BPMNShape_CompensateSuperset" targetElement="BPMNShape_ExclusiveGateway_8">
+        <di:waypoint xsi:type="dc:Point" x="1400.0" y="595.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1330.0" y="595.0"/>
+        <di:waypoint xsi:type="dc:Point" x="1270.0" y="663.0"/>
+        <bpmndi:BPMNLabel id="BPMNLabel_SupersetCompensation"/>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="BPMNEdge_SequenceFlow_38" bpmnElement="flow-prune-error" sourceElement="BPMNShape_BoundaryEvent_7" targetElement="BPMNShape_ExclusiveGateway_8">
         <di:waypoint xsi:type="dc:Point" x="1778.0" y="468.0"/>

@@ -15,5 +15,7 @@ public enum PayloadKind {
   /**
    * Declarative field-to-field mapping between two DataStructures, extracted from a pipeline node.
    */
-  MAPPING
+  MAPPING,
+  /** Declarative dashboard metadata and rendering options. */
+  DASHBOARD
 }

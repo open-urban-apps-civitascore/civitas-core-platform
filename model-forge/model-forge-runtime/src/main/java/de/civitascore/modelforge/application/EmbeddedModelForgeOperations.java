@@ -561,6 +561,7 @@ public class EmbeddedModelForgeOperations implements ModelForge {
             case PIPELINE -> { String p = registry.storePipeline(urn, content, bump); registerWritten(p, urn); yield p; }
             case DATA_SOURCE -> { String p = registry.storeDataSource(urn, content, bump); registerWritten(p, urn); yield p; }
             case DATA_SINK -> { String p = registry.storeDataSink(urn, content, bump); registerWritten(p, urn); yield p; }
+            case DASHBOARD -> { String p = registry.storeDashboard(urn, content, bump); registerWritten(p, urn); yield p; }
             case DATA_SET -> { String p = registry.storeDataSet(urn, content, bump); registerWritten(p, urn); yield p; }
         };
         // Defensive fallback (a registry double may return nothing): the honest unversioned
@@ -606,6 +607,7 @@ public class EmbeddedModelForgeOperations implements ModelForge {
             case "mapping" -> ArtifactKind.MAPPING;
             case "datasource" -> ArtifactKind.DATA_SOURCE;
             case "datasink" -> ArtifactKind.DATA_SINK;
+            case "dashboard" -> ArtifactKind.DASHBOARD;
             case "datastructure" -> ArtifactKind.DATA_STRUCTURE;
             default -> null;
         };
@@ -619,6 +621,7 @@ public class EmbeddedModelForgeOperations implements ModelForge {
             case DATA_SINK -> "dataSinkRefs";
             case MAPPING -> "mappingRefs";
             case DATA_STRUCTURE -> "datastructureRefs";
+            case DASHBOARD -> "dashboardRefs";
             case DATA_SET, ELEMENT -> null;
         };
     }
@@ -655,7 +658,7 @@ public class EmbeddedModelForgeOperations implements ModelForge {
                 }
             }
             if (!present) {
-                requireOwnMapping(dataSetUrn, entry.getValue(), memberLogical);
+                requireOwnSingleDataSetMembership(dataSetUrn, entry.getValue(), memberLogical);
                 refs.add(memberLogical);
                 changed = true;
             }
@@ -671,8 +674,9 @@ public class EmbeddedModelForgeOperations implements ModelForge {
      * one, so a second link would grant that read. A Mapping that does not exist is refused in the
      * same words, or the difference would tell a caller which URNs are taken.
      */
-    private void requireOwnMapping(String dataSetUrn, ArtifactKind kind, String memberLogical) {
-        if (kind != ArtifactKind.MAPPING) {
+    private void requireOwnSingleDataSetMembership(
+            String dataSetUrn, ArtifactKind kind, String memberLogical) {
+        if (kind != ArtifactKind.MAPPING && kind != ArtifactKind.DASHBOARD) {
             return;
         }
         String own = UrnParser.logicalUrn(dataSetUrn);
@@ -681,7 +685,7 @@ public class EmbeddedModelForgeOperations implements ModelForge {
                 .allMatch(holder -> own.equals(UrnParser.logicalUrn(holder)));
         if (!ours) {
             throw new ValidationFailedException(
-                "Mapping " + memberLogical + " is not a Mapping of this Data Set", List.of());
+                kind + " " + memberLogical + " is not owned by this Data Set", List.of());
         }
     }
 
@@ -876,6 +880,7 @@ public class EmbeddedModelForgeOperations implements ModelForge {
             case DATA_SINK -> "datasink";
             case DATA_STRUCTURE -> "datastructure";
             case DATA_SET -> "dataset";
+            case DASHBOARD -> "dashboard";
             case ELEMENT -> "element";
         };
     }

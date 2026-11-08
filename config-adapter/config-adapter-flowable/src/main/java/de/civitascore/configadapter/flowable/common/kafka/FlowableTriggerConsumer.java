@@ -225,6 +225,7 @@ public class FlowableTriggerConsumer {
     variables.put("hasGeoSink", hasDataSinkOfType(trigger, DATASINK_TYPE_POSTGIS));
     variables.put("hasFrostSink", hasDataSinkOfType(trigger, DATASINK_TYPE_FROST));
     variables.put("hasLayers", deriveHasLayers(trigger));
+    variables.put("hasDashboards", deriveHasDashboards(trigger));
 
     ProcessInstance instance =
         runtimeService.startProcessInstanceByKey(processKey, businessKey, variables);
@@ -273,5 +274,16 @@ public class FlowableTriggerConsumer {
    */
   private static boolean deriveHasLayers(Map<String, Object> trigger) {
     return trigger.get("layers") instanceof List<?> layers && !layers.isEmpty();
+  }
+
+  /**
+   * Run Superset when dashboards need to be synced or removed. In particular, deleting the last
+   * dashboard leaves {@code dashboards} empty but still requires the Superset cleanup step.
+   */
+  private static boolean deriveHasDashboards(Map<String, Object> trigger) {
+    return (trigger.get("dashboards") instanceof List<?> dashboards && !dashboards.isEmpty())
+        || (trigger.get("dashboardIds") instanceof List<?> dashboardIds && !dashboardIds.isEmpty())
+        || (trigger.get("deletedDashboardIds") instanceof List<?> deletedIds
+            && !deletedIds.isEmpty());
   }
 }

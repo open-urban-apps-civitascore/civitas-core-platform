@@ -41,16 +41,16 @@ class PermissionInitializerIntegrationTest extends BaseKeycloakIntegrationTest {
 
   @Test
   @DisplayName(
-      "Should persist DATASET_DASHBOARD_WRITE as a DATA permission sourced from DATASET_DASHBOARD on"
+      "Should persist DATASET_DASHBOARD_UPDATE as a DATA permission sourced from DATASET_DASHBOARD on"
           + " startup")
-  void shouldPersistDashboardWrite() {
-    Permission dashboardWrite =
+  void shouldPersistDashboardUpdate() {
+    Permission dashboardUpdate =
         findByNameAndSource(
-            PermissionName.DATASET_DASHBOARD_WRITE, PermissionSource.DATASET_DASHBOARD);
+            PermissionName.DATASET_DASHBOARD_UPDATE, PermissionSource.DATASET_DASHBOARD);
 
-    assertThat(dashboardWrite.getPermissionType()).isEqualTo(PermissionType.DATA);
-    assertThat(dashboardWrite.getCategory()).isEqualTo(PermissionCategory.DATA);
-    assertThat(dashboardWrite.getSource()).isEqualTo(PermissionSource.DATASET_DASHBOARD);
+    assertThat(dashboardUpdate.getPermissionType()).isEqualTo(PermissionType.DATA);
+    assertThat(dashboardUpdate.getCategory()).isEqualTo(PermissionCategory.DATA);
+    assertThat(dashboardUpdate.getSource()).isEqualTo(PermissionSource.DATASET_DASHBOARD);
   }
 
   /**

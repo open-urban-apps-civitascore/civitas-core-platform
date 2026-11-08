@@ -48,6 +48,7 @@
 .mf-tree-dot--pipeline { background: var(--mf-type-pipeline); }
 .mf-tree-dot--datasource { background: var(--mf-type-datasource); }
 .mf-tree-dot--datasink { background: var(--mf-type-datasink); }
+.mf-tree-dot--dashboard { background: var(--mf-type-dashboard); }
 .mf-tree-dot--dataset { background: var(--mf-type-dataset); }
 .mf-tree-dot--other { background: var(--mf-type-other); }
 .mf-tree-dot--group { background: transparent; border: 1px solid var(--mf-text-faint); box-shadow: none; }

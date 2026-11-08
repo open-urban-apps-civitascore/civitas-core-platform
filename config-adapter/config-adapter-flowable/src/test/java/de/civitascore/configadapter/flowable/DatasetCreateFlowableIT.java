@@ -13,10 +13,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import de.civitascore.configadapter.adapter.SagaCommandHandler;
+import de.civitascore.configadapter.adapter.SagaCommandMessage;
+import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.apisix.ApisixSagaHandler;
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.flowable.bpmn.BpmnProcessDeployer;
@@ -49,6 +54,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -105,6 +112,7 @@ class DatasetCreateFlowableIT {
   private HttpServer apisixMock;
   private List<String> apisixRequestPaths;
   private FlowableResultPublisher resultPublisher;
+  private SagaCommandHandler supersetHandler;
   private OkHttpClient httpClient;
   private String frostBaseUrl;
 
@@ -144,6 +152,15 @@ class DatasetCreateFlowableIT {
     SagaHandlerRegistry registry = new SagaHandlerRegistry();
     registry.register(frostHandler);
     registry.register(apisixHandler);
+    supersetHandler = FlowableTestSupport.mockHandler("superset");
+    when(supersetHandler.handle(any()))
+        .thenAnswer(
+            invocation -> {
+              SagaCommandMessage command = invocation.getArgument(0);
+              return SagaCommandResult.success(
+                  command.sagaId(), command.stepId(), Map.of(), Map.of());
+            });
+    registry.register(supersetHandler);
 
     resultPublisher = mock(FlowableResultPublisher.class);
 
@@ -168,8 +185,10 @@ class DatasetCreateFlowableIT {
     network.close();
   }
 
-  @Test
-  void datasetCreateSaga_completesWithRealFrostAndMockApisix() throws IOException {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void datasetCreateSaga_completesWithRealFrostAndMockApisix(boolean hasDashboards)
+      throws IOException {
     deployProcesses();
     String datasetId = "ds-flowable-e2e-" + UUID.randomUUID().toString().substring(0, 8);
 
@@ -180,6 +199,7 @@ class DatasetCreateFlowableIT {
     variables.put("description", "Integration test via Flowable");
     variables.put("hasPipelines", false);
     variables.put("hasFrostSink", true);
+    variables.put("hasDashboards", hasDashboards);
     variables.put("artifacts", Map.of());
     variables.put("dataPipelines", List.of());
     // Per-NamedApi route model (#1311/#1379): CREATE_ROUTE provisions one route per named-API
@@ -214,9 +234,11 @@ class DatasetCreateFlowableIT {
             .filter(id -> !id.startsWith("compensate-") && !id.startsWith("publish-"))
             .toList();
     assertEquals(
-        List.of("create-project", "create-route"),
+        hasDashboards
+            ? List.of("create-project", "create-route", "register-superset")
+            : List.of("create-project", "create-route"),
         tasks,
-        "Should execute FROST then APISIX (no pipelines = skip Pipeline)");
+        "Superset should run only when the Dataset has a Dashboard");
 
     Object projectId =
         historyService

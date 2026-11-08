@@ -1,5 +1,6 @@
 package de.civitascore.portal.messaging.saga;
 
+import de.civitascore.configadapter.model.dataset.Dashboard;
 import de.civitascore.configadapter.model.dataset.DataPipeline;
 import de.civitascore.configadapter.model.dataset.NamedApi;
 import de.civitascore.portal.configuration.PipelineClosureValidationProperties;
@@ -18,14 +19,19 @@ import de.civitascore.portal.model.saga.DataSinkPayload;
 import de.civitascore.portal.model.saga.LayerPayload;
 import de.civitascore.portal.model.saga.StylePayload;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.modelregistry.PayloadKind;
+import de.civitascore.portal.repository.AssignmentRepository;
+import de.civitascore.portal.repository.DashboardRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.util.InvalidInputException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -59,6 +65,8 @@ public class DataSetSagaPublisher {
   private final ObjectMapper objectMapper;
   private final SagaProperties sagaProperties;
   private final DataSinkRepository dataSinkRepository;
+  private final DashboardRepository dashboardRepository;
+  private final AssignmentRepository assignmentRepository;
   private final ModelRegistryGateway modelRegistryGateway;
   private final PipelineClosureValidationProperties closureProperties;
 
@@ -67,12 +75,16 @@ public class DataSetSagaPublisher {
       ObjectMapper objectMapper,
       SagaProperties sagaProperties,
       DataSinkRepository dataSinkRepository,
+      DashboardRepository dashboardRepository,
+      AssignmentRepository assignmentRepository,
       ModelRegistryGateway modelRegistryGateway,
       PipelineClosureValidationProperties closureProperties) {
     this.eventKafkaTemplate = eventKafkaTemplate;
     this.objectMapper = objectMapper;
     this.sagaProperties = sagaProperties;
     this.dataSinkRepository = dataSinkRepository;
+    this.dashboardRepository = dashboardRepository;
+    this.assignmentRepository = assignmentRepository;
     this.modelRegistryGateway = modelRegistryGateway;
     this.closureProperties = closureProperties;
   }
@@ -90,6 +102,7 @@ public class DataSetSagaPublisher {
    */
   public void publishCreateRequested(DataSet dataset) {
     verifyLayerStyleReferences(dataset);
+    List<Dashboard> dashboards = buildDashboards(dataset);
     var trigger =
         SagaTrigger.DatasetCreate.of(
             dataset.getId().toString(),
@@ -100,7 +113,9 @@ public class DataSetSagaPublisher {
             buildStyles(dataset),
             buildPipelines(dataset.getPipelines(), PipelineAction.ADD),
             buildNamedApis(dataset),
-            buildArtifacts(dataset.getPipelines()));
+            dashboards,
+            groupIdsWithPermission(dataset, "DATASET_UPDATE"),
+            buildArtifacts(dataset.getPipelines(), dashboards));
     sendTrigger(trigger);
   }
 
@@ -114,7 +129,14 @@ public class DataSetSagaPublisher {
    * only after an unrelease and a release.
    */
   public void publishUpdateRequested(DataSet dataset, Set<Pipeline> previousPipelines) {
+    publishUpdateRequested(dataset, previousPipelines, List.of());
+  }
+
+  /** Publishes an update and records Superset dashboards removed from the CORE dataset. */
+  public void publishUpdateRequested(
+      DataSet dataset, Set<Pipeline> previousPipelines, List<String> deletedDashboardIds) {
     verifyLayerStyleReferences(dataset);
+    List<Dashboard> dashboards = buildDashboards(dataset);
     var trigger =
         SagaTrigger.DatasetUpdate.of(
             dataset.getId().toString(),
@@ -129,7 +151,10 @@ public class DataSetSagaPublisher {
             buildStyles(dataset),
             buildPipelineDiff(previousPipelines, dataset.getPipelines()),
             buildNamedApis(dataset),
-            buildArtifacts(withoutStopped(dataset.getPipelines())));
+            dashboards,
+            deletedDashboardIds,
+            groupIdsWithPermission(dataset, "DATASET_UPDATE"),
+            buildArtifacts(withoutStopped(dataset.getPipelines()), dashboards));
     sendTrigger(trigger);
   }
 
@@ -154,6 +179,7 @@ public class DataSetSagaPublisher {
     var trigger =
         SagaTrigger.DatasetDelete.of(
             dataset.getId().toString(),
+            dataset.getName(),
             dataset.getProjectId(),
             dataset.getFrostBaseUrl(),
             buildRouteIds(dataset),
@@ -164,7 +190,11 @@ public class DataSetSagaPublisher {
             dataset.getId().toString(),
             dataset.getPipelineIds(),
             buildDatasinks(dataset),
-            buildNamedApis(dataset));
+            buildNamedApis(dataset),
+            dashboardRepository.findByDataSetId(dataset.getId()).stream()
+                .map(entity -> entity.getExternalDashboardId())
+                .filter(Objects::nonNull)
+                .toList());
     sendTrigger(trigger);
   }
 
@@ -356,9 +386,10 @@ public class DataSetSagaPublisher {
 
   /**
    * The {@code artifacts} of a CREATE or UPDATE trigger: every artifact the given Pipelines
-   * reference, keyed by the URN that Model Forge's dependency graph reports for it and sorted for a
-   * deterministic payload. A Data structure is its inlined view, every other artifact its stored
-   * document.
+   * reference plus each Dataset Dashboard model, keyed by its CORE URN. Pipeline artifacts use the
+   * URNs reported by Model Forge's dependency graph; dashboard artifacts use their model pins. The
+   * map is sorted for a deterministic payload. A Data structure is its inlined view, every other
+   * artifact its stored document.
    *
    * <p>The config-adapter is callback-free, so it resolves every Pipeline node from this map. The
    * host learns the references from the dependency graph and never interprets Pipeline or Mapping
@@ -376,8 +407,22 @@ public class DataSetSagaPublisher {
    *     artifact type the payload does not carry, or more than {@code
    *     dataset.closure-validation.max-depth} hops, so that an incomplete map is never published
    */
-  private Map<String, Map<String, Object>> buildArtifacts(Collection<Pipeline> pipelines) {
+  private Map<String, Map<String, Object>> buildArtifacts(
+      Collection<Pipeline> pipelines, List<Dashboard> dashboards) {
     Map<String, Map<String, Object>> artifacts = new TreeMap<>();
+    for (Dashboard dashboard : dashboards) {
+      Map<String, Object> model =
+          modelRegistryGateway
+              .fetchPayload(dashboard.modelUrn())
+              .map(ModelRegistryGateway.RegistryDocument::content)
+              .orElseThrow(
+                  () ->
+                      new InvalidInputException(
+                          "Dashboard",
+                          UUID.fromString(dashboard.id()),
+                          "Dashboard model was not found in Model Forge"));
+      artifacts.put(dashboard.modelUrn(), model);
+    }
     for (Pipeline pipeline : pipelines) {
       if (pipeline.getModelUrn() != null) {
         collectArtifacts(pipeline, artifacts);
@@ -494,6 +539,52 @@ public class DataSetSagaPublisher {
                     api.getName(),
                     api.getDescription()))
         .toList();
+  }
+
+  /** Dashboards are provisioned with the dataset so their Superset datasets already exist. */
+  private List<Dashboard> buildDashboards(DataSet dataset) {
+    var dashboards = dashboardRepository.findByDataSetId(dataset.getId());
+    if (dashboards.isEmpty()) {
+      return List.of();
+    }
+    return dashboards.stream().map(d -> toDashboardModel(dataset, d)).toList();
+  }
+
+  /** Ensures each engine binding points to a model stored in the DataSet manifest. */
+  private Dashboard toDashboardModel(
+      DataSet dataset, de.civitascore.portal.model.entity.Dashboard entity) {
+    String manifestUrn = dataset.getManifestLogicalUrn();
+    if (manifestUrn == null || manifestUrn.isBlank()) {
+      throw new InvalidInputException(
+          "Dashboard", entity.getId(), "DataSet has no Model Forge manifest to hold dashboards");
+    }
+    if (entity.getModelUrn() == null || entity.getModelUrn().isBlank()) {
+      Map<String, Object> content = new LinkedHashMap<>();
+      content.put("title", entity.getName());
+      if (entity.getDescription() != null) content.put("description", entity.getDescription());
+      content.put("released", entity.isReleased());
+      content.put("standaloneMode", entity.getStandaloneMode());
+      content.put("showFilters", entity.isShowFilters());
+      content.put("filterExpansion", entity.getFilterExpansion().name());
+      ModelRegistryGateway.ModelPin pin =
+          modelRegistryGateway.storePayload(
+              PayloadKind.DASHBOARD,
+              Optional.empty(),
+              entity.getId(),
+              entity.getName(),
+              content,
+              null,
+              manifestUrn);
+      entity.setModelUrn(pin.logicalUrn());
+      dashboardRepository.save(entity);
+    }
+    return new Dashboard(
+        entity.getId().toString(),
+        entity.getModelUrn(),
+        entity.getExternalDashboardId(),
+        groupIdsWithPermission(dataset, "DATASET_UPDATE"),
+        groupIdsWithPermission(dataset, "DATASET_READ"),
+        Boolean.TRUE.equals(dataset.getOpenDataAccess()));
   }
 
   /**
@@ -682,6 +773,16 @@ public class DataSetSagaPublisher {
           e);
       throw new IllegalStateException("Failed to serialize saga trigger", e);
     }
+  }
+
+  private List<String> groupIdsWithPermission(DataSet dataset, String permission) {
+    UUID poolId = dataset.getDataPool() == null ? null : dataset.getDataPool().getId();
+    return assignmentRepository
+        .findGroupIdsWithDatasetPermission(permission, dataset.getId(), poolId)
+        .stream()
+        .map(UUID::toString)
+        .sorted()
+        .toList();
   }
 
   private static boolean isCausedByRecordTooLarge(Throwable failure) {

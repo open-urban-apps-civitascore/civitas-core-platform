@@ -46,6 +46,10 @@ This is required because the Keycloak JWT issuer must use the same hostname acro
 
 For mocking data in the frontend, the json-server can be used.
 
+Set `SUPERSET_PUBLIC_URL` on the running frontend server to the browser-accessible
+Superset origin. Dashboard links read it when the Dataset page is rendered, so
+the same frontend image can be used with different deployment URLs.
+
 1. Adjust the port number in the env variables JSON_SERVER_PORT and NEXT_PUBLIC_JSON_SERVER_PORT in your .env.local file if you need to use another port for the json server.
 2. Start the json-server by running the command `pnpm json-server`
 
@@ -53,14 +57,14 @@ For mocking data in the frontend, the json-server can be used.
 
 ### Running e2e-tests
 
-This project uses [Playwright](https://playwright.dev) for end-to-end tests.  
+This project uses [Playwright](https://playwright.dev) for end-to-end tests.
 To run e2e tests locally, ensure that you have
 
 1. installed Playwright and its dependencies locally (see [docs](https://playwright.dev/docs/intro#updating-playwright) for details)
 2. setup and started Keycloak as mentioned above (see [Configuring Keycloak](#configuring-keycloak))
 3. adjusted your local `.env.local` file with the variables matching the user you created in your local Keycloak instance
 
-That's it!  
+That's it!
 You can now run your e2e tests either in the CLI with
 
 ```bash

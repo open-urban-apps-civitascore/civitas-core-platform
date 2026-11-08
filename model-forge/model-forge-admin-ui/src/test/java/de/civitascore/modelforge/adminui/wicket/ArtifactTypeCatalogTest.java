@@ -7,9 +7,9 @@ import org.junit.jupiter.api.Test;
 class ArtifactTypeCatalogTest {
 
     @Test
-    void ordersAllSevenKnownTypes() {
+    void ordersAllEightKnownTypes() {
         assertThat(ArtifactTypeCatalog.TYPE_ORDER).containsExactly(
-            "element", "datastructure", "dataset", "mapping", "pipeline", "datasource", "datasink");
+            "element", "datastructure", "dataset", "mapping", "pipeline", "datasource", "datasink", "dashboard");
     }
 
     @Test

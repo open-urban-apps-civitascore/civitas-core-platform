@@ -84,6 +84,12 @@ public enum AdapterErrorCode {
   NIFI_AUTH_ERROR(
       3605, false, "NiFi OIDC authentication error: %s", "Pipeline authentication failed"),
 
+  SUPERSET_ERROR(3401, false, "Superset error: %s", "Visualization platform error"),
+  SUPERSET_DATASET_ERROR(3402, false, "Superset dataset error: %s", "Dataset operation failed"),
+  SUPERSET_AUTH_ERROR(3403, false, "Superset authentication error: %s", "Authentication failed"),
+  SUPERSET_DASHBOARD_ERROR(
+      3405, false, "Superset dashboard error: %s", "Dashboard operation failed"),
+
   // 9xxx: Unknown/unexpected errors
   UNKNOWN_ERROR(9001, false, "Unexpected error: %s", "Internal error"),
   SERIALIZATION_ERROR(9002, false, "Serialization error: %s", "Data processing error"),

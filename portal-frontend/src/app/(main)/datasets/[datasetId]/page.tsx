@@ -38,6 +38,7 @@ const DatasetPage = async (props: DatasetPageProps) => {
       groupCount={groupCount}
       roleCount={roleCount}
       datapoolOptions={datapoolOptions}
+      supersetPublicUrl={process.env.SUPERSET_PUBLIC_URL ?? ''}
     />
   )
 }

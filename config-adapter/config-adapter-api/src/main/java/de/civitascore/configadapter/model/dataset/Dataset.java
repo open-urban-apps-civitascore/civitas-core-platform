@@ -17,16 +17,17 @@ import java.util.Map;
 
 /**
  * Typed representation of a dataset CloudEvent payload. Contains the dataset metadata, its data
- * pipeline definitions, named API endpoints, and the artifacts that the pipelines reference.
+ * pipeline definitions, named API endpoints, dashboard bindings, and the artifacts that the
+ * pipelines and dashboards reference.
  *
  * @param id unique dataset identifier (UUID)
  * @param name human-readable dataset name
  * @param datapipelines engine-neutral pipeline graphs
  * @param namedApis named API endpoints exposed by this dataset (per concepts #1379 and #1383); one
  *     APISIX route per entry
- * @param artifacts the artifacts that the pipelines reference, keyed by the CORE URN exactly as the
- *     referencing artifact carries it: a Data structure as its inlined JSON Schema, every other
- *     artifact as stored (never null; empty when the trigger carries none)
+ * @param artifacts the artifacts that the pipelines and dashboards reference, keyed by the CORE URN
+ *     exactly as the referencing artifact carries it: a Data structure as its inlined JSON Schema,
+ *     every other artifact as stored (never null; empty when the trigger carries none)
  */
 // openDataAccess is intentionally absent: it is no longer part of the saga payload (the
 // portal-backend no longer sends it; open-data access is an OPA per-request decision). Any

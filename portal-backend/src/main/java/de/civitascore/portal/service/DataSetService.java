@@ -18,6 +18,8 @@ import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.DataSetMetaInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.repository.DashboardRepository;
+import de.civitascore.portal.repository.DashboardSourceRepository;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
@@ -65,12 +67,15 @@ public class DataSetService
   private static final String DRIFT_UNPROVISIONED_SLUGS = "unprovisioned-slugs";
   private static final String DRIFT_REPLACED_ROUTEID = "replaced-routeid";
   private static final String DRIFT_UNEXPECTED_ROUTEIDS = "unexpected-routeids";
+  private static final String DRIFT_UNKNOWN_DASHBOARD = "unknown-dashboard";
 
   private final DataSetRepository dataSetRepository;
   private final DataSinkRepository dataSinkRepository;
   private final LayerRepository layerRepository;
   private final DataSetMapper dataSetMapper;
   private final DataPoolRepository dataPoolRepository;
+  private final DashboardRepository dashboardRepository;
+  private final DashboardSourceRepository dashboardSourceRepository;
 
   private final AssignmentFactory assignmentFactory;
   private final AssignmentChangeAuthorizer assignmentChangeAuthorizer;
@@ -93,6 +98,8 @@ public class DataSetService
       LayerRepository layerRepository,
       DataSetMapper dataSetMapper,
       DataPoolRepository dataPoolRepository,
+      DashboardRepository dashboardRepository,
+      DashboardSourceRepository dashboardSourceRepository,
       AssignmentFactory assignmentFactory,
       AssignmentChangeAuthorizer assignmentChangeAuthorizer,
       DataSetSagaPublisher sagaPublisher,
@@ -107,6 +114,8 @@ public class DataSetService
     this.layerRepository = layerRepository;
     this.dataSetMapper = dataSetMapper;
     this.dataPoolRepository = dataPoolRepository;
+    this.dashboardRepository = dashboardRepository;
+    this.dashboardSourceRepository = dashboardSourceRepository;
     this.assignmentFactory = assignmentFactory;
     this.assignmentChangeAuthorizer = assignmentChangeAuthorizer;
     this.sagaPublisher = sagaPublisher;
@@ -867,6 +876,9 @@ public class DataSetService
           sink.setPipeline(null);
           dataSinkRepository.delete(sink);
         });
+    dashboardRepository.deleteAll(dashboardRepository.findByDataSetId(datasetId));
+    dashboardRepository.flush();
+    dashboardSourceRepository.deleteAll(dashboardSourceRepository.findByMappedDatasetId(datasetId));
     dataSetRepository.delete(dataSet);
     dataSetRepository.flush();
 
@@ -1048,6 +1060,33 @@ public class DataSetService
     }
     if (result.pipelineIds() != null) {
       dataSet.setPipelineIds(result.pipelineIds());
+    }
+    if (result.dashboards() != null) {
+      for (SagaResultPayload.DashboardResult dashboardResult : result.dashboards()) {
+        UUID dashboardId;
+        try {
+          dashboardId = UUID.fromString(dashboardResult.dashboardId());
+        } catch (IllegalArgumentException | NullPointerException e) {
+          log.error(
+              "drift={} dataset={} dashboardId={} — saga returned a malformed dashboard id.",
+              DRIFT_UNKNOWN_DASHBOARD,
+              dataSet.getId(),
+              Encode.forJava(String.valueOf(dashboardResult.dashboardId())));
+          continue;
+        }
+        dashboardRepository
+            .findById(dashboardId)
+            .ifPresentOrElse(
+                dashboard ->
+                    dashboard.setExternalDashboardId(dashboardResult.externalDashboardId()),
+                () ->
+                    log.error(
+                        "drift={} dataset={} dashboardId={} — saga returned a dashboard id absent"
+                            + " from the platform.",
+                        DRIFT_UNKNOWN_DASHBOARD,
+                        dataSet.getId(),
+                        Encode.forJava(dashboardResult.dashboardId())));
+      }
     }
   }
 }
