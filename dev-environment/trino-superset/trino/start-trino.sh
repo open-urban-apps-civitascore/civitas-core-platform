@@ -139,7 +139,7 @@ EOF
 cat > /etc/trino/access-control.properties <<EOF
 access-control.name=opa
 opa.policy.uri=http://civitas-opa:8181/v1/data/civitas/trino/allow
-# Keep row-filter configuration on the plugin's `opa.policy.row-filters-uri` property.
+# Keep row-filter configuration on the plugin's opa.policy.row-filters-uri property.
 opa.policy.row-filters-uri=http://civitas-opa:8181/v1/data/civitas/trino/row_filters/result
 opa.log-requests=true
 EOF
@@ -168,4 +168,4 @@ case-insensitive-name-matching=true
 unsupported-type-handling=CONVERT_TO_VARCHAR
 EOF
 
-exec /usr/lib/trino/bin/run-trino
+exec /usr/lib/trino/bin/launcher run --etc-dir /etc/trino
