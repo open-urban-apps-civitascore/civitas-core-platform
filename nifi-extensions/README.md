@@ -450,6 +450,7 @@ value at the path gives the records:
 - No value, or a JSON number, string or boolean: `stop`. The cause names the path and the type it
   found, never a value of the response.
 - A response that holds the path twice, through a repeated member name: `stop`.
+- A response that is only `null`: no records, as without an `entriesPath`.
 
 The FlowFile on `success` holds the value at the path with the bytes of the response: an array
 stays an array, an object stays an object, and `null` gives `[]`. The rest of the response is not

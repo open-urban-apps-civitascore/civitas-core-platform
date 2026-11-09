@@ -97,6 +97,22 @@ class GetHttpApiCallEntriesPathTest {
   }
 
   @ParameterizedTest
+  @ValueSource(strings = {"null", " null\n"})
+  void onTrigger_whenTheResponseIsOnlyNull_createsNoFlowFile(String body)
+      throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, body)) {
+      TestRunner runner = runner(endpoint, "$.data", null);
+
+      runner.run();
+
+      runner.assertTransferCount(GetHttpApiCall.SUCCESS, 0);
+      runner.assertTransferCount(GetHttpApiCall.STOP, 0);
+      runner.assertTransferCount(GetHttpApiCall.FAILURE, 0);
+      assertTrue(runner.getLogger().getErrorMessages().isEmpty());
+    }
+  }
+
+  @ParameterizedTest
   @ValueSource(strings = {"7", "\"val-1f3e\"", "true", "null", "[]", "[{\"stationid\":\"a0\"}]"})
   void onTrigger_whenAnEntryIsNotAnObjectAndTheSchemaAllowsIt_routesTheRunToStop(String element)
       throws InitializationException {
