@@ -176,8 +176,6 @@ final class RecordSchema {
     private final List<JsonPath> paths;
     private final Map<JsonPath, JsonNode> values = new HashMap<>();
     private final Violations violations = new Violations();
-    private Optional<PageContent.Span> entries = Optional.empty();
-    private boolean found;
 
     EntriesReader(JsonParser parser, ResponseShape.EntriesAt shape) {
       this.parser = new NumberTextParser(parser, shape.paths());
@@ -190,12 +188,21 @@ final class RecordSchema {
 
     /** Leaves the parser at the last token of the response. */
     Verdict read() throws IOException {
+      boolean found = false;
+      Optional<PageContent.Span> entries = Optional.empty();
       for (JsonToken token = parser.currentToken(); ; token = parser.nextToken()) {
         if (token != JsonToken.FIELD_NAME && !token.isStructEnd()) {
-          Optional<String> rejection = value(token);
+          JsonStreamContext location = location(token);
+          Optional<String> rejection = rejection(token, location, found);
           if (rejection.isPresent()) {
             skipToTheEnd();
             return new Verdict.Rejected(rejection.get());
+          }
+          if (entriesPath.isAt(location)) {
+            found = true;
+            entries = entriesAt(token, location);
+          } else {
+            value(token, location);
           }
         }
         if (parser.getParsingContext().inRoot()) {
@@ -209,38 +216,21 @@ final class RecordSchema {
     }
 
     /**
-     * Reads the value that starts at {@code token}, or only its first token when the parser must
-     * descend into it to reach a path.
+     * @param found whether the response had a value at the path to entries before {@code token}
      */
-    private Optional<String> value(JsonToken token) throws IOException {
-      JsonStreamContext location = location(token);
+    private Optional<String> rejection(JsonToken token, JsonStreamContext location, boolean found) {
       Optional<JsonPath> holder = paths.stream().filter(path -> path.isAt(location)).findFirst();
-      boolean holdsEntries = entriesPath.isAt(location) || entriesPath.isInside(location);
-      if (token.isStructStart() && holdsEntries && holder.isPresent()) {
+      if (token.isStructStart() && holdsEntries(location) && holder.isPresent()) {
         return Optional.of(
             "the value at " + holder.get() + " must not hold the path to entries " + entriesPath);
       }
-      if (entriesPath.isAt(location)) {
-        return entriesAt(token, location);
+      if (!entriesPath.isAt(location)) {
+        return Optional.empty();
       }
-      if (holder.isPresent()) {
-        capture(location);
-      } else if (token.isStructStart()
-          && !holdsEntries
-          && paths.stream().noneMatch(path -> path.isInside(location))) {
-        parser.skipChildren();
-      }
-      return Optional.empty();
-    }
-
-    private Optional<String> entriesAt(JsonToken token, JsonStreamContext location)
-        throws IOException {
       if (found) {
         return Optional.of("the response holds more than one value at " + entriesPath);
       }
-      found = true;
       if (token == JsonToken.VALUE_NULL) {
-        capture(location);
         return Optional.empty();
       }
       if (!token.isStructStart()) {
@@ -251,10 +241,36 @@ final class RecordSchema {
                 + scalarType(token)
                 + ", not an object or an array");
       }
-      long start = parser.currentTokenLocation().getByteOffset();
-      if (start < 0) {
+      if (parser.currentTokenLocation().getByteOffset() < 0) {
         return Optional.of("the response is not UTF-8");
       }
+      return Optional.empty();
+    }
+
+    /**
+     * Reads the value that starts at {@code token}, or only its first token when the parser must
+     * descend into it to reach a path.
+     */
+    private void value(JsonToken token, JsonStreamContext location) throws IOException {
+      if (paths.stream().anyMatch(path -> path.isAt(location))) {
+        capture(location);
+      } else if (token.isStructStart()
+          && !holdsEntries(location)
+          && paths.stream().noneMatch(path -> path.isInside(location))) {
+        parser.skipChildren();
+      }
+    }
+
+    /**
+     * @return where the value lies in the response; empty for {@code null}
+     */
+    private Optional<PageContent.Span> entriesAt(JsonToken token, JsonStreamContext location)
+        throws IOException {
+      if (token == JsonToken.VALUE_NULL) {
+        capture(location);
+        return Optional.empty();
+      }
+      long start = parser.currentTokenLocation().getByteOffset();
       if (token == JsonToken.START_ARRAY) {
         for (JsonToken element = parser.nextToken();
             element != JsonToken.END_ARRAY;
@@ -265,10 +281,12 @@ final class RecordSchema {
       } else {
         violations.add(violations(capture(location)));
       }
-      entries =
-          Optional.of(
-              new PageContent.Span(start, parser.currentLocation().getByteOffset() - start));
-      return Optional.empty();
+      return Optional.of(
+          new PageContent.Span(start, parser.currentLocation().getByteOffset() - start));
+    }
+
+    private boolean holdsEntries(JsonStreamContext location) {
+      return entriesPath.isAt(location) || entriesPath.isInside(location);
     }
 
     /**

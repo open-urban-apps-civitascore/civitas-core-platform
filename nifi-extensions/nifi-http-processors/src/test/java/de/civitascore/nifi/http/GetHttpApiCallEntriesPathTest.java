@@ -106,6 +106,7 @@ class GetHttpApiCallEntriesPathTest {
         "[] | the response has no value at $.data",
         "'\"s-7d1e\"' | the response has no value at $.data",
         "{\"data\":[],\"data\":[]} | the response holds more than one value at $.data",
+        "{\"data\":null,\"data\":null} | the response holds more than one value at $.data",
         "{\"data\":[{\"stationid\":\"a1\"} | the response is not JSON",
         "{\"data\":42} | the value at $.data is a JSON number, not an object or an array",
         "{\"data\":\"s-7d1e\"} | the value at $.data is a JSON string, not an object or an array",
