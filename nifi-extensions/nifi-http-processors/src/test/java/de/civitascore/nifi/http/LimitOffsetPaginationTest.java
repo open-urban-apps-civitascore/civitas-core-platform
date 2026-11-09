@@ -219,11 +219,11 @@ class LimitOffsetPaginationTest {
   }
 
   private static PageContent arrayOf(int records) {
-    return new PageContent(records, Map.of(), Map.of());
+    return new PageContent(records, Map.of(), Map.of(), Optional.empty());
   }
 
   private static PageContent countOf(JsonNode count) {
-    return new PageContent(1, Map.of(COUNT_PATH, count), Map.of());
+    return new PageContent(1, Map.of(COUNT_PATH, count), Map.of(), Optional.empty());
   }
 
   private static Page nextPage(LimitOffsetPagination pagination, Page page, PageContent content) {

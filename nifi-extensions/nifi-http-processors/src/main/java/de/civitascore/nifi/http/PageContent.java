@@ -34,10 +34,6 @@ record PageContent(
     numberTexts = Map.copyOf(numberTexts);
   }
 
-  PageContent(int records, Map<JsonPath, JsonNode> values, Map<JsonPath, String> numberTexts) {
-    this(records, values, numberTexts, Optional.empty());
-  }
-
   /** The bytes of a value in the response, from the first byte of the value. */
   record Span(long offset, long length) {}
 }
