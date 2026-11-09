@@ -154,7 +154,8 @@ variables:
   BRUNO_CLI_VERSION: '4.3.0' # api-test-backend; was installed unpinned on every run
   CHECK_JSONSCHEMA_VERSION: '0.38.2' # validate-schemas-model-forge
   DEPCHECK_VERSION: '1.4.7' # lint-frontend
-  PLAYWRIGHT_VERSION: '1.58.2' # e2e-test-frontend; keep equal to @playwright/test in portal-frontend/package.json
+  # renovate: datasource=docker
+  PLAYWRIGHT_IMAGE: "mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f" # e2e-test-frontend; same version as @playwright/test in portal-frontend/package.json (lint-frontend checks it)
   TRIVY_GATE_SEVERITY: 'CRITICAL' # Container scan fails on fixable findings of these severities. Stricter: 'HIGH,CRITICAL'
   GITLAB_ADVANCED_SAST_ENABLED: 'true'
   AST_ENABLE_MR_PIPELINES: 'true' # Enable secret detection in MR pipelines
