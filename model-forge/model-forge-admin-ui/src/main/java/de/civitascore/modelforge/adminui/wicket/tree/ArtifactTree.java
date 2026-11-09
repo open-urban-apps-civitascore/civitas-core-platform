@@ -27,13 +27,26 @@ public class ArtifactTree extends NestedTree<ArtifactTreeNode> {
         super(id, provider);
         this.currentUrn = currentUrn;
         setOutputMarkupId(true);
+        expandGroupOfCurrent(provider);
     }
 
     /**
-     * The artifact this tree highlights, or {@code null}. Artifact nodes are lazy children of their
-     * type group, so the highlight is not in the initially rendered markup — this exposes it so a
-     * test can assert the tree was given the open artifact without driving a branch expansion.
+     * Expands the type group that holds the open artifact, so the highlighted row is visible and the
+     * tree matches the page's {@code Browse › type › artifact} breadcrumb. Type-group children come
+     * from the same root search as the groups themselves, so this costs no extra registry query.
      */
+    private void expandGroupOfCurrent(ArtifactTreeProvider provider) {
+        if (currentUrn == null) {
+            return;
+        }
+        provider.getRoots().forEachRemaining(group -> provider.getChildren(group).forEachRemaining(child -> {
+            if (child instanceof ArtifactTreeNode.Artifact a && currentUrn.equals(a.urn())) {
+                expand(group);
+            }
+        }));
+    }
+
+    /** The artifact this tree highlights, or {@code null}. */
     public String currentUrn() {
         return currentUrn;
     }

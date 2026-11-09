@@ -97,7 +97,7 @@ class ArtifactViewPageTest extends AbstractWicketPageTest {
     }
 
     @Test
-    void theSidebarMarksTheOpenArtifactActive() {
+    void theSidebarExpandsToAndMarksTheOpenArtifactActive() {
         ArtifactId self = new ArtifactId(URN);
         when(modelForge.getArtifact(eq(self)))
             .thenReturn(Optional.of(new ArtifactView(self, JSON.readTree("{\"type\":\"object\"}"))));
@@ -112,11 +112,14 @@ class ArtifactViewPageTest extends AbstractWicketPageTest {
         tester.startPage(ArtifactViewPage.class, new PageParameters().add("urn", URN));
 
         tester.assertNoErrorMessage();
-        // Artifact nodes are lazy children of their type group, so the "active" class is not in the
-        // initial markup — assert the tree was handed the open artifact instead. This is null when
-        // currentUrn() is read from the base-page constructor, before the subclass assigns its urn.
+        // This is null when currentUrn() is read from the base-page constructor, before the subclass
+        // assigns its urn.
         ArtifactTree tree = (ArtifactTree) tester.getLastRenderedPage().get("artifactTree");
         assertThat(tree.currentUrn()).isEqualTo(URN);
+        // The open artifact's type group is expanded, so its row is in the initial markup.
+        assertThat(tester.getLastResponseAsString()).containsPattern("class=\"mf-tree-label active\"[^>]*>");
+        // An artifact page belongs to Browse, like its breadcrumb.
+        assertThat(tester.getTagByWicketId("navArtifacts").getAttribute("aria-current")).isEqualTo("page");
     }
 
     private static DependencyGraphView oneRelated(String name) {

@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import de.civitascore.modelforge.adminui.wicket.AbstractWicketPageTest;
 import de.civitascore.modelforge.contract.ArtifactId;
 import de.civitascore.modelforge.contract.ArtifactView;
+import java.util.List;
 import java.util.Optional;
 import org.apache.wicket.request.mapper.parameter.PageParameters;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,9 @@ import tools.jackson.databind.ObjectMapper;
 class SmokePagesTest extends AbstractWicketPageTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final List<String> NAV_LINKS = List.of(
+        "navArtifacts", "navNew", "navImport", "navSeed", "navSmartDataModels", "navXRepository",
+        "navValidate", "navGraph");
 
     @Test
     void importPageRenders() {
@@ -111,5 +115,37 @@ class SmokePagesTest extends AbstractWicketPageTest {
         // The pre-loaded content renders inside the CodeEditorPanel's textarea/viewer, where Wicket
         // HTML-escapes the JSON quotes ({"type":"object"} → {&quot;type&quot;:&quot;object&quot;}).
         tester.assertContains("&quot;type&quot;");
+    }
+
+    @Test
+    void theNavMarksTheCurrentPageActive() {
+        tester.startPage(ImportPage.class);
+
+        assertThat(activeNavLinks()).containsExactly("navImport");
+    }
+
+    @Test
+    void theNavMarksNewArtifactWhenCreating() {
+        tester.startPage(ArtifactEditPage.class);
+
+        assertThat(activeNavLinks()).containsExactly("navNew");
+    }
+
+    @Test
+    void theNavMarksBrowseWhenEditingAnExistingArtifact() {
+        String urn = "urn:core:platform:civitas:element:common:d9e5d4ce-e872-8435-beb7-2038c6a6866a:1.0.0";
+        ArtifactId id = new ArtifactId(urn);
+        when(modelForge.getArtifact(eq(id)))
+            .thenReturn(Optional.of(new ArtifactView(id, JSON.readTree("{\"type\":\"object\"}"))));
+
+        tester.startPage(ArtifactEditPage.class, new PageParameters().add("urn", urn));
+
+        assertThat(activeNavLinks()).containsExactly("navArtifacts");
+    }
+
+    private List<String> activeNavLinks() {
+        return NAV_LINKS.stream()
+            .filter(id -> "active".equals(tester.getTagByWicketId(id).getAttribute("class")))
+            .toList();
     }
 }
