@@ -343,7 +343,7 @@ class GetHttpApiCallTest {
       delimiter = '|',
       quoteCharacter = '\'',
       value = {"'\"val-1f3e\"' | string", "42             | number", "true           | boolean"})
-  void onTrigger_whenTheResponseIsAJsonScalar_routesToStop(String body, String kind)
+  void onTrigger_whenTheResponseIsAJsonStringNumberOrBoolean_routesToStop(String body, String kind)
       throws InitializationException {
     try (ApiEndpoint endpoint = ApiEndpoint.answering(200, body)) {
       TestRunner runner = runner(endpoint.baseUrl());

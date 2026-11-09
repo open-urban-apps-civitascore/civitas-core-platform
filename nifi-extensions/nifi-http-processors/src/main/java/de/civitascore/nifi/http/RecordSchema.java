@@ -94,7 +94,7 @@ final class RecordSchema {
     try (JsonParser parser = RECORD_READER.createParser(response)) {
       JsonToken first = parser.nextToken();
       if (first == null) {
-        return new Verdict.NoRecords();
+        return new Verdict.Empty();
       }
       Verdict verdict =
           switch (first) {
@@ -112,7 +112,7 @@ final class RecordSchema {
               }
               yield object(parser, shape);
             }
-            case VALUE_NULL -> new Verdict.NoRecords();
+            case VALUE_NULL -> new Verdict.Empty();
             default -> new Verdict.WrongType(scalarType(first), shape.expected());
           };
       return parser.nextToken() == null ? verdict : new Verdict.Rejected(NOT_JSON);
@@ -174,7 +174,7 @@ final class RecordSchema {
      * The response holds only JSON whitespace, or only {@code null}, which some APIs send for an
      * empty result.
      */
-    record NoRecords() implements Verdict {}
+    record Empty() implements Verdict {}
 
     record Agrees(PageContent content) implements Verdict {}
 
