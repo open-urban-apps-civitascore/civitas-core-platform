@@ -184,6 +184,37 @@ class FlowableTriggerConsumerHasPipelinesTest {
         Arguments.of(null, false));
   }
 
+  @ParameterizedTest(name = "hasPendingGeoSink={1} when pendingUnprovisionDatasinks={0}")
+  @MethodSource("geoSinkCases")
+  void deriveHasPendingGeoSink(Object pendingSinks, boolean expected) throws Exception {
+    TriggerTestSupport.processTrigger(
+        consumer, triggerWith("pendingUnprovisionDatasinks", pendingSinks));
+
+    assertEquals(expected, capturedVariables().get("hasPendingGeoSink"));
+  }
+
+  @ParameterizedTest(name = "hasPendingFrostSink={1} when pendingUnprovisionDatasinks={0}")
+  @MethodSource("frostSinkCases")
+  void deriveHasPendingFrostSink(Object pendingSinks, boolean expected) throws Exception {
+    TriggerTestSupport.processTrigger(
+        consumer, triggerWith("pendingUnprovisionDatasinks", pendingSinks));
+
+    assertEquals(expected, capturedVariables().get("hasPendingFrostSink"));
+  }
+
+  @Test
+  void pendingSinksDoNotSetTheActiveSinkFlags() throws Exception {
+    TriggerTestSupport.processTrigger(
+        consumer,
+        triggerWith(
+            "pendingUnprovisionDatasinks",
+            List.of(Map.of("type", "FROST"), Map.of("type", "POSTGIS"))));
+
+    Map<String, Object> variables = capturedVariables();
+    assertEquals(Boolean.FALSE, variables.get("hasGeoSink"));
+    assertEquals(Boolean.FALSE, variables.get("hasFrostSink"));
+  }
+
   @Test
   void deriveHasFrostSink_explicitValueInPayloadIsOverriddenByDerivation() throws Exception {
     Map<String, Object> payload = new HashMap<>();

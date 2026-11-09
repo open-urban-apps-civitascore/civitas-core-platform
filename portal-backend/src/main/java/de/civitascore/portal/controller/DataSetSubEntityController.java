@@ -15,6 +15,8 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -36,6 +38,19 @@ public abstract class DataSetSubEntityController<
         E extends DataSetOwnedEntity,
         S extends BaseSpec<E>>
     extends BaseController<I, O, E, S> {
+
+  /** Query parameter that confirms the deletion of stored data. */
+  protected static final String CONFIRM_DATA_LOSS = "confirmDataLoss";
+
+  protected static final String CONFIRM_DATA_LOSS_DESCRIPTION =
+      "Must be true when the request removes a provisioned Data sink: its stored data is deleted"
+          + " at the next release. Layers and APIs that the request removes need no confirmation.";
+
+  protected static final String REMOVAL_CONFLICT_DESCRIPTION =
+      "A saga is in flight on the parent dataset (code SAGA_IN_FLIGHT), or the request removes a"
+          + " provisioned Data sink without confirmDataLoss=true (code REMOVAL_NOT_CONFIRMED; the"
+          + " property removal lists the dataSinks, layers and apis it would remove). Nothing"
+          + " changed.";
 
   /**
    * Names this controller's entity in the {@code dataSetId} path-variable error and in the
@@ -119,13 +134,20 @@ public abstract class DataSetSubEntityController<
    * @return the addressed entity
    * @throws ResourceNotFoundException if the entity does not exist or belongs to another dataset
    */
-  private E requireOwnedByPathDataSet(UUID id) {
+  protected E requireOwnedByPathDataSet(UUID id) {
     UUID dataSetId = extractDataSetId();
     E entity = getService().findByIdOrThrow(id);
     if (!dataSetId.equals(entity.getDataSet().getId())) {
       throw new ResourceNotFoundException(getEntityClass().getSimpleName(), id);
     }
     return entity;
+  }
+
+  /** Whether the {@value #CONFIRM_DATA_LOSS} query parameter is {@code true}. */
+  protected boolean isDataLossConfirmed() {
+    ServletRequestAttributes attributes =
+        (ServletRequestAttributes) RequestContextHolder.currentRequestAttributes();
+    return Boolean.parseBoolean(attributes.getRequest().getParameter(CONFIRM_DATA_LOSS));
   }
 
   private UUID extractDataSetId() {

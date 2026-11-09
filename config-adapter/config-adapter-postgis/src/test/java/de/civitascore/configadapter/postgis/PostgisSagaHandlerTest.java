@@ -709,6 +709,106 @@ class PostgisSagaHandlerTest {
       assertEquals("COMPENSATION_COMPLETED", result.type());
     }
 
+    @Test
+    void unprovisionSinksDropsPendingRoleTableAndSchemaWhenNoActivePostgisSinkRemains()
+        throws Exception {
+      Map<String, Object> trigger =
+          Map.of(
+              "datasetId",
+              "ds-42",
+              "datasinks",
+              List.of(Map.of("type", "FROST", "configuration", Map.of())),
+              "pendingUnprovisionDatasinks",
+              List.of(pendingSink("sensor_readings", "ds_42_geo")));
+
+      SagaCommandResult result = handler.handle(execute("UNPROVISION_SINKS", trigger));
+
+      assertEquals("STEP_COMPLETED", result.type());
+      assertEquals(
+          List.of(
+              "DROP OWNED BY \"ds_42_geo\"",
+              "DROP ROLE \"ds_42_geo\"",
+              "DROP TABLE \"ds_42\".\"sensor_readings\"",
+              "DROP SCHEMA \"ds_42\" RESTRICT"),
+          executedSql());
+      verify(mockConnection).commit();
+    }
+
+    @Test
+    void unprovisionSinksKeepsTheSchemaAndTheActiveTableWhileAnActivePostgisSinkRemains()
+        throws Exception {
+      Map<String, Object> trigger =
+          Map.of(
+              "datasetId",
+              "ds-42",
+              "datasinks",
+              List.of(
+                  Map.of("type", "POSTGIS", "configuration", Map.of("tableName", "active_table"))),
+              "pendingUnprovisionDatasinks",
+              List.of(pendingSink("sensor_readings", "ds_42_geo")));
+
+      SagaCommandResult result = handler.handle(execute("UNPROVISION_SINKS", trigger));
+
+      assertEquals("STEP_COMPLETED", result.type());
+      List<String> executed = executedSql();
+      assertTrue(executed.contains("DROP TABLE \"ds_42\".\"sensor_readings\""), executed::toString);
+      assertTrue(executed.stream().noneMatch(s -> s.startsWith("DROP SCHEMA")), executed::toString);
+      assertTrue(executed.stream().noneMatch(s -> s.contains("active_table")), executed::toString);
+    }
+
+    @Test
+    void unprovisionSinksKeepsATableThatAnActivePostgisSinkAlsoNames() throws Exception {
+      Map<String, Object> trigger =
+          Map.of(
+              "datasetId",
+              "ds-42",
+              "datasinks",
+              List.of(
+                  Map.of("type", "POSTGIS", "configuration", Map.of("tableName", "shared_table"))),
+              "pendingUnprovisionDatasinks",
+              List.of(
+                  pendingSink("shared_table", "ds_42_shared"),
+                  pendingSink("sensor_readings", "ds_42_geo")));
+
+      SagaCommandResult result = handler.handle(execute("UNPROVISION_SINKS", trigger));
+
+      assertEquals("STEP_COMPLETED", result.type());
+      List<String> executed = executedSql();
+      assertTrue(executed.contains("DROP TABLE \"ds_42\".\"sensor_readings\""), executed::toString);
+      assertTrue(executed.stream().noneMatch(s -> s.contains("shared")), executed::toString);
+    }
+
+    @Test
+    void unprovisionSinksAbsorbsMissingObjects() throws Exception {
+      when(mockStatement.execute(anyString()))
+          .thenThrow(new SQLException("undefined object", "42704"));
+      Map<String, Object> trigger =
+          Map.of(
+              "datasetId",
+              "ds-42",
+              "pendingUnprovisionDatasinks",
+              List.of(pendingSink("sensor_readings", "ds_42_geo")));
+
+      SagaCommandResult result = handler.handle(execute("UNPROVISION_SINKS", trigger));
+
+      assertEquals("STEP_COMPLETED", result.type());
+      verify(mockConnection).commit();
+    }
+
+    private Map<String, Object> pendingSink(String tableName, String readRole) {
+      return Map.of(
+          "type",
+          "POSTGIS",
+          "configuration",
+          Map.of("tableName", tableName, "readRole", Map.of("name", readRole)));
+    }
+
+    private List<String> executedSql() throws SQLException {
+      ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+      verify(mockStatement, org.mockito.Mockito.atLeastOnce()).execute(sql.capture());
+      return sql.getAllValues();
+    }
+
     private Map<String, Object> postgisSinkTrigger() {
       return Map.of(
           "datasetId",

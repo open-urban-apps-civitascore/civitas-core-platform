@@ -23,8 +23,8 @@ vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
   useGetDataSinks: vi.fn().mockReturnValue({
     data: {
       data: [
-        { id: 'sink-1', dataSinkType: 'POSTGIS', pipelineId: 'pipeline-1' },
-        { id: 'sink-2', dataSinkType: 'FROST', pipelineId: 'pipeline-1' },
+        { id: 'sink-1', dataSinkType: 'POSTGIS', pipelineIds: ['pipeline-1'] },
+        { id: 'sink-2', dataSinkType: 'FROST', pipelineIds: ['pipeline-1'] },
       ],
     },
   }),
@@ -100,7 +100,7 @@ describe('ApiList', () => {
 
     it('SensorThings item is disabled when no pipeline has a FROST data sink', async () => {
       vi.mocked(useGetDataSinks).mockReturnValueOnce({
-        data: { data: [{ id: 'sink-2', dataSinkType: 'FROST', pipelineId: null }] },
+        data: { data: [{ id: 'sink-2', dataSinkType: 'FROST', pipelineIds: [] }] },
       } as never)
       renderComponent()
       await userEvent.click(screen.getByText('addButton'))

@@ -24,8 +24,9 @@ import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
-import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
+import de.civitascore.portal.service.removal.DataSinkRemovalService;
+import de.civitascore.portal.service.removal.RemovalNotConfirmedException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -43,7 +44,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
@@ -55,13 +55,13 @@ class DataSinkServiceTest {
   @Mock private DataSinkMapper dataSinkMapper;
   @Mock private DataSetRepository dataSetRepository;
   @Mock private DataStructureVersionRepository dataStructureVersionRepository;
-  @Mock private LayerRepository layerRepository;
+  @Mock private DataSinkRemovalService dataSinkRemovalService;
   @Mock private ModelRegistryGateway modelRegistryGateway;
   @Mock private ScopeAccessAuthorizer scopeAccessAuthorizer;
 
   @Mock private DataSetMutationGuard dataSetMutationGuard;
 
-  @InjectMocks private DataSinkService dataSinkService;
+  private DataSinkService dataSinkService;
 
   private static final String STORED_LOGICAL_URN =
       "urn:core:platform:civitas:datasink:common:00000000-0000-4000-8000-000000000013";
@@ -69,6 +69,21 @@ class DataSinkServiceTest {
   private static final UUID STRUCTURE_ID = UUID.fromString("5cf6e9e7-fa0d-877a-bda7-df0cc339e439");
   private static final String ELEMENT_URN =
       "urn:core:platform:civitas:element:common:" + STRUCTURE_ID + ":1.0.0";
+
+  @BeforeEach
+  void createService() {
+    dataSinkService =
+        new DataSinkService(
+            dataSinkRepository,
+            dataSinkMapper,
+            dataSetRepository,
+            dataStructureVersionRepository,
+            modelRegistryGateway,
+            scopeAccessAuthorizer,
+            dataSetMutationGuard,
+            dataSinkRemovalService,
+            new DataSinkTableNames(modelRegistryGateway));
+  }
 
   @BeforeEach
   void stubPayloadStore() {
@@ -127,7 +142,7 @@ class DataSinkServiceTest {
       DataSink result = dataSinkService.create(input);
 
       assertThat(result.getDataSet()).isSameAs(dataSet);
-      assertThat(result.getPipeline()).isNull();
+      assertThat(result.getPipelines()).isEmpty();
     }
 
     @Test
@@ -235,46 +250,19 @@ class DataSinkServiceTest {
     }
 
     @Test
-    @DisplayName("Delete removes the backing configuration artifact from the registry")
-    void deleteRemovesConfigurationArtifact() {
+    @DisplayName("A sink pending unprovision is not found")
+    void pendingSinkIsNotFound() {
       UUID sinkId = UUID.randomUUID();
       DataSink sink = new DataSink();
       sink.setId(sinkId);
       sink.setDataSet(dataSet(UUID.randomUUID()));
-      sink.setDataSinkType(DataSinkType.POSTGIS);
-      sink.setConfigurationLogicalUrn(STORED_LOGICAL_URN);
-      sink.setConfigurationUrn(STORED_VERSIONED_URN);
-
-      when(dataSinkRepository.existsById(sinkId)).thenReturn(true);
-      when(dataSinkRepository.findByIdWithRelations(sinkId)).thenReturn(Optional.of(sink));
-      when(layerRepository.existsByDataSinkId(sinkId)).thenReturn(false);
-
-      dataSinkService.deleteById(sinkId);
-
-      verify(dataSinkRepository).deleteById(sinkId);
-      verify(modelRegistryGateway).deletePayload(STORED_LOGICAL_URN);
-    }
-
-    @Test
-    @DisplayName("Delete refuses a provisioned sink and keeps its configuration artifact")
-    void deleteRefusesProvisionedSink() {
-      UUID sinkId = UUID.randomUUID();
-      DataSink sink = new DataSink();
-      sink.setId(sinkId);
-      sink.setDataSet(dataSet(UUID.randomUUID()));
-      sink.setDataSinkType(DataSinkType.POSTGIS);
-      sink.setProvisioned(true);
-      sink.setConfigurationLogicalUrn(STORED_LOGICAL_URN);
-
-      when(dataSinkRepository.existsById(sinkId)).thenReturn(true);
+      sink.markPendingUnprovision(null);
       when(dataSinkRepository.findByIdWithRelations(sinkId)).thenReturn(Optional.of(sink));
 
       assertThatThrownBy(() -> dataSinkService.deleteById(sinkId))
-          .isInstanceOf(ResourceInUseException.class)
-          .hasMessageContaining("provisioned");
-
-      verify(dataSinkRepository, never()).deleteById(sinkId);
-      verify(modelRegistryGateway, never()).deletePayload(any());
+          .isInstanceOf(ResourceNotFoundException.class);
+      assertThat(dataSinkService.findById(sinkId)).isEmpty();
+      verify(dataSinkRemovalService, never()).apply(any());
     }
   }
 
@@ -697,6 +685,23 @@ class DataSinkServiceTest {
     }
 
     @Test
+    @DisplayName("Should name the next release when a removed sibling still holds the tableName")
+    void shouldExplainATableNameHeldByARemovedSink() {
+      UUID dataSetId = UUID.randomUUID();
+      DataSink removed = postgisSink(UUID.randomUUID(), dataSetId, "messwerte");
+      removed.markPendingUnprovision("messwerte");
+
+      DataSinkInputDTO input = postgisInput(dataSetId, "messwerte");
+      stubCreate(dataSetId, input);
+      when(dataSinkRepository.findByDataSetId(dataSetId)).thenReturn(List.of(removed));
+
+      assertThatThrownBy(() -> dataSinkService.create(input))
+          .isInstanceOf(UniqueConstraintViolationException.class)
+          .hasMessageContaining("A removed POSTGIS DataSink")
+          .hasMessageContaining("until the next release");
+    }
+
+    @Test
     @DisplayName("Should reject a tableName differing from a sibling only in case")
     void shouldRejectCaseOnlyDifference() {
       UUID dataSetId = UUID.randomUUID();
@@ -927,8 +932,12 @@ class DataSinkServiceTest {
       input.setConfirmDataLoss(false);
 
       assertThatThrownBy(() -> dataSinkService.update(sink.getId(), input))
-          .isInstanceOf(ResourceInUseException.class)
-          .hasMessageContaining("confirmDataLoss");
+          .isInstanceOfSatisfying(
+              RemovalNotConfirmedException.class,
+              e ->
+                  assertThat(e.getRemoval().dataSinks())
+                      .singleElement()
+                      .satisfies(removed -> assertThat(removed.id()).isEqualTo(sink.getId())));
     }
 
     @ParameterizedTest(name = "confirmDataLoss={0}")
@@ -977,7 +986,7 @@ class DataSinkServiceTest {
       input.setConfirmDataLoss(true);
 
       assertThatThrownBy(() -> dataSinkService.update(sink.getId(), input))
-          .isNotInstanceOf(ResourceInUseException.class);
+          .isNotInstanceOfAny(ResourceInUseException.class, RemovalNotConfirmedException.class);
     }
 
     /**
@@ -993,7 +1002,7 @@ class DataSinkServiceTest {
       DataSinkInputDTO input = updateInput("new_table", "v1", false);
 
       assertThatThrownBy(() -> dataSinkService.update(sink.getId(), input))
-          .isNotInstanceOf(ResourceInUseException.class);
+          .isNotInstanceOfAny(ResourceInUseException.class, RemovalNotConfirmedException.class);
     }
 
     @Test
@@ -1006,7 +1015,7 @@ class DataSinkServiceTest {
       DataSinkInputDTO input = updateInput("old_table", "v1", false);
 
       assertThatThrownBy(() -> dataSinkService.update(sink.getId(), input))
-          .isNotInstanceOf(ResourceInUseException.class);
+          .isNotInstanceOfAny(ResourceInUseException.class, RemovalNotConfirmedException.class);
     }
   }
 }

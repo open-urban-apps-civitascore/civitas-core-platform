@@ -3,6 +3,7 @@ package de.civitascore.portal.service;
 import de.civitascore.configadapter.model.dataset.CoreUrn;
 import de.civitascore.portal.mapper.DataSinkMapper;
 import de.civitascore.portal.model.datasink.FrostSinkPort;
+import de.civitascore.portal.model.embedded.DataSinkState;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSet;
@@ -13,8 +14,11 @@ import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.DataStructureVersionRepository;
-import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
+import de.civitascore.portal.service.removal.DataSinkChange;
+import de.civitascore.portal.service.removal.DataSinkRemovalService;
+import de.civitascore.portal.service.removal.RemovalNotConfirmedException;
+import de.civitascore.portal.service.removal.UnconfirmedRemoval;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -28,8 +32,11 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Service for managing {@link DataSink} entities. A DataSink belongs directly to a {@link DataSet};
@@ -37,6 +44,8 @@ import org.springframework.stereotype.Service;
  * {@link PipelineService} when a Pipeline declares the DataSink in its {@code dataSinkIds}. The
  * type-specific configuration document lives in the Model Forge registry, pinned by the sink's
  * {@code configurationUrn}.
+ *
+ * <p>Only {@link DataSinkState#ACTIVE} sinks are visible: a sink pending unprovision is not found.
  */
 @Slf4j
 @Service
@@ -57,28 +66,31 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
   private final DataSinkRepository dataSinkRepository;
   private final DataSinkMapper dataSinkMapper;
   private final DataSetRepository dataSetRepository;
-  private final LayerRepository layerRepository;
   private final DataStructureVersionRepository dataStructureVersionRepository;
   private final ModelRegistryGateway modelRegistryGateway;
   private final ScopeAccessAuthorizer scopeAccessAuthorizer;
+  private final DataSinkRemovalService dataSinkRemovalService;
+  private final DataSinkTableNames dataSinkTableNames;
 
   public DataSinkService(
       DataSinkRepository dataSinkRepository,
       DataSinkMapper dataSinkMapper,
       DataSetRepository dataSetRepository,
       DataStructureVersionRepository dataStructureVersionRepository,
-      LayerRepository layerRepository,
       ModelRegistryGateway modelRegistryGateway,
       ScopeAccessAuthorizer scopeAccessAuthorizer,
-      DataSetMutationGuard dataSetMutationGuard) {
+      DataSetMutationGuard dataSetMutationGuard,
+      DataSinkRemovalService dataSinkRemovalService,
+      DataSinkTableNames dataSinkTableNames) {
     super(dataSetMutationGuard);
     this.dataSinkRepository = dataSinkRepository;
     this.dataSinkMapper = dataSinkMapper;
     this.dataSetRepository = dataSetRepository;
     this.dataStructureVersionRepository = dataStructureVersionRepository;
-    this.layerRepository = layerRepository;
     this.modelRegistryGateway = modelRegistryGateway;
     this.scopeAccessAuthorizer = scopeAccessAuthorizer;
+    this.dataSinkRemovalService = dataSinkRemovalService;
+    this.dataSinkTableNames = dataSinkTableNames;
   }
 
   @Override
@@ -98,7 +110,15 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
 
   @Override
   public Optional<DataSink> findById(UUID id) {
-    return dataSinkRepository.findByIdWithRelations(id);
+    return dataSinkRepository.findByIdWithRelations(id).filter(DataSink::isActive);
+  }
+
+  @Override
+  protected Specification<DataSink> preProcessQuery(
+      Specification<DataSink> spec, Pageable pageable) {
+    Specification<DataSink> active =
+        (root, query, cb) -> cb.equal(root.get("state"), DataSinkState.ACTIVE);
+    return super.preProcessQuery(spec == null ? active : spec.and(active), pageable);
   }
 
   /**
@@ -158,9 +178,9 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
           "DataSink is provisioned; its table name and data structure can no longer change."
               + " Create a new DataSink and attach it to the Pipeline instead");
     }
-    throw new ResourceInUseException(
-        getEntityName(),
-        existingEntity.getId(),
+    throw new RemovalNotConfirmedException(
+        existingEntity.getDataSet().getId(),
+        UnconfirmedRemoval.storedDataOf(existingEntity),
         "This change rebuilds the sink's table and discards all stored data;"
             + " set confirmDataLoss=true to proceed");
   }
@@ -222,7 +242,7 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
     if (entity.getDataSinkType() != DataSinkType.POSTGIS) {
       return;
     }
-    String tableName = tableNameOf(entity);
+    String tableName = dataSinkTableNames.of(entity);
     if (tableName == null) {
       return;
     }
@@ -230,12 +250,12 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
     dataSinkRepository.findByDataSetId(entity.getDataSet().getId()).stream()
         .filter(sibling -> !Objects.equals(sibling.getId(), entity.getId()))
         .filter(sibling -> sibling.getDataSinkType() == DataSinkType.POSTGIS)
-        .filter(sibling -> tableName.equalsIgnoreCase(tableNameOf(sibling)))
+        .filter(sibling -> tableName.equalsIgnoreCase(dataSinkTableNames.of(sibling)))
         .findFirst()
         .ifPresent(
-            _ -> {
+            sibling -> {
               throw new UniqueConstraintViolationException(
-                  duplicateTableNameMessage(created, tableName));
+                  duplicateTableNameMessage(sibling, created, tableName));
             });
   }
 
@@ -244,7 +264,13 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
    * a sink that already collides is rejected by a request that changed nothing about its name. That
    * reads as a bug in the request unless the message points at the stored value.
    */
-  private static String duplicateTableNameMessage(boolean created, String tableName) {
+  private static String duplicateTableNameMessage(
+      DataSink sibling, boolean created, String tableName) {
+    if (sibling.getState() == DataSinkState.PENDING_UNPROVISION) {
+      return "A removed POSTGIS DataSink of this dataset keeps tableName '%s' until the next"
+              .formatted(tableName)
+          + " release drops its table; choose another tableName or release the dataset first";
+    }
     if (created) {
       return "Another POSTGIS DataSink of this dataset already uses tableName '%s';"
               .formatted(tableName)
@@ -253,24 +279,6 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
     return "This DataSink's tableName '%s' is already used by another POSTGIS DataSink of this"
             .formatted(tableName)
         + " dataset; rename it to change this sink";
-  }
-
-  /**
-   * A sink's {@code tableName} lives in its registry-stored configuration document rather than on
-   * the row, so the uniqueness check resolves it through the sink's pin. Null when the sink has no
-   * stored configuration yet.
-   */
-  private String tableNameOf(DataSink sink) {
-    if (sink.getConfigurationUrn() == null) {
-      return null;
-    }
-    return modelRegistryGateway
-        .fetchPayload(sink.getConfigurationUrn())
-        .map(ModelRegistryGateway.RegistryDocument::content)
-        .map(content -> content.get("tableName"))
-        .filter(String.class::isInstance)
-        .map(String.class::cast)
-        .orElse(null);
   }
 
   /**
@@ -339,54 +347,28 @@ public class DataSinkService extends DataSetOwnedService<DataSink, DataSinkInput
         : "datasink";
   }
 
-  /**
-   * Detaches every DataSink belonging to the given pipeline by clearing its {@code pipeline}
-   * reference. DataSinks themselves survive — they remain owned by their parent dataset and can be
-   * reattached to a different pipeline later.
-   *
-   * @param pipelineId the pipeline whose DataSinks should be detached
-   */
-  public void unlinkByPipelineId(UUID pipelineId) {
-    dataSinkRepository
-        .findByPipelineId(pipelineId)
-        .forEach(
-            sink -> {
-              sink.setPipeline(null);
-              dataSinkRepository.save(sink);
-            });
+  /** Does not confirm data loss; see {@link #deleteById(UUID, boolean)}. */
+  @Override
+  @Transactional
+  public void deleteById(UUID id) {
+    deleteById(id, false);
   }
 
   /**
-   * A provisioned sink's storage outlives its row, and the dataset teardown only finds storage of
-   * the sinks still present, so such a sink goes only with its dataset.
+   * Deletes the DataSink with its Layers, and with the APIs it is the last backing DataSink of (see
+   * {@link DataSinkRemovalService}). A provisioned DataSink stays as PENDING_UNPROVISION until the
+   * next release removes its storage.
    *
-   * @throws ResourceInUseException (409) if this DataSink is provisioned or a Layer references it
+   * @param confirmDataLoss whether the caller accepts that stored data goes
+   * @throws ResourceInUseException if a Pipeline still links the DataSink
+   * @throws RemovalNotConfirmedException if the delete removes stored data and {@code
+   *     confirmDataLoss} is not set
    */
-  @Override
-  protected void onDelete(DataSink sink) {
-    if (sink.isProvisioned()) {
-      throw new ResourceInUseException(
-          getEntityName(),
-          sink.getId(),
-          "DataSink is provisioned; its storage is removed only together with its DataSet");
-    }
-    if (layerRepository.existsByDataSinkId(sink.getId())) {
-      throw new ResourceInUseException(
-          getEntityName(), sink.getId(), "DataSink is referenced by one or more Layers");
-    }
-  }
-
-  /**
-   * After the sink row is deleted, delete the backing configuration artifact from Model Forge in
-   * the same transaction. No-op when no configuration was ever stored (FROST sinks).
-   *
-   * @param entity the deleted data sink
-   */
-  @Override
-  protected void postDelete(DataSink entity) {
-    if (entity != null && entity.getConfigurationLogicalUrn() != null) {
-      modelRegistryGateway.deletePayload(entity.getConfigurationLogicalUrn());
-    }
+  @Transactional
+  public void deleteById(UUID id, boolean confirmDataLoss) {
+    DataSink sink = preProcessDelete(id);
+    dataSinkRemovalService.apply(
+        dataSinkRemovalService.prepare(DataSinkChange.deleteDataSink(sink), confirmDataLoss));
   }
 
   private void validateConfiguration(DataSinkType type, Map<String, Object> config) {

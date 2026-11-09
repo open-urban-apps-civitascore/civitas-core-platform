@@ -68,7 +68,7 @@ class DataSinkAssemblerTest {
 
     DataSink entity = new DataSink();
     entity.setDataSet(dataSet);
-    entity.setPipeline(pipeline);
+    entity.getPipelines().add(pipeline);
     entity.setDataSinkType(type);
     applyConfiguration(entity, configuration);
     return entity;

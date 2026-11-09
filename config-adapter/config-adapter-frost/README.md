@@ -69,7 +69,8 @@ Kafka. It handles project-level operations only:
   cosmetic (FROST has no other notion of the portal's dataset name); only the datasetId suffix is
   load-bearing, since it survives a dataset rename that the display-name portion does not.
 - **A project exists only for a DataSet with a FROST data sink.** The orchestrator gates `CREATE_PROJECT`
-  and `UPDATE_PROJECT` on it and leaves `DELETE_PROJECT` ungated — see
+  and `UPDATE_PROJECT` on it, leaves `DELETE_PROJECT` ungated in the delete saga, and runs `DELETE_PROJECT`
+  with the recorded `projectId` in a release that leaves only pending FROST sinks — see
   [../config-adapter-flowable/README.md](../config-adapter-flowable/README.md).
 - **`CREATE_PROJECT` finds or creates, surviving a rename across an unrelease.** The lookup matches on
   the datasetId suffix of the name (`endswith(name,'({datasetId})')`), not the full name, so it still
@@ -88,8 +89,10 @@ Kafka. It handles project-level operations only:
   data access is an authorization decision made per request at the gateway, never granted through FROST
   project visibility.
 - **`DELETE_PROJECT` is idempotent.** An absent `projectId`, and an absent project (HTTP 404), are both the
-  goal state and succeed forward and compensating. Deleting a Thing cascades to its Datastreams and
-  Observations, while deleting a project cascades to nothing — which is why the Things are removed first.
+  goal state and succeed forward and compensating. A forward delete reports `projectDeleted: true` in all
+  three cases, so the portal forgets the project id and `baseUrl`; a compensating delete reports nothing.
+  Deleting a Thing cascades to its Datastreams and Observations, while deleting a project cascades to
+  nothing — which is why the Things are removed first.
 - **Results carry the public service root.** `baseUrl` derives from `frost.public.url`, so consumers
   receive a reachable URL even when the adapter itself reaches FROST over an internal address.
 

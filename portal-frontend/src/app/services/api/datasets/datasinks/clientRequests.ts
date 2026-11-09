@@ -1,21 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AxiosError } from 'axios'
 
-import { apiRequest, type ApiServiceResponse } from '@/app/services/api/request/apiRequest'
+import { apiRequest, apiRequestAllPages, type ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { GetListInput } from '@/types/common'
 import { CreateDataSinkInput, DataSink, DeleteDataSinkInput, UpdateDataSinkInput } from '@/types/datasinks'
 
 export const DATASINKS_QUERY_KEY = 'datasinks'
 
-export const useGetDataSinks = (datasetId: string, { params, isEnabled }: GetListInput = {}) =>
+/** Loads every Data sink of the Dataset. */
+export const useGetDataSinks = (datasetId: string, { isEnabled }: Pick<GetListInput, 'isEnabled'> = {}) =>
   useQuery<ApiServiceResponse<DataSink[]>>({
     queryKey: [DATASINKS_QUERY_KEY, datasetId],
     queryFn: () =>
-      apiRequest<DataSink[]>({
-        method: 'GET',
+      apiRequestAllPages<DataSink>({
         endpoint: `/datasets/${datasetId}/datasinks`,
         headers: { 'x-api-request': 'true' },
-        params,
         errorMessage: 'An error occurred while loading data sinks.',
       }),
     enabled: isEnabled,

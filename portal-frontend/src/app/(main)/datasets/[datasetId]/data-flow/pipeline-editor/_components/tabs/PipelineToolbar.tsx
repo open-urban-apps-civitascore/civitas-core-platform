@@ -14,7 +14,6 @@ import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { InfoModal } from '@/components/modals/info-modal/InfoModal'
 import { WarningModal } from '@/components/modals/warning-modal/WarningModal'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -43,23 +42,13 @@ interface PipelineToolbarProps {
  */
 export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = '' }) => {
   const t = useTranslations('pipelineEditor')
-  const tDeleteBlocked = useTranslations('datasets.overview.completion.dataFlow.pipelines.deleteBlocked')
-  const {
-    pipeline,
-    runValidation,
-    deletePipeline,
-    renamePipeline,
-    isDirty,
-    isDeleting,
-    pipelineDeleteBlockReason,
-    activeSessionId,
-  } = useActivePipeline()
+  const { pipeline, runValidation, deletePipeline, renamePipeline, isDirty, isDeleting, activeSessionId } =
+    useActivePipeline()
   const { datasetId } = useParams<{ datasetId: string }>()
   const { canDeletePipeline: canDelete, canEditPipeline: canEdit } = useDatasetPermissionsById(datasetId)
   const { isReadOnly } = useReadOnly()
 
-  const [shouldShowDeleteConfirm, setShouldShowDeleteConfirm] = useState(false)
-  const [shouldShowDeleteBlocked, setShouldShowDeleteBlocked] = useState(false)
+  const [shouldShowDiscardConfirm, setShouldShowDiscardConfirm] = useState(false)
   const [isEditingName, setIsEditingName] = useState(false)
   const [editName, setEditName] = useState('')
   const pendingRenameRef = useRef(false)
@@ -68,10 +57,6 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = ''
   const canDiscard = canDelete || isUnsaved
   const canShowMenu = !isReadOnly && (canDiscard || canEdit)
   const pipelineRemovalLabel = isUnsaved ? t('toolbar.discardPipeline') : t('toolbar.deletePipeline')
-  const pipelineRemovalConfirmTitle = isUnsaved ? t('toolbar.discardConfirmTitle') : t('toolbar.deleteConfirmTitle')
-  const pipelineRemovalConfirmDescription = isUnsaved
-    ? t('toolbar.discardConfirmDescription')
-    : t('toolbar.deleteConfirmDescription')
 
   // Switching tabs while renaming would otherwise leave the input open, editing the wrong pipeline.
   useEffect(() => {
@@ -90,21 +75,19 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = ''
     runValidation()
   }, [pipeline, runValidation])
 
-  /**
-   * Handle delete confirmation.
-   */
-  const handleDeleteConfirm = useCallback(() => {
-    setShouldShowDeleteConfirm(false)
+  const handleDiscardConfirm = useCallback(() => {
+    setShouldShowDiscardConfirm(false)
     deletePipeline()
   }, [deletePipeline])
 
+  // The provider confirms the delete of a saved pipeline itself, with what the delete takes along.
   const handleDeleteSelect = useCallback(() => {
-    if (pipelineDeleteBlockReason) {
-      setShouldShowDeleteBlocked(true)
+    if (isUnsaved) {
+      setShouldShowDiscardConfirm(true)
       return
     }
-    setShouldShowDeleteConfirm(true)
-  }, [pipelineDeleteBlockReason])
+    deletePipeline()
+  }, [isUnsaved, deletePipeline])
 
   const handleRenameSelect = useCallback(() => {
     pendingRenameRef.current = true
@@ -214,27 +197,15 @@ export const PipelineToolbar: React.FC<PipelineToolbarProps> = ({ className = ''
         </div>
       </div>
 
-      {/* Delete confirmation modal */}
       <WarningModal
-        open={shouldShowDeleteConfirm}
-        onOpenChange={setShouldShowDeleteConfirm}
-        title={pipelineRemovalConfirmTitle}
-        description={pipelineRemovalConfirmDescription}
+        open={shouldShowDiscardConfirm}
+        onOpenChange={setShouldShowDiscardConfirm}
+        title={t('toolbar.discardConfirmTitle')}
+        description={t('toolbar.discardConfirmDescription')}
         confirmButtonTitle={pipelineRemovalLabel}
-        onConfirm={handleDeleteConfirm}
-        onDiscard={() => setShouldShowDeleteConfirm(false)}
-        isLoading={isDeleting}
+        onConfirm={handleDiscardConfirm}
+        onDiscard={() => setShouldShowDiscardConfirm(false)}
       />
-
-      {pipelineDeleteBlockReason && (
-        <InfoModal
-          open={shouldShowDeleteBlocked}
-          onOpenChange={setShouldShowDeleteBlocked}
-          title={tDeleteBlocked('title')}
-          description={tDeleteBlocked(pipelineDeleteBlockReason)}
-          onClose={() => setShouldShowDeleteBlocked(false)}
-        />
-      )}
     </>
   )
 }

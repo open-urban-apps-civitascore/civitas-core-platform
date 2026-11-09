@@ -27,8 +27,8 @@ import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.repository.PipelineRepository;
 import de.civitascore.portal.security.dto.PrincipalUserDetails;
+import de.civitascore.portal.service.removal.RemovalNotConfirmedException;
 import de.civitascore.portal.util.InvalidInputException;
-import de.civitascore.portal.util.ResourceInUseException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -155,7 +155,7 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
 
   private SagaResultPayload sagaResultFor(UUID datasetId) {
     return new SagaResultPayload(
-        datasetId.toString(), null, null, null, null, null, null, null, null, null, null);
+        datasetId.toString(), null, null, null, null, null, null, null, null, null);
   }
 
   private DataSet createInitialDataSet() {
@@ -396,7 +396,7 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
     void shouldRemoveProvisionedSinkOnSagaDeleteCompleted() {
       DataSet dataSet = portalData.dataSet(b -> b.dataSetStatus(DataSetStatus.DRAFT));
       Pipeline pipeline = portalData.pipeline(dataSet);
-      DataSink sink = portalData.dataSink(dataSet, pipeline);
+      DataSink sink = portalData.dataSink(dataSet, null);
       UUID id = dataSet.getId();
 
       completeSaga(id, DataSetStatus.AVAILABLE, PendingSagaType.CREATE);
@@ -404,7 +404,7 @@ class DataSetServiceIntegrationTest extends BaseKeycloakIntegrationTest {
       dataSetService.unstage(id);
 
       assertThatThrownBy(() -> dataSinkService.deleteById(sink.getId()))
-          .isInstanceOf(ResourceInUseException.class);
+          .isInstanceOf(RemovalNotConfirmedException.class);
       assertThat(dataSinkRepository.findById(sink.getId())).isPresent();
 
       completeSaga(id, DataSetStatus.DRAFT, PendingSagaType.DELETE);

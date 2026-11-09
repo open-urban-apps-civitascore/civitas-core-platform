@@ -336,6 +336,92 @@ class DataSetSagaPublisherTest {
   }
 
   @Nested
+  @DisplayName("datasinks by state")
+  class DataSinkStateTests {
+
+    private DataSink active;
+    private DataSink pending;
+    private DataSet dataSet;
+
+    @BeforeEach
+    void setUp() {
+      active = postgisSink(UUID.randomUUID(), "active_table");
+      pending = new DataSink();
+      pending.setId(UUID.randomUUID());
+      pending.setDataSinkType(DataSinkType.POSTGIS);
+      pending.setProvisioned(true);
+      pending.markPendingUnprovision("pending_table");
+      dataSet = new DataSet();
+      dataSet.setId(UUID.randomUUID());
+      dataSet.setName("test");
+      dataSet.setProjectId("proj-1");
+      dataSet.setPipelines(Set.of());
+    }
+
+    private JsonNode publishedTrigger(Runnable publish) {
+      ArgumentCaptor<String> json = stubKafkaSend();
+      publish.run();
+      return new JsonMapper().readTree(json.getValue());
+    }
+
+    private List<String> tableNames(JsonNode datasinks) {
+      return datasinks
+          .valueStream()
+          .map(sink -> sink.get("configuration").get("tableName").asString())
+          .toList();
+    }
+
+    @Test
+    @DisplayName("CREATE trigger carries pending sinks apart from active ones, and the projectId")
+    void createTriggerSeparatesPendingSinks() {
+      when(dataSinkRepository.findByDataSetId(dataSet.getId()))
+          .thenReturn(List.of(active, pending));
+
+      JsonNode trigger = publishedTrigger(() -> publisher.publishCreateRequested(dataSet));
+
+      assertThat(tableNames(trigger.get("datasinks"))).containsExactly("active_table");
+      assertThat(tableNames(trigger.get("pendingUnprovisionDatasinks")))
+          .containsExactly("pending_table");
+      assertThat(trigger.get("projectId").asString()).isEqualTo("proj-1");
+    }
+
+    @Test
+    @DisplayName("CREATE trigger omits pendingUnprovisionDatasinks when nothing is pending")
+    void createTriggerOmitsEmptyPendingSinks() {
+      when(dataSinkRepository.findByDataSetId(dataSet.getId())).thenReturn(List.of(active));
+
+      JsonNode trigger = publishedTrigger(() -> publisher.publishCreateRequested(dataSet));
+
+      assertThat(trigger.has("pendingUnprovisionDatasinks")).isFalse();
+    }
+
+    @Test
+    @DisplayName("UPDATE trigger carries active sinks only")
+    void updateTriggerCarriesActiveSinksOnly() {
+      when(dataSinkRepository.findByDataSetId(dataSet.getId()))
+          .thenReturn(List.of(active, pending));
+
+      JsonNode trigger =
+          publishedTrigger(() -> publisher.publishUpdateRequested(dataSet, Set.of()));
+
+      assertThat(tableNames(trigger.get("datasinks"))).containsExactly("active_table");
+      assertThat(trigger.has("pendingUnprovisionDatasinks")).isFalse();
+    }
+
+    @Test
+    @DisplayName("DELETE trigger carries active and pending sinks")
+    void deleteTriggerCarriesActiveAndPendingSinks() {
+      when(dataSinkRepository.findByDataSetId(dataSet.getId()))
+          .thenReturn(List.of(active, pending));
+
+      JsonNode trigger = publishedTrigger(() -> publisher.publishDeleteRequested(dataSet));
+
+      assertThat(tableNames(trigger.get("datasinks")))
+          .containsExactlyInAnyOrder("active_table", "pending_table");
+    }
+  }
+
+  @Nested
   @DisplayName("artifacts from the dependency graph")
   class ArtifactsTests {
 
@@ -509,7 +595,7 @@ class DataSetSagaPublisherTest {
       pipeline.setModelUrn(PIPELINE_URN);
       DataSink sink = new DataSink();
       sink.setConfigurationUrn(currentSink);
-      when(dataSinkRepository.findByPipelineId(pipeline.getId())).thenReturn(List.of(sink));
+      when(dataSinkRepository.findByPipelinesId(pipeline.getId())).thenReturn(List.of(sink));
 
       JsonNode payload = publishCreate(dataSet(pipeline));
 

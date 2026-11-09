@@ -100,6 +100,10 @@ import org.slf4j.LoggerFactory;
  * drops only the tables and schema the provision created rather than found: a re-release finds the
  * tables an unrelease kept, and a later step's failure must not destroy their data.
  *
+ * <p>{@code UNPROVISION_SINKS} drops the table and read role of each {@code POSTGIS} entry in the
+ * trigger's {@code pendingUnprovisionDatasinks} in one transaction. It drops the per-DataSet schema
+ * only when {@code datasinks} holds no {@code POSTGIS} sink, so the tables of active sinks survive.
+ *
  * <p>CREATE/PROVISION are idempotent (duplicate-object SQLStates absorbed); DROP/DEPROVISION are
  * idempotent (missing-object SQLStates absorbed), so steps and compensations are safe to retry.
  *
@@ -113,6 +117,8 @@ public class PostgisSagaHandler implements SagaCommandHandler {
   private static final String ADAPTER_NAME = "postgis";
   private static final String COMPENSATE_TYPE = "COMPENSATE_STEP";
   private static final String DATASINK_TYPE_POSTGIS = "POSTGIS";
+  private static final String SINKS = "datasinks";
+  private static final String PENDING_SINKS = "pendingUnprovisionDatasinks";
   private static final String KEY_CREATED_TABLES = "createdTables";
   private static final String KEY_CREATED_SCHEMA = "createdSchema";
 
@@ -163,6 +169,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
         case "DROP_ROLE" -> dropRole(command, compensation);
         case "PROVISION_SINK" -> provisionSink(command);
         case "DEPROVISION_SINK" -> deprovisionSink(command, compensation);
+        case "UNPROVISION_SINKS" -> unprovisionSinks(command);
         default -> unknownOperation(command, compensation);
       };
     } catch (Exception e) {
@@ -228,7 +235,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
   // ─── Dataset-saga sink provisioning ─────────────────────────────────────────
 
   private SagaCommandResult provisionSink(SagaCommandMessage command) throws SQLException {
-    List<SinkSpec> sinks = parseSinks(command, true);
+    List<SinkSpec> sinks = parseSinks(command, SINKS, true);
     List<Map<String, Object>> provisioned = new ArrayList<>();
     String schema = datasetSchemaName(command);
     List<String> createdTables = new ArrayList<>();
@@ -286,7 +293,7 @@ public class PostgisSagaHandler implements SagaCommandHandler {
 
   private SagaCommandResult deprovisionSink(SagaCommandMessage command, boolean compensation)
       throws SQLException {
-    List<SinkSpec> sinks = parseSinks(command, false);
+    List<SinkSpec> sinks = parseSinks(command, SINKS, false);
     ProvisionedByThisSaga createdBySaga =
         compensation ? ProvisionedByThisSaga.from(command.payload()) : null;
     List<String> statements = new ArrayList<>();
@@ -299,34 +306,74 @@ public class PostgisSagaHandler implements SagaCommandHandler {
             Encode.forJava(command.sagaId()));
         continue;
       }
-      if (sink.role() != null) {
-        statements.addAll(dialect().dropRole(sink.role()));
-      }
-      statements.addAll(dialect().dropTable(sink.table().getSchema(), sink.table().getName()));
-      // Collect the per-DataSet schema to drop after its tables (never public or a blank one).
-      SchemaConfig schema = sink.schema();
-      if (schema != null
-          && schema.getName() != null
-          && !schema.getName().isBlank()
-          && !SHARED_PUBLIC_SCHEMA.equalsIgnoreCase(schema.getName())
-          && (createdBySaga == null || createdBySaga.schema())) {
-        schemasToDrop.add(schema.getName());
+      statements.addAll(dropSinkObjects(sink));
+      if (sink.hasDroppableSchema() && (createdBySaga == null || createdBySaga.schema())) {
+        schemasToDrop.add(sink.schema().getName());
       }
     }
-    // Drop each per-DataSet schema once, after its tables: a DataSet's sinks share one schema, so a
-    // per-sink drop would hit sibling tables. RESTRICT (never CASCADE) means the schema is dropped
-    // only once empty — which it is here, its tables having just been dropped. A schema left
-    // unexpectedly non-empty makes this step fail (the best-effort delete then continues); nothing
-    // is force-dropped.
-    for (String schemaName : schemasToDrop) {
-      SchemaConfig schema = new SchemaConfig();
-      schema.setName(schemaName);
-      statements.addAll(dialect().dropSchema(schema));
-    }
+    statements.addAll(dropSchemasAfterTheirTables(schemasToDrop));
     ddl.runDdl(statements, false, true);
 
     logger.info("PostGIS sink(s) deprovisioned, saga={}", Encode.forJava(command.sagaId()));
     return done(command, compensation);
+  }
+
+  private SagaCommandResult unprovisionSinks(SagaCommandMessage command) throws SQLException {
+    List<SinkSpec> pendingSinks = parseSinks(command, PENDING_SINKS, false);
+    Set<String> activeTables =
+        new HashSet<>(
+            postgisSinkEntries(command, SINKS).stream()
+                .map(sink -> stringValue(mapValue(sink, "configuration"), "tableName"))
+                .toList());
+    boolean activeSinkRemains = !activeTables.isEmpty();
+    List<String> statements = new ArrayList<>();
+    Set<String> schemasToDrop = new LinkedHashSet<>();
+    for (SinkSpec sink : pendingSinks) {
+      if (activeTables.contains(sink.table().getName())) {
+        logger.warn(
+            "PostGIS table {} is also named by an active sink, keeping it and its data, saga={}",
+            Encode.forJava(sink.table().qualifiedName()),
+            Encode.forJava(command.sagaId()));
+        continue;
+      }
+      statements.addAll(dropSinkObjects(sink));
+      if (!activeSinkRemains && sink.hasDroppableSchema()) {
+        schemasToDrop.add(sink.schema().getName());
+      }
+    }
+    statements.addAll(dropSchemasAfterTheirTables(schemasToDrop));
+    ddl.runDdl(statements, false, true);
+
+    logger.info(
+        "PostGIS pending sink(s) unprovisioned: {}, schema dropped: {}, saga={}",
+        Encode.forJava(String.valueOf(pendingSinks.stream().map(SinkSpec::identifiers).toList())),
+        !schemasToDrop.isEmpty(),
+        Encode.forJava(command.sagaId()));
+    return done(command, false);
+  }
+
+  private List<String> dropSinkObjects(SinkSpec sink) {
+    List<String> statements = new ArrayList<>();
+    if (sink.role() != null) {
+      statements.addAll(dialect().dropRole(sink.role()));
+    }
+    statements.addAll(dialect().dropTable(sink.table().getSchema(), sink.table().getName()));
+    return statements;
+  }
+
+  /**
+   * Drops each per-DataSet schema once, after its tables: a DataSet's sinks share one schema, so a
+   * per-sink drop would hit sibling tables. RESTRICT (never CASCADE) means a schema left
+   * unexpectedly non-empty fails the step; nothing is force-dropped.
+   */
+  private List<String> dropSchemasAfterTheirTables(Set<String> schemaNames) {
+    List<String> statements = new ArrayList<>();
+    for (String schemaName : schemaNames) {
+      SchemaConfig schema = new SchemaConfig();
+      schema.setName(schemaName);
+      statements.addAll(dialect().dropSchema(schema));
+    }
+    return statements;
   }
 
   // ─── Drop operations (also serve as compensations) ──────────────────────────
@@ -444,6 +491,13 @@ public class PostgisSagaHandler implements SagaCommandHandler {
 
   /** One PostGIS data sink resolved into the objects to provision/drop. */
   private record SinkSpec(SchemaConfig schema, TableConfig table, DbRoleConfig role) {
+    boolean hasDroppableSchema() {
+      return schema != null
+          && schema.getName() != null
+          && !schema.getName().isBlank()
+          && !SHARED_PUBLIC_SCHEMA.equalsIgnoreCase(schema.getName());
+    }
+
     Map<String, Object> identifiers() {
       Map<String, Object> id = new LinkedHashMap<>();
       if (table.getSchema() != null && !table.getSchema().isBlank()) {
@@ -458,18 +512,16 @@ public class PostgisSagaHandler implements SagaCommandHandler {
   }
 
   /**
-   * Parses the trigger's {@code datasinks} into per-sink specs. See the class javadoc for the
-   * {@code POSTGIS} sink {@code configuration} shape. Used by {@code PROVISION_SINK} and {@code
-   * DEPROVISION_SINK} so the forward and rollback paths resolve the same identifiers; only the
-   * provisioning path needs the column definitions ({@code requireColumns}) — dropping a table
-   * requires just its name, so a delete trigger may omit columns and {@code dataStructure}.
+   * Parses the trigger's sink list {@code field} into per-sink specs. See the class javadoc for the
+   * {@code POSTGIS} sink {@code configuration} shape. Used by every sink operation so the forward
+   * and rollback paths resolve the same identifiers; only the provisioning path needs the column
+   * definitions ({@code requireColumns}) — dropping a table requires just its name, so a delete
+   * trigger may omit columns and {@code dataStructure}.
    */
-  private List<SinkSpec> parseSinks(SagaCommandMessage command, boolean requireColumns) {
+  private List<SinkSpec> parseSinks(
+      SagaCommandMessage command, String field, boolean requireColumns) {
     List<SinkSpec> specs = new ArrayList<>();
-    for (Map<String, Object> sink : mapList(command.payload(), "datasinks")) {
-      if (!DATASINK_TYPE_POSTGIS.equals(sink.get("type"))) {
-        continue;
-      }
+    for (Map<String, Object> sink : postgisSinkEntries(command, field)) {
       Map<String, Object> config = mapValue(sink, "configuration");
       String tableName = stringValue(config, "tableName");
       if (tableName == null || tableName.isBlank()) {
@@ -564,6 +616,13 @@ public class PostgisSagaHandler implements SagaCommandHandler {
           command.operation() + " requires at least one POSTGIS data sink in the payload");
     }
     return specs;
+  }
+
+  private static List<Map<String, Object>> postgisSinkEntries(
+      SagaCommandMessage command, String field) {
+    return mapList(command.payload(), field).stream()
+        .filter(sink -> DATASINK_TYPE_POSTGIS.equals(sink.get("type")))
+        .toList();
   }
 
   private DbRoleConfig parseReadRole(Map<String, Object> config, String schemaName) {

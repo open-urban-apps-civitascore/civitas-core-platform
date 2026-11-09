@@ -25,6 +25,10 @@ import java.util.Objects;
  * tears down only the ingest/consumer-access layer (pipeline + route) on UNRELEASE while leaving
  * the data-holding sink intact.
  *
+ * <p>{@code datasinks} holds the active Data sinks. CREATE also removes the storage of the {@code
+ * pendingUnprovisionDatasinks}; DELETE removes the storage of every Data sink in {@code datasinks},
+ * which then holds the pending ones too.
+ *
  * <p>{@code routeIds} is keyed by named-API slug so per-route infrastructure state is addressable
  * independently.
  *
@@ -50,7 +54,9 @@ public sealed interface SagaTrigger
       String datasetId,
       String datasetName,
       String description,
+      String projectId,
       List<DataSinkPayload> datasinks,
+      List<DataSinkPayload> pendingUnprovisionDatasinks,
       List<LayerPayload> layers,
       List<StylePayload> styles,
       List<DataPipeline> dataPipelines,
@@ -70,7 +76,9 @@ public sealed interface SagaTrigger
         String datasetId,
         String datasetName,
         String description,
+        String projectId,
         List<DataSinkPayload> datasinks,
+        List<DataSinkPayload> pendingUnprovisionDatasinks,
         List<LayerPayload> layers,
         List<StylePayload> styles,
         List<DataPipeline> dataPipelines,
@@ -81,7 +89,9 @@ public sealed interface SagaTrigger
           datasetId,
           datasetName,
           description,
+          projectId,
           datasinks,
+          pendingUnprovisionDatasinks,
           layers,
           styles,
           dataPipelines,

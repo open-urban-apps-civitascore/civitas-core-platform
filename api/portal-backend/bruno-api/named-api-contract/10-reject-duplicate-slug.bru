@@ -1,7 +1,7 @@
 meta {
   name: 10. Reject duplicate slug within one dataset
   type: http
-  seq: 10
+  seq: 14
 }
 
 post {
@@ -17,8 +17,8 @@ body:json {
     "description": "Negative fixture — the repeated slug must be the only reason this create fails.",
     "openDataAccess": false,
     "namedApis": [
-      { "name": "Things One", "slug": "things", "standard": "STA", "version": "1.1" },
-      { "name": "Things Two", "slug": "things", "standard": "STA", "version": "1.1" }
+      { "name": "Things One", "slug": "things", "standard": "CUSTOM" },
+      { "name": "Things Two", "slug": "things", "standard": "CUSTOM" }
     ]
   }
 }

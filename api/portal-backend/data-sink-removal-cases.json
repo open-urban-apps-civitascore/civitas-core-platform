@@ -1,0 +1,316 @@
+{
+  "description": "What a request removes from its Dataset. The backend (DataSinkRemovalPlanSharedCasesTest) and the portal frontend (dataSinkRemoval.test.ts) both run every case, so their two calculations cannot drift apart. Ids are labels; each side maps them to its own ids. 'expected' lists ids in any order.",
+  "cases": [
+    {
+      "name": "a Pipeline delete removes a Data sink that was never released, and nothing else",
+      "dataSinks": [
+        {
+          "id": "sink",
+          "type": "POSTGIS",
+          "provisioned": false,
+          "pipelineIds": ["pipeline"]
+        }
+      ],
+      "layers": [],
+      "apis": [],
+      "request": {
+        "removedLinks": [{ "pipelineId": "pipeline", "dataSinkId": "sink" }],
+        "deletedDataSinkIds": []
+      },
+      "expected": {
+        "dataSinks": ["sink"],
+        "layers": [],
+        "apis": [],
+        "deletesStoredData": false
+      }
+    },
+    {
+      "name": "removing the last PostGIS Data sink removes its Layer and the OWS API and deletes stored data",
+      "dataSinks": [
+        {
+          "id": "postgis",
+          "type": "POSTGIS",
+          "provisioned": true,
+          "pipelineIds": ["pipeline"]
+        }
+      ],
+      "layers": [
+        { "id": "layer", "dataSinkId": "postgis", "namedApiId": "ows" }
+      ],
+      "apis": [{ "id": "ows", "standard": "OWS" }],
+      "request": {
+        "removedLinks": [{ "pipelineId": "pipeline", "dataSinkId": "postgis" }],
+        "deletedDataSinkIds": []
+      },
+      "expected": {
+        "dataSinks": ["postgis"],
+        "layers": ["layer"],
+        "apis": ["ows"],
+        "deletesStoredData": true
+      }
+    },
+    {
+      "name": "a replacement PostGIS Data sink keeps the OWS API, but the Layer of the removed one goes",
+      "dataSinks": [
+        {
+          "id": "old",
+          "type": "POSTGIS",
+          "provisioned": true,
+          "pipelineIds": ["pipeline"]
+        },
+        {
+          "id": "replacement",
+          "type": "POSTGIS",
+          "provisioned": false,
+          "pipelineIds": []
+        }
+      ],
+      "layers": [{ "id": "layer", "dataSinkId": "old", "namedApiId": "ows" }],
+      "apis": [{ "id": "ows", "standard": "OWS" }],
+      "request": {
+        "removedLinks": [{ "pipelineId": "pipeline", "dataSinkId": "old" }],
+        "deletedDataSinkIds": []
+      },
+      "expected": {
+        "dataSinks": ["old"],
+        "layers": ["layer"],
+        "apis": [],
+        "deletesStoredData": true
+      }
+    },
+    {
+      "name": "a Data sink that another Pipeline still writes into stays",
+      "dataSinks": [
+        {
+          "id": "shared",
+          "type": "POSTGIS",
+          "provisioned": true,
+          "pipelineIds": ["deleted", "other"]
+        }
+      ],
+      "layers": [
+        { "id": "layer", "dataSinkId": "shared", "namedApiId": "ows" }
+      ],
+      "apis": [{ "id": "ows", "standard": "OWS" }],
+      "request": {
+        "removedLinks": [{ "pipelineId": "deleted", "dataSinkId": "shared" }],
+        "deletedDataSinkIds": []
+      },
+      "expected": {
+        "dataSinks": [],
+        "layers": [],
+        "apis": [],
+        "deletesStoredData": false
+      }
+    },
+    {
+      "name": "a Data sink without a Pipeline stays and keeps backing its API",
+      "dataSinks": [
+        {
+          "id": "linked",
+          "type": "FROST",
+          "provisioned": false,
+          "pipelineIds": ["pipeline"]
+        },
+        {
+          "id": "unlinked",
+          "type": "FROST",
+          "provisioned": true,
+          "pipelineIds": []
+        }
+      ],
+      "layers": [],
+      "apis": [{ "id": "sta", "standard": "STA" }],
+      "request": {
+        "removedLinks": [{ "pipelineId": "pipeline", "dataSinkId": "linked" }],
+        "deletedDataSinkIds": []
+      },
+      "expected": {
+        "dataSinks": ["linked"],
+        "layers": [],
+        "apis": [],
+        "deletesStoredData": false
+      }
+    },
+    {
+      "name": "deleting the last FROST Data sink directly removes the STA API",
+      "dataSinks": [
+        {
+          "id": "frost",
+          "type": "FROST",
+          "provisioned": true,
+          "pipelineIds": []
+        }
+      ],
+      "layers": [],
+      "apis": [{ "id": "sta", "standard": "STA" }],
+      "request": { "removedLinks": [], "deletedDataSinkIds": ["frost"] },
+      "expected": {
+        "dataSinks": ["frost"],
+        "layers": [],
+        "apis": ["sta"],
+        "deletesStoredData": true
+      }
+    },
+    {
+      "name": "removing the last FROST Data sink keeps the OWS API and its Layers",
+      "dataSinks": [
+        {
+          "id": "frost",
+          "type": "FROST",
+          "provisioned": true,
+          "pipelineIds": ["sensor"]
+        },
+        {
+          "id": "postgis",
+          "type": "POSTGIS",
+          "provisioned": true,
+          "pipelineIds": ["map"]
+        }
+      ],
+      "layers": [
+        { "id": "layer", "dataSinkId": "postgis", "namedApiId": "ows" }
+      ],
+      "apis": [
+        { "id": "sta", "standard": "STA" },
+        { "id": "ows", "standard": "OWS" },
+        { "id": "custom", "standard": "CUSTOM" }
+      ],
+      "request": {
+        "removedLinks": [{ "pipelineId": "sensor", "dataSinkId": "frost" }],
+        "deletedDataSinkIds": []
+      },
+      "expected": {
+        "dataSinks": ["frost"],
+        "layers": [],
+        "apis": ["sta"],
+        "deletesStoredData": true
+      }
+    },
+    {
+      "name": "a Pipeline delete removes Data sinks of both types with both APIs, but never a CUSTOM API",
+      "dataSinks": [
+        {
+          "id": "frost",
+          "type": "FROST",
+          "provisioned": true,
+          "pipelineIds": ["pipeline"]
+        },
+        {
+          "id": "postgis",
+          "type": "POSTGIS",
+          "provisioned": false,
+          "pipelineIds": ["pipeline"]
+        }
+      ],
+      "layers": [
+        { "id": "layer", "dataSinkId": "postgis", "namedApiId": "ows" }
+      ],
+      "apis": [
+        { "id": "sta", "standard": "STA" },
+        { "id": "ows", "standard": "OWS" },
+        { "id": "custom", "standard": "CUSTOM" }
+      ],
+      "request": {
+        "removedLinks": [
+          { "pipelineId": "pipeline", "dataSinkId": "frost" },
+          { "pipelineId": "pipeline", "dataSinkId": "postgis" }
+        ],
+        "deletedDataSinkIds": []
+      },
+      "expected": {
+        "dataSinks": ["frost", "postgis"],
+        "layers": ["layer"],
+        "apis": ["sta", "ows"],
+        "deletesStoredData": true
+      }
+    },
+    {
+      "name": "a Layer goes with its API even when its own Data sink stays",
+      "dataSinks": [
+        {
+          "id": "postgis",
+          "type": "POSTGIS",
+          "provisioned": true,
+          "pipelineIds": ["pipeline"]
+        },
+        {
+          "id": "frost",
+          "type": "FROST",
+          "provisioned": true,
+          "pipelineIds": ["other"]
+        }
+      ],
+      "layers": [{ "id": "layer", "dataSinkId": "frost", "namedApiId": "ows" }],
+      "apis": [{ "id": "ows", "standard": "OWS" }],
+      "request": {
+        "removedLinks": [{ "pipelineId": "pipeline", "dataSinkId": "postgis" }],
+        "deletedDataSinkIds": []
+      },
+      "expected": {
+        "dataSinks": ["postgis"],
+        "layers": ["layer"],
+        "apis": ["ows"],
+        "deletesStoredData": true
+      }
+    },
+    {
+      "name": "the last PostGIS Data sink takes only the OWS API, never an STA API that no Data sink backs",
+      "dataSinks": [
+        {
+          "id": "postgis",
+          "type": "POSTGIS",
+          "provisioned": true,
+          "pipelineIds": ["pipeline"]
+        }
+      ],
+      "layers": [],
+      "apis": [
+        { "id": "ows", "standard": "OWS" },
+        { "id": "sta", "standard": "STA" }
+      ],
+      "request": {
+        "removedLinks": [{ "pipelineId": "pipeline", "dataSinkId": "postgis" }],
+        "deletedDataSinkIds": []
+      },
+      "expected": {
+        "dataSinks": ["postgis"],
+        "layers": [],
+        "apis": ["ows"],
+        "deletesStoredData": true
+      }
+    },
+    {
+      "name": "a Layer linked to no API goes only with its own Data sink",
+      "dataSinks": [
+        {
+          "id": "removed",
+          "type": "POSTGIS",
+          "provisioned": false,
+          "pipelineIds": ["pipeline"]
+        },
+        {
+          "id": "kept",
+          "type": "POSTGIS",
+          "provisioned": false,
+          "pipelineIds": ["other"]
+        }
+      ],
+      "layers": [
+        { "id": "layerOfRemoved", "dataSinkId": "removed", "namedApiId": null },
+        { "id": "layerOfKept", "dataSinkId": "kept", "namedApiId": null }
+      ],
+      "apis": [],
+      "request": {
+        "removedLinks": [{ "pipelineId": "pipeline", "dataSinkId": "removed" }],
+        "deletedDataSinkIds": []
+      },
+      "expected": {
+        "dataSinks": ["removed"],
+        "layers": ["layerOfRemoved"],
+        "apis": [],
+        "deletesStoredData": false
+      }
+    }
+  ]
+}

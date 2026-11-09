@@ -72,6 +72,10 @@ vi.mock('@/app/services/api/datasets/clientRequests', () => ({
   useGetDataset: vi.fn(),
 }))
 
+vi.mock('@/hooks/use-data-sink-removal-state', () => ({
+  useDataSinkRemovalState: () => ({ removalState: { dataSinks: [], layers: [], apis: [] }, isLoadingError: false }),
+}))
+
 vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
   useGetDataSinks: vi.fn(() => ({ data: undefined })),
   useCreateDataSink: vi.fn(),

@@ -11,7 +11,7 @@ One BPMN process per saga type; the trigger's `sagaType` selects it.
 
 | `sagaType` | Process | Step order | On step failure |
 |---|---|---|---|
-| `DATASET_CREATE` | `dataset-create` | FROST branch → APISIX `CREATE_ROUTE` → geo branch → pipeline branch → GeoServer `PRUNE_FEATURE_TYPES` when `hasGeoSink` | reverse-order compensation; a failing prune triggers it too |
+| `DATASET_CREATE` | `dataset-create` | FROST branch → APISIX `CREATE_ROUTE` → geo branch → pipeline branch → GeoServer `PRUNE_FEATURE_TYPES` when `hasGeoSink` → pending-sink teardown | reverse-order compensation; a failing prune or teardown step triggers it too |
 | `DATASET_UPDATE` | `dataset-update` | FROST branch → APISIX `UPDATE_ROUTE` → geo branch → pipeline branch → GeoServer `PRUNE_FEATURE_TYPES` when `hasGeoSink` | reverse-order compensation; a failing prune is absorbed and the saga still succeeds |
 | `DATASET_DELETE` | `dataset-delete` | pipeline branch → APISIX `DELETE_ROUTE` → geo teardown → FROST `DELETE_PROJECT` | best-effort: the chain continues, no compensation |
 | `DATASET_UNRELEASE` | `dataset-unrelease` | pipeline branch → APISIX `DELETE_ROUTE` | best-effort: the chain continues, no compensation |
@@ -32,6 +32,19 @@ removes a layer, so without the prune a layer deleted between unrelease and re-r
 prune fails the release and compensates it, which deletes the workspace: a successful release has to serve exactly the
 Dataset's layers, and a released Dataset cannot be edited to retry the prune.
 
+The create saga then removes the storage of the pending sinks, the Data sinks the portal marked
+`pending_unprovision` and sends in `pendingUnprovisionDatasinks` apart from the active ones in `datasinks`:
+
+| Step | Runs when |
+|---|---|
+| GeoServer `DELETE_WORKSPACE` | `hasPendingGeoSink` and not `hasGeoSink` |
+| PostGIS `UNPROVISION_SINKS` | `hasPendingGeoSink` |
+| FROST `DELETE_PROJECT` with the trigger's recorded `projectId` | `hasPendingFrostSink` and not `hasFrostSink` |
+
+These steps follow the prune for the same reason: what they remove cannot be restored, so they have no
+compensation. A failing one fails the release and compensates the earlier steps; the portal keeps the pending
+sinks, so the next release retries the teardown, and every teardown step absorbs objects that are already gone.
+
 Compensation chains run in full reverse order:
 
 | Saga | Chain |
@@ -49,7 +62,7 @@ without a GeoServer adapter from failing every delete, and avoids a recursive wo
 no geo data. Gating the FROST branch keeps a dataset that stores nothing in FROST from being given a project, and
 leaves the APISIX step without an `upstreamUrl` — which it requires only for an `STA` slug.
 
-The flags gate provisioning, not teardown: `DELETE_PROJECT` runs for every delete saga, keyed on the recorded
+The active-sink flags gate provisioning, not teardown: `DELETE_PROJECT` runs for every delete saga, keyed on the recorded
 `projectId` the trigger carries, so a FROST sink removed before the dataset cannot strand the project. The geo
 teardown is the exception, because the table it drops is named only in the sink entry a removal takes away.
 
@@ -57,6 +70,8 @@ teardown is the exception, because the table it drops is named only in the sink 
 |---|---|
 | `hasFrostSink` | `datasinks` is a list holding an entry whose `type` is `FROST` |
 | `hasGeoSink` | `datasinks` is a list holding an entry whose `type` is `POSTGIS` |
+| `hasPendingFrostSink` | `pendingUnprovisionDatasinks` is a list holding an entry whose `type` is `FROST` |
+| `hasPendingGeoSink` | `pendingUnprovisionDatasinks` is a list holding an entry whose `type` is `POSTGIS` |
 | `hasLayers` | `layers` is a non-empty list |
 | `hasPipelines` | `dataPipelines` or `pipelineIds` is a non-empty list |
 
@@ -96,7 +111,7 @@ every saga type, and steps are dispatched in-process from there.
 
 | Topic | Direction | Key | Payload |
 |---|---|---|---|
-| `de.civitascore.dataset.saga.trigger` | consumed | — | `sagaType`, `datasetId`, and the fields the steps consume: `datasinks`, `layers`, `styles`, pipelines |
+| `de.civitascore.dataset.saga.trigger` | consumed | — | `sagaType`, `datasetId`, and the fields the steps consume: `datasinks`, `pendingUnprovisionDatasinks`, `projectId`, `layers`, `styles`, pipelines |
 | `de.civitascore.saga.result` | published | `sagaId` | `SAGA_COMPLETED`, or `SAGA_FAILED` with `status` `FAILED` or `COMPENSATED` |
 | named by `pipeline.status-topic` | published | `datasetId/pipelineId` | pipeline runtime status |
 

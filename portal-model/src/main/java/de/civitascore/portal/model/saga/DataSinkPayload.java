@@ -25,6 +25,9 @@ import java.util.Map;
  *       a version <em>is</em> referenced but carries no model, the saga publish fails rather than
  *       emitting a null value here.
  * </ul>
+ *
+ * <p>A sink that waits for removal of its storage carries only {@code type} and, for {@code
+ * POSTGIS}, the {@code tableName} in {@code configuration}.
  */
 public record DataSinkPayload(
     String id, String type, Map<String, Object> configuration, Map<String, Object> dataStructure) {}

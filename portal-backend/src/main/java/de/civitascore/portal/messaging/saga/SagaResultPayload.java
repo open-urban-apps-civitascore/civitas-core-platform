@@ -19,6 +19,7 @@ public record SagaResultPayload(
     // SAGA_COMPLETED infrastructure fields
     String projectId,
     String baseUrl,
+    Boolean projectDeleted,
     Map<String, String> routeIds,
     String serviceId,
     String publicUrl,
@@ -43,6 +44,7 @@ public record SagaResultPayload(
         datasetId,
         projectId,
         baseUrl,
+        null,
         routeIds,
         serviceId,
         publicUrl,

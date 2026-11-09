@@ -1,0 +1,65 @@
+meta {
+  name: Add OWS API
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/datasets/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{dataSetId}}
+}
+
+body:json {
+  {
+    "namedApis": [
+      { "name": "Map", "slug": "map", "standard": "OWS" }
+    ]
+  }
+}
+
+script:pre-request {
+  // A PATCH replaces the whole list, so the APIs the Dataset already has are sent along.
+  const axios = require('axios');
+  // Bruno's QuickJS sandbox has no URLSearchParams — build the form body by hand.
+  const form = [
+    ['grant_type', 'password'],
+    ['client_id', bru.getEnvVar('clientId')],
+    ['client_secret', bru.getEnvVar('clientSecret')],
+    ['username', bru.getEnvVar('username')],
+    ['password', bru.getEnvVar('password')],
+  ].map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&');
+  const token = await axios.post(
+    `${bru.getEnvVar('keycloakUrl')}/realms/${bru.getEnvVar('realm')}/protocol/openid-connect/token`,
+    form,
+    { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+  );
+  const response = await axios.get(`${bru.getEnvVar('baseUrl')}/datasets/${bru.getVar('dataSetId')}`, {
+    headers: { Authorization: `Bearer ${token.data.access_token}` },
+  });
+  const kept = (response.data.namedApis || [])
+    .filter(api => api.standard !== 'OWS')
+    .map(({ name, slug, standard, version, description }) => ({ name, slug, standard, version, description }));
+  req.setBody({ namedApis: [...kept, { name: 'Map', slug: 'map', standard: 'OWS' }] });
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+  test("The Dataset has an OWS API", function() {
+    expect(res.body.namedApis.map(api => api.standard)).to.include('OWS');
+  });
+}
+
+docs {
+  **Precondition:** `dataSetId` is set and `create-layer-datasink.bru` ran. An OWS API needs an active POSTGIS DataSink in the Dataset.
+
+  Adds the OWS named API `map` and keeps the APIs the Dataset already has. A Layer is published through the Dataset's OWS API, so `create-layer` answers `400` without it.
+
+  **Expected Response:** 200 OK, `namedApis` contains an `OWS` entry.
+}

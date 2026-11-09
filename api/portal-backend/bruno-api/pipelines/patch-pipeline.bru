@@ -10,6 +10,10 @@ patch {
   auth: inherit
 }
 
+params:query {
+  ~confirmDataLoss: true
+}
+
 params:path {
   dataSetId: {{dataSetId}}
   id: {{pipelineId}}
@@ -37,6 +41,8 @@ docs {
   **Precondition:** `dataSetId` and `pipelineId` are set.
 
   **Expected Response:** 200 OK, body reflects updated `description`; other fields unchanged.
+
+  **Removed DataSinks:** A DataSink that loses its last Pipeline because `dataSinkIds` no longer lists it becomes inactive, with the same effects and the same `confirmDataLoss` rule as `delete-pipeline`. The backend calculates the effects on the state after the request, so an API stays when the request replaces its DataSink with a new one of the same kind. When the request removes stored data and `confirmDataLoss` is not `true`, the backend answers `409` `REMOVAL_NOT_CONFIRMED` with the `removal` list of `delete-pipeline` and changes nothing. The Pipeline of this collection links no DataSink at this point, so the request removes none.
 
   **System Impact:**
 

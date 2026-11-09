@@ -45,15 +45,15 @@ tests {
 }
 
 docs {
-  **Saga step 4d of 18** — Prerequisites: dataset created (step 4) with its OWS named API, structure version released (step 3d).
+  **Saga step 4d of 18** — Prerequisites: dataset created (step 4), structure version released (step 3d).
 
-  Creates the POSTGIS DataSink that backs the dataset's OWS named API. Release rejects an OWS named API with no POSTGIS sink behind it, because the route rewrites to a GeoServer workspace that is never provisioned — the published endpoint would 404. This sink is what makes the map surface complete and step 8 releasable.
+  Creates the POSTGIS DataSink that backs the dataset's OWS named API (step 4e). An OWS named API needs an active POSTGIS sink, because the route rewrites to a GeoServer workspace that is provisioned only for one — the published endpoint would 404 otherwise.
 
   The sink is discovered by the saga via the dataset id, so it is deliberately not declared in the pipeline (step 5): the pipeline's flow ingests into FROST only, and adding a PostGIS branch would change what step 9d verifies.
 
   **Expected Response:** 201 Created, body contains `id` and `dataSinkType: "POSTGIS"`. 409 if the sink already existed (idempotent).
 
-  **Post-condition:** Save `sagaPostgisDataSinkId` from `body.id` (deleted in cleanup step 12c).
+  **Post-condition:** Save `sagaPostgisDataSinkId` from `body.id` (deleted in cleanup steps 12c and 12d).
 
   **System Impact:**
 

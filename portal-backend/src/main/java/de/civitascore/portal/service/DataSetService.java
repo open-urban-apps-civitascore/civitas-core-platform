@@ -5,6 +5,7 @@ import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DataSinkState;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.embedded.ReleasableStatus;
@@ -24,6 +25,7 @@ import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.security.AssignmentChangeAuthorizer;
+import de.civitascore.portal.service.removal.DataSinkRemovalService;
 import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.service.validation.PipelineClosureValidator;
 import de.civitascore.portal.util.DataSetNotEditableException;
@@ -36,6 +38,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -86,6 +89,7 @@ public class DataSetService
   private final PipelineClosureValidator pipelineClosureValidator;
 
   private final DataSetMutationGuard dataSetMutationGuard;
+  private final DataSinkRemovalService dataSinkRemovalService;
 
   public DataSetService(
       DataSetRepository dataSetRepository,
@@ -101,7 +105,8 @@ public class DataSetService
       DataSourceDatapoolScopeValidator datapoolScopeValidator,
       ModelRegistryGateway modelRegistryGateway,
       DataSetMutationGuard dataSetMutationGuard,
-      PipelineClosureValidator pipelineClosureValidator) {
+      PipelineClosureValidator pipelineClosureValidator,
+      DataSinkRemovalService dataSinkRemovalService) {
     this.dataSetRepository = dataSetRepository;
     this.dataSinkRepository = dataSinkRepository;
     this.layerRepository = layerRepository;
@@ -116,6 +121,7 @@ public class DataSetService
     this.modelRegistryGateway = modelRegistryGateway;
     this.dataSetMutationGuard = dataSetMutationGuard;
     this.pipelineClosureValidator = pipelineClosureValidator;
+    this.dataSinkRemovalService = dataSinkRemovalService;
   }
 
   @Override
@@ -269,36 +275,33 @@ public class DataSetService
                   + "' — named-API slugs must be unique within a dataset");
         }
       }
-      long owsCount = incoming.stream().filter(dto -> dto.getStandard() == ApiStandard.OWS).count();
-      if (owsCount > 1) {
-        throw new InvalidInputException(
-            "namedApis",
-            entity.getId(),
-            "A dataset can expose at most one OWS named API; got "
-                + owsCount
-                + ". Workspace and route target both derive from the dataset id, so they would all"
-                + " serve the same layers from the same workspace, leaving no way to tell which"
-                + " API a layer belongs to.");
-      }
+      requireApiCardinality(entity, incoming);
       Map<String, NamedApi> existingBySlug = new HashMap<>();
       for (NamedApi api : entity.getNamedApis()) {
         existingBySlug.put(api.getSlug(), api);
       }
       for (NamedApiInputDTO dto : incoming) {
         NamedApi existing = existingBySlug.get(dto.getSlug());
-        if (existing != null) {
-          existing.setName(dto.getName());
-          existing.setStandard(dto.getStandard());
-          existing.setVersion(dto.getVersion());
-          existing.setDescription(dto.getDescription());
-        } else {
-          NamedApi created = dataSetMapper.toNamedApiEntity(dto);
-          created.setDataSet(entity);
-          entity.getNamedApis().add(created);
+        if (existing == null || existing.getStandard() != dto.getStandard()) {
+          requireBackingDataSink(entity, dto.getStandard());
         }
       }
+      for (NamedApiInputDTO dto : incoming) {
+        NamedApi api = existingBySlug.get(dto.getSlug());
+        if (api == null) {
+          api = dataSetMapper.toNamedApiEntity(dto);
+          api.setDataSet(entity);
+          entity.getNamedApis().add(api);
+        } else {
+          api.setName(dto.getName());
+          api.setStandard(dto.getStandard());
+          api.setVersion(dto.getVersion());
+          api.setDescription(dto.getDescription());
+        }
+      }
+      relinkLayersToPublishingApi(entity, incomingSlugs);
       entity.getNamedApis().removeIf(api -> !incomingSlugs.contains(api.getSlug()));
-      cleanUpOrphanedOwsLayers(entity);
+      cleanUpUnservedLayers(entity);
     }
 
     if (entity.getId() != null) {
@@ -328,23 +331,97 @@ public class DataSetService
   }
 
   /**
-   * Layers are published only through the dataset's OWS {@link NamedApi}, so once none remains
-   * nothing serves them. Keyed on the post-reconcile state rather than on the removed entry, so
-   * replacing an OWS API with a differently-slugged one keeps the layers.
+   * Datasets from before the limit can exceed it; they can still save their APIs.
+   *
+   * @throws InvalidInputException if the input names more APIs of a standard than a dataset can
+   *     have, and more than the dataset has now
    */
-  private void cleanUpOrphanedOwsLayers(DataSet entity) {
+  private void requireApiCardinality(DataSet entity, List<NamedApiInputDTO> incoming) {
+    Map<ApiStandard, Long> counts =
+        incoming.stream()
+            .collect(Collectors.groupingBy(NamedApiInputDTO::getStandard, Collectors.counting()));
+    for (Map.Entry<ApiStandard, Long> entry : counts.entrySet()) {
+      ApiStandard standard = entry.getKey();
+      long count = entry.getValue();
+      long existing =
+          entity.getNamedApis().stream().filter(api -> api.getStandard() == standard).count();
+      OptionalInt max = NamedApiRules.maxPerDataSet(standard);
+      if (max.isPresent() && count > max.getAsInt() && count > existing) {
+        throw new InvalidInputException(
+            "namedApis",
+            entity.getId(),
+            "A dataset can expose at most %d %s named API(s); got %d"
+                .formatted(max.getAsInt(), standard, count));
+      }
+    }
+  }
+
+  /**
+   * An API whose standard is backed by DataSinks can be added only while an active DataSink of a
+   * backing type exists; without one, the release would provision a route to nothing.
+   *
+   * @throws InvalidInputException if no such DataSink exists
+   */
+  private void requireBackingDataSink(DataSet entity, ApiStandard standard) {
+    if (NamedApiRules.isBackedBy(standard, activeDataSinkTypesOf(entity))) {
+      return;
+    }
+    throw new InvalidInputException(
+        "namedApis",
+        entity.getId(),
+        "An %s named API needs an active %s data sink in the dataset; add one first"
+            .formatted(standard, joined(NamedApiRules.backingDataSinkTypes(standard))));
+  }
+
+  private Set<DataSinkType> activeDataSinkTypesOf(DataSet dataSet) {
+    if (dataSet.getId() == null) {
+      return Set.of();
+    }
+    return dataSinkRepository
+        .findByDataSetIdAndState(dataSet.getId(), DataSinkState.ACTIVE)
+        .stream()
+        .map(DataSink::getDataSinkType)
+        .collect(Collectors.toSet());
+  }
+
+  private static String joined(Set<DataSinkType> types) {
+    return types.stream().map(Enum::name).sorted().collect(Collectors.joining(" or "));
+  }
+
+  /**
+   * A Layer goes with the API it is linked to. Relinking every Layer to the API that publishes
+   * Layers after the reconcile keeps them when that API replaces another under a new slug.
+   */
+  private void relinkLayersToPublishingApi(DataSet entity, Set<String> incomingSlugs) {
     if (entity.getId() == null) {
       return;
     }
-    boolean hasOwsApi =
-        entity.getNamedApis().stream().anyMatch(api -> api.getStandard() == ApiStandard.OWS);
-    if (!hasOwsApi) {
+    NamedApiRules.layerPublishingApi(
+            entity.getNamedApis().stream()
+                .filter(api -> incomingSlugs.contains(api.getSlug()))
+                .toList())
+        .ifPresent(
+            target ->
+                layerRepository
+                    .findByDataSetId(entity.getId())
+                    .forEach(layer -> layer.setNamedApi(target)));
+  }
+
+  /**
+   * Layers are published only through an API that publishes Layers, so once none remains nothing
+   * serves them. This also removes Layers that are linked to no API.
+   */
+  private void cleanUpUnservedLayers(DataSet entity) {
+    if (entity.getId() == null) {
+      return;
+    }
+    if (NamedApiRules.layerPublishingApi(entity.getNamedApis()).isEmpty()) {
       int removed = layerRepository.deleteByDataSetId(entity.getId());
       if (removed > 0) {
         // The response is an ordinary 200 on the dataset, so without this the layer rows are gone
         // with no record of it anywhere.
         log.info(
-            "Removed {} layer(s) of dataset {}: no OWS named API left to serve them",
+            "Removed {} layer(s) of dataset {}: no named API left to serve them",
             removed,
             entity.getId());
       }
@@ -577,39 +654,28 @@ public class DataSetService
    * leaves behind, and the data is meant to survive it.
    */
   private void verifyPublishedSurfacesAreServable(DataSet dataSet) {
-    boolean hasOwsApi =
-        dataSet.getNamedApis().stream().anyMatch(api -> api.getStandard() == ApiStandard.OWS);
-
-    if (layerRepository.existsByDataSetId(dataSet.getId()) && !hasOwsApi) {
+    if (layerRepository.existsByDataSetId(dataSet.getId())
+        && NamedApiRules.layerPublishingApi(dataSet.getNamedApis()).isEmpty()) {
       throw new InvalidInputException(
           "namedApis",
           dataSet.getId(),
-          "DataSet has layers but no OWS named API to serve them. Add an OWS named API or remove"
-              + " the layers.");
+          "DataSet has layers but no named API that publishes Layers. Add one or remove the"
+              + " layers.");
     }
 
-    if (hasOwsApi && !hasSink(dataSet, DataSinkType.POSTGIS)) {
-      throw new InvalidInputException(
-          "dataSinks",
-          dataSet.getId(),
-          "DataSet has an OWS named API but no POSTGIS data sink to back its map service. The"
-              + " route would resolve to a workspace that is never provisioned.");
+    Set<DataSinkType> activeTypes = activeDataSinkTypesOf(dataSet);
+    for (NamedApi api : dataSet.getNamedApis()) {
+      if (!NamedApiRules.isBackedBy(api.getStandard(), activeTypes)) {
+        throw new InvalidInputException(
+            "dataSinks",
+            dataSet.getId(),
+            "DataSet has an %s named API but no active %s data sink to back it. The route would"
+                    .formatted(
+                        api.getStandard(),
+                        joined(NamedApiRules.backingDataSinkTypes(api.getStandard())))
+                + " resolve to storage that is never provisioned.");
+      }
     }
-
-    boolean hasStaApi =
-        dataSet.getNamedApis().stream().anyMatch(api -> api.getStandard() == ApiStandard.STA);
-
-    if (hasStaApi && !hasSink(dataSet, DataSinkType.FROST)) {
-      throw new InvalidInputException(
-          "dataSinks",
-          dataSet.getId(),
-          "DataSet has an STA named API but no FROST data sink to back it. The route would resolve"
-              + " to a FROST project that is never provisioned.");
-    }
-  }
-
-  private boolean hasSink(DataSet dataSet, DataSinkType type) {
-    return dataSinkRepository.existsByDataSetIdAndDataSinkType(dataSet.getId(), type);
   }
 
   /**
@@ -673,6 +739,7 @@ public class DataSetService
       case CREATE -> {
         applyInfrastructureResult(dataSet, result);
         markProvisioned(dataSet);
+        dataSinkRemovalService.deleteUnprovisioned(dataSet);
         pipelineRuntimeStatusService.markDeploymentSucceeded(deployedPipelineIds(dataSet, result));
         log.info("Saga CREATE completed for dataset {}, infrastructure provisioned", datasetId);
       }
@@ -837,13 +904,12 @@ public class DataSetService
   }
 
   /**
-   * Removes a dataset together with its DataSinks. A sink carries an FK onto the dataset and, once
-   * released, one onto a pipeline the dataset delete cascades away; removing the sinks first clears
-   * both before that cascade runs.
+   * Removes a dataset together with its DataSinks in every state. A sink carries an FK onto the
+   * dataset; removing the sinks first clears it before the dataset delete runs.
    *
-   * <p>Going through the repository bypasses the layer and provisioned guards on a standalone sink
-   * delete, which protect a sink whose dataset lives on; the teardown has removed its storage.
-   * Flushing keeps a constraint violation inside this call rather than at commit.
+   * <p>Going through the repository bypasses the removal rules of a standalone sink delete, which
+   * protect a sink whose dataset lives on; the teardown has removed its storage. Flushing keeps a
+   * constraint violation inside this call rather than at commit.
    *
    * <p>The only place a dataset row is removed — a provisioned dataset keeps its row until its
    * teardown saga reports back — so the registry cleanup belongs here, not in {@code postDelete}.
@@ -862,11 +928,7 @@ public class DataSetService
             .distinct()
             .toList();
 
-    sinks.forEach(
-        sink -> {
-          sink.setPipeline(null);
-          dataSinkRepository.delete(sink);
-        });
+    sinks.forEach(dataSinkRepository::delete);
     dataSetRepository.delete(dataSet);
     dataSetRepository.flush();
 
@@ -926,12 +988,13 @@ public class DataSetService
    * reliable proxy. Never resets it: the flag survives an unrelease and is only dropped when the
    * row is removed on DELETE.
    *
-   * <p>Each sink is marked as well. A completed saga provisioned every sink it was sent, and the
-   * mutation guard keeps the sinks of an AVAILABLE dataset from changing in between.
+   * <p>Each active sink is marked as well. A completed saga provisioned every active sink it was
+   * sent, and the mutation guard keeps the sinks of an AVAILABLE dataset from changing in between.
    */
   private void markProvisioned(DataSet dataSet) {
     dataSet.setProvisioned(true);
-    for (DataSink sink : dataSinkRepository.findByDataSetId(dataSet.getId())) {
+    for (DataSink sink :
+        dataSinkRepository.findByDataSetIdAndState(dataSet.getId(), DataSinkState.ACTIVE)) {
       sink.setProvisioned(true);
       dataSinkRepository.save(sink);
     }
@@ -974,6 +1037,10 @@ public class DataSetService
   }
 
   private void applyInfrastructureResult(DataSet dataSet, SagaResultPayload result) {
+    if (Boolean.TRUE.equals(result.projectDeleted())) {
+      dataSet.setProjectId(null);
+      dataSet.setFrostBaseUrl(null);
+    }
     if (result.projectId() != null) {
       dataSet.setProjectId(result.projectId());
     }

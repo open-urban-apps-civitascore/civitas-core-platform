@@ -1,6 +1,7 @@
 import { isAxiosError } from 'axios'
 
 import { ConnectionTestProblem } from '@/types/connectionTest'
+import type { DataSinkRemoval } from '@/types/dataSinkRemoval'
 
 type ApiError = {
   type: string
@@ -104,7 +105,7 @@ export const isSagaInFlightError = (error: unknown) => {
 
 export const isResourceInUseError = (error: unknown) => {
   const problem = problemWithStatus(error, 409)
-  return !!problem && hasErrorType(problem, 'RESOURCE_IN_USE') && !problem.detail.includes('confirmDataLoss')
+  return !!problem && hasErrorType(problem, 'RESOURCE_IN_USE')
 }
 
 export const isPipelineClosureInvalidError = (error: unknown) => {
@@ -114,7 +115,27 @@ export const isPipelineClosureInvalidError = (error: unknown) => {
 
 export const isUnconfirmedDataLossError = (error: unknown) => {
   const problem = problemWithStatus(error, 409)
-  return !!problem && hasErrorType(problem, 'RESOURCE_IN_USE') && problem.detail.includes('confirmDataLoss')
+  return !!problem && hasErrorType(problem, 'REMOVAL_NOT_CONFIRMED')
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null
+
+const listOf = <T>(value: unknown, isItem: (item: Record<string, unknown>) => boolean): T[] =>
+  Array.isArray(value) ? (value.filter(item => isRecord(item) && isItem(item)) as T[]) : []
+
+/** What the backend would remove with a request it refused as unconfirmed, or null for any other error. */
+export const unconfirmedRemoval = (error: unknown): DataSinkRemoval | null => {
+  if (!isUnconfirmedDataLossError(error) || !isAxiosError(error)) return null
+  const removal: unknown = (error.response?.data as { removal?: unknown } | undefined)?.removal
+  const fields = isRecord(removal) ? removal : {}
+  return {
+    dataSinks: listOf(
+      fields.dataSinks,
+      dataSink => typeof dataSink.id === 'string' && typeof dataSink.provisioned === 'boolean',
+    ),
+    layers: listOf(fields.layers, layer => typeof layer.id === 'string' && typeof layer.layerName === 'string'),
+    apis: listOf(fields.apis, api => typeof api.id === 'string' && typeof api.name === 'string'),
+  }
 }
 
 export const isLayerNameError = (error: unknown) => {

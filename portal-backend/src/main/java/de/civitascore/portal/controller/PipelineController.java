@@ -8,7 +8,11 @@ import de.civitascore.portal.repository.specification.PipelineSpec;
 import de.civitascore.portal.service.PipelineService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.parameters.RequestBody;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.io.IOException;
@@ -19,6 +23,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -75,22 +80,71 @@ public class PipelineController
   }
 
   @Override
-  @Operation(operationId = "updatePipeline", summary = "Replace a pipeline")
+  @Operation(
+      operationId = "updatePipeline",
+      summary = "Replace a pipeline",
+      description =
+          "A DataSink that loses its last Pipeline through this update is removed with its Layers,"
+              + " and with the APIs it is the last backing DataSink of.")
+  @Parameter(
+      name = CONFIRM_DATA_LOSS,
+      in = ParameterIn.QUERY,
+      description = CONFIRM_DATA_LOSS_DESCRIPTION,
+      schema = @Schema(type = "boolean"))
+  @ApiResponse(
+      responseCode = "409",
+      description = REMOVAL_CONFLICT_DESCRIPTION,
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<PipelineOutputDTO> update(
       @PathVariable UUID id, @Valid @RequestBody PipelineInputDTO input) {
     return super.update(id, input);
   }
 
   @Override
-  @Operation(operationId = "patchPipeline", summary = "Partially update a pipeline")
+  @Operation(
+      operationId = "patchPipeline",
+      summary = "Partially update a pipeline",
+      description =
+          "A DataSink that loses its last Pipeline through this update is removed with its Layers,"
+              + " and with the APIs it is the last backing DataSink of.")
+  @Parameter(
+      name = CONFIRM_DATA_LOSS,
+      in = ParameterIn.QUERY,
+      description = CONFIRM_DATA_LOSS_DESCRIPTION,
+      schema = @Schema(type = "boolean"))
+  @ApiResponse(
+      responseCode = "409",
+      description = REMOVAL_CONFLICT_DESCRIPTION,
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<PipelineOutputDTO> patch(
       @PathVariable UUID id, @RequestBody JsonNode updates) throws IOException {
     return super.patch(id, updates);
   }
 
   @Override
-  @Operation(operationId = "deletePipeline", summary = "Delete a pipeline")
+  @Operation(
+      operationId = "deletePipeline",
+      summary = "Delete a pipeline",
+      description =
+          "A DataSink whose last Pipeline this is is removed with its Layers, and with the APIs it"
+              + " is the last backing DataSink of.")
+  @Parameter(
+      name = CONFIRM_DATA_LOSS,
+      in = ParameterIn.QUERY,
+      description = CONFIRM_DATA_LOSS_DESCRIPTION,
+      schema = @Schema(type = "boolean"))
+  @ApiResponse(
+      responseCode = "409",
+      description = REMOVAL_CONFLICT_DESCRIPTION,
+      content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public void delete(@PathVariable UUID id) {
-    super.delete(id);
+    requireOwnedByPathDataSet(id);
+    pipelineService.deleteById(id, isDataLossConfirmed());
+  }
+
+  @Override
+  protected PipelineInputDTO preProcessInput(PipelineInputDTO input) {
+    input.setConfirmDataLoss(isDataLossConfirmed());
+    return super.preProcessInput(input);
   }
 }

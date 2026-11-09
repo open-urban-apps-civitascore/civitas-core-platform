@@ -57,7 +57,7 @@ class PipelineAssemblerTest {
     pipeline.setId(pipelineId);
     pipeline.setDataSources(Set.of(sourceWithId(sourceId)));
 
-    when(dataSinkRepository.findByPipelineId(pipelineId)).thenReturn(List.of(sinkWithId(sinkId)));
+    when(dataSinkRepository.findByPipelinesId(pipelineId)).thenReturn(List.of(sinkWithId(sinkId)));
     when(dataSourceRepository.findIdsByPipelineId(pipelineId)).thenReturn(List.of(sourceId));
 
     PipelineOutputDTO dto = new PipelineOutputDTO();
@@ -80,7 +80,7 @@ class PipelineAssemblerTest {
     PipelineInputDTO pipelineInput = new PipelineInputDTO();
 
     when(pipelineMapper.toInput(pipeline)).thenReturn(pipelineInput);
-    when(dataSinkRepository.findByPipelineId(pipelineId)).thenReturn(List.of(sinkWithId(sinkId)));
+    when(dataSinkRepository.findByPipelinesId(pipelineId)).thenReturn(List.of(sinkWithId(sinkId)));
     when(dataSourceRepository.findIdsByPipelineId(pipelineId)).thenReturn(List.of(sourceId));
 
     PipelineInputDTO result = assembler.toInput(pipeline);
@@ -99,7 +99,7 @@ class PipelineAssemblerTest {
         "urn:core:platform:civitas:pipeline:common:8a46d02f-0994-8f94-8b55-031414ee2859:1.0.0";
     pipeline.setModelUrn(urn);
 
-    when(dataSinkRepository.findByPipelineId(pipelineId)).thenReturn(List.of());
+    when(dataSinkRepository.findByPipelinesId(pipelineId)).thenReturn(List.of());
     when(modelRegistryGateway.fetchPayload(urn))
         .thenReturn(
             Optional.of(
@@ -119,7 +119,7 @@ class PipelineAssemblerTest {
     Pipeline pipeline = new Pipeline();
     pipeline.setId(pipelineId);
 
-    when(dataSinkRepository.findByPipelineId(pipelineId)).thenReturn(List.of());
+    when(dataSinkRepository.findByPipelinesId(pipelineId)).thenReturn(List.of());
 
     PipelineOutputDTO result = assembler.enrichDto(new PipelineOutputDTO(), pipeline);
 
@@ -138,7 +138,7 @@ class PipelineAssemblerTest {
     pipeline.setModelUrn(urn);
 
     when(pipelineMapper.toInput(pipeline)).thenReturn(new PipelineInputDTO());
-    when(dataSinkRepository.findByPipelineId(pipelineId)).thenReturn(List.of());
+    when(dataSinkRepository.findByPipelinesId(pipelineId)).thenReturn(List.of());
     when(modelRegistryGateway.fetchPayload(urn))
         .thenReturn(
             Optional.of(

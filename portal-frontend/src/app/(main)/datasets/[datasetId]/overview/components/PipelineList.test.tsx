@@ -3,12 +3,9 @@ import { toast } from 'sonner'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { PIPELINE_NODE_TYPES } from '@/app/(main)/datasets/[datasetId]/data-flow/pipeline-editor/_types/pipeline'
-import { useGetDataSinks } from '@/app/services/api/datasets/datasinks/clientRequests'
 import { useGetDatasources } from '@/app/services/api/datasources/clientRequests'
 import { useGetPipelines } from '@/app/services/api/pipelines/clientRequests'
 import { PipelineBasicInfo } from '@/types/datasets'
-import { DATASINK_TYPES } from '@/types/datasinks'
-import { API_STANDARDS, NamedApi } from '@/types/namedApis'
 
 import { PipelineList } from './PipelineList'
 
@@ -17,21 +14,12 @@ vi.mock('./PipelineCard', () => ({
     pipeline,
     badges,
     canDelete,
-    deleteBlockReason,
-    isDeleteDisabled,
   }: {
     pipeline: PipelineBasicInfo
     badges: string[]
     canDelete: boolean
-    deleteBlockReason: string | null
-    isDeleteDisabled: boolean
   }) => (
-    <div
-      data-testid={`pipelineCard-${pipeline.id}`}
-      data-can-delete={canDelete}
-      data-delete-block-reason={deleteBlockReason ?? ''}
-      data-delete-disabled={isDeleteDisabled}
-    >
+    <div data-testid={`pipelineCard-${pipeline.id}`} data-can-delete={canDelete}>
       {pipeline.name}
       {badges.map(label => (
         <span key={label}>{label}</span>
@@ -56,12 +44,14 @@ vi.mock('@/app/services/api/pipelines/clientRequests', () => ({
   useGetPipelines: vi.fn().mockReturnValue({ data: { data: [] } }),
 }))
 
-vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
-  useGetDataSinks: vi.fn().mockReturnValue({ data: { data: [] } }),
-}))
-
 vi.mock('@/app/services/api/datasources/clientRequests', () => ({
   useGetDatasources: vi.fn().mockReturnValue({ data: { data: [] } }),
+}))
+
+const mockRemovalStateResult = vi.hoisted(() => ({ removalState: null, isLoadingError: false }))
+
+vi.mock('@/hooks/use-data-sink-removal-state', () => ({
+  useDataSinkRemovalState: () => mockRemovalStateResult,
 }))
 
 vi.mock('sonner', () => ({
@@ -77,7 +67,6 @@ const makePipeline = (overrides: Partial<PipelineBasicInfo> = {}): PipelineBasic
 const defaultProps = {
   datasetId: 'dataset-123',
   pipelines: [] as PipelineBasicInfo[],
-  namedApis: [] as NamedApi[],
   canCreatePipeline: true,
   canDeletePipeline: true,
 }
@@ -88,9 +77,9 @@ const renderComponent = (props: Partial<typeof defaultProps> = {}) =>
 describe('PipelineList', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockRemovalStateResult.isLoadingError = false
     vi.mocked(useGetPipelines).mockReturnValue({ data: { data: [] } } as never)
     vi.mocked(useGetDatasources).mockReturnValue({ data: { data: [] } } as never)
-    vi.mocked(useGetDataSinks).mockReturnValue({ data: { data: [] } } as never)
   })
 
   describe('Empty state', () => {
@@ -115,29 +104,6 @@ describe('PipelineList', () => {
     it('forwards canDeletePipeline to each PipelineCard as canDelete', () => {
       renderComponent({ pipelines: [makePipeline({ id: 'p1' })], canDeletePipeline: false })
       expect(screen.getByTestId('pipelineCard-p1')).toHaveAttribute('data-can-delete', 'false')
-    })
-
-    it('forwards the delete block reason of each pipeline to its PipelineCard', () => {
-      vi.mocked(useGetDataSinks).mockReturnValue({
-        data: { data: [{ id: 'sink-1', pipelineId: 'p1', dataSinkType: DATASINK_TYPES.FROST }] },
-      } as never)
-      const namedApis: NamedApi[] = [{ name: 'STA', slug: 'sta', standard: API_STANDARDS.STA }]
-
-      renderComponent({ pipelines: [makePipeline({ id: 'p1' }), makePipeline({ id: 'p2' })], namedApis })
-
-      expect(screen.getByTestId('pipelineCard-p1')).toHaveAttribute('data-delete-block-reason', 'lastFrostWithSta')
-      expect(screen.getByTestId('pipelineCard-p2')).toHaveAttribute('data-delete-block-reason', '')
-    })
-
-    it.each([
-      ['loading', { isLoading: true, isError: false }],
-      ['failed', { isLoading: false, isError: true }],
-    ])('disables the delete when the data sinks request is %s', (_state, requestState) => {
-      vi.mocked(useGetDataSinks).mockReturnValue({ data: undefined, ...requestState } as never)
-
-      renderComponent({ pipelines: [makePipeline({ id: 'p1' })] })
-
-      expect(screen.getByTestId('pipelineCard-p1')).toHaveAttribute('data-delete-disabled', 'true')
     })
 
     it('does not show the empty message when there are pipelines', () => {
@@ -229,6 +195,18 @@ describe('PipelineList', () => {
         />,
       )
       expect(toast.error).toHaveBeenCalledTimes(2)
+    })
+
+    it('says why Delete is disabled when the Data sinks, Layers or Dataset failed to load', () => {
+      mockRemovalStateResult.isLoadingError = true
+      renderComponent({ pipelines: [makePipeline()] })
+      expect(toast.error).toHaveBeenCalledWith('messages.deleteUnavailable', expect.anything())
+    })
+
+    it('says nothing about Delete to a user who may not delete Pipelines', () => {
+      mockRemovalStateResult.isLoadingError = true
+      renderComponent({ pipelines: [makePipeline()], canDeletePipeline: false })
+      expect(toast.error).not.toHaveBeenCalled()
     })
   })
 })

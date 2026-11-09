@@ -1,0 +1,50 @@
+meta {
+  name: 3b. Reject a second STA API
+  type: http
+  seq: 7
+}
+
+patch {
+  url: {{baseUrl}}/datasets/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{napiContractDataSetId}}
+}
+
+body:json {
+  {
+    "namedApis": [
+      { "name": "Things", "slug": "things", "standard": "STA", "version": "1.1" },
+      { "name": "More Things", "slug": "more-things", "standard": "STA", "version": "1.1" }
+    ]
+  }
+}
+
+tests {
+  const body = res.body || {};
+
+  test("Status code is 400", function() {
+    expect(res.getStatus()).to.equal(400);
+  });
+  test("Response is a problem document", function() {
+    expect(body.detail !== undefined || body.title !== undefined).to.be.true;
+  });
+}
+
+docs {
+  **Contract step 3b** — Reject a second `STA` API in one dataset.
+
+  A dataset has at most one `OWS` and at most one `STA` API. The FROST DataSink of step 1a backs
+  `STA`, so a 400 here can only come from the second `STA` entry. The database enforces the same
+  limit as a backstop.
+
+  **Precondition:** steps 1 to 1b ran.
+
+  **Expected Response:** 400 Bad Request, `application/problem+json`. The dataset keeps only the
+  `things` API.
+
+  **Post-condition:** none — the request changes nothing.
+}

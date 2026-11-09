@@ -24,6 +24,7 @@ import de.civitascore.portal.messaging.saga.DataSetSagaPublisher;
 import de.civitascore.portal.messaging.saga.SagaResultPayload;
 import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DataSinkState;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
 import de.civitascore.portal.model.embedded.PendingSagaType;
@@ -32,6 +33,7 @@ import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
+import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.input.DataSetInputDTO;
@@ -45,6 +47,7 @@ import de.civitascore.portal.repository.DataSinkRepository;
 import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.security.AssignmentChangeAuthorizer;
+import de.civitascore.portal.service.removal.DataSinkRemovalService;
 import de.civitascore.portal.service.validation.DataSourceDatapoolScopeValidator;
 import de.civitascore.portal.service.validation.PipelineClosureValidator;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
@@ -52,12 +55,14 @@ import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.PipelineClosureValidationException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.SagaInFlightException;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -72,6 +77,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionSynchronizationUtils;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("DataSetService Tests")
@@ -121,7 +128,12 @@ class DataSetServiceTest {
         new DataSourceDatapoolScopeValidator(),
         modelRegistryGateway,
         new DataSetMutationGuard(dataSetRepository),
-        pipelineClosureValidator);
+        pipelineClosureValidator,
+        new DataSinkRemovalService(
+            dataSinkRepository,
+            layerRepository,
+            modelRegistryGateway,
+            new DataSinkTableNames(modelRegistryGateway)));
   }
 
   private static AllowedScopes wildcardScopes() {
@@ -160,6 +172,17 @@ class DataSetServiceTest {
     ds.setPublicUrl("https://example.com");
     ds.setPipelineIds(List.of("pipe-1"));
     return ds;
+  }
+
+  private static List<DataSink> activeSinks(DataSinkType... types) {
+    return Arrays.stream(types)
+        .map(
+            type -> {
+              DataSink sink = new DataSink();
+              sink.setDataSinkType(type);
+              return sink;
+            })
+        .toList();
   }
 
   private DataSet draftDataSet(UUID id) {
@@ -385,8 +408,8 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet ds = readyDataSet(id);
       when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
-      when(dataSinkRepository.existsByDataSetIdAndDataSinkType(id, DataSinkType.FROST))
-          .thenReturn(true);
+      when(dataSinkRepository.findByDataSetIdAndState(id, DataSinkState.ACTIVE))
+          .thenReturn(activeSinks(DataSinkType.FROST));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       DataSetService service = createService();
@@ -398,7 +421,7 @@ class DataSetServiceTest {
     }
 
     @Test
-    @DisplayName("rejects layers with no OWS named API to serve them")
+    @DisplayName("rejects layers with no named API that publishes them")
     void rejectsLayersWithoutOwsApi() {
       // Layers and the OWS route are gated independently downstream, so this would provision
       // feature types that no route can reach and still report the release successful.
@@ -409,7 +432,7 @@ class DataSetServiceTest {
 
       assertThatThrownBy(() -> createService().release(id))
           .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("no OWS named API");
+          .hasMessageContaining("no named API that publishes Layers");
 
       verify(sagaPublisher, never()).publishCreateRequested(any());
     }
@@ -424,12 +447,10 @@ class DataSetServiceTest {
       ds.getNamedApis().forEach(api -> api.setStandard(ApiStandard.OWS));
       when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
       when(layerRepository.existsByDataSetId(id)).thenReturn(false);
-      when(dataSinkRepository.existsByDataSetIdAndDataSinkType(id, DataSinkType.POSTGIS))
-          .thenReturn(false);
 
       assertThatThrownBy(() -> createService().release(id))
           .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("no POSTGIS data sink");
+          .hasMessageContaining("no active POSTGIS data sink");
 
       verify(sagaPublisher, never()).publishCreateRequested(any());
     }
@@ -443,12 +464,10 @@ class DataSetServiceTest {
       DataSet ds = readyDataSet(id);
       when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
       when(layerRepository.existsByDataSetId(id)).thenReturn(false);
-      when(dataSinkRepository.existsByDataSetIdAndDataSinkType(id, DataSinkType.FROST))
-          .thenReturn(false);
 
       assertThatThrownBy(() -> createService().release(id))
           .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("no FROST data sink");
+          .hasMessageContaining("no active FROST data sink");
 
       verify(sagaPublisher, never()).publishCreateRequested(any());
     }
@@ -461,8 +480,8 @@ class DataSetServiceTest {
       ds.getNamedApis().forEach(api -> api.setStandard(ApiStandard.OWS));
       when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
       when(layerRepository.existsByDataSetId(id)).thenReturn(true);
-      when(dataSinkRepository.existsByDataSetIdAndDataSinkType(id, DataSinkType.POSTGIS))
-          .thenReturn(true);
+      when(dataSinkRepository.findByDataSetIdAndState(id, DataSinkState.ACTIVE))
+          .thenReturn(activeSinks(DataSinkType.POSTGIS));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       DataSet result = createService().release(id);
@@ -532,8 +551,8 @@ class DataSetServiceTest {
       addPipelineWithSource(ds, dataSource(UUID.randomUUID(), DatapoolScopeType.SPECIFIC, poolB));
 
       when(dataSetRepository.findByIdWithPipelineDataSources(id)).thenReturn(Optional.of(ds));
-      when(dataSinkRepository.existsByDataSetIdAndDataSinkType(id, DataSinkType.FROST))
-          .thenReturn(true);
+      when(dataSinkRepository.findByDataSetIdAndState(id, DataSinkState.ACTIVE))
+          .thenReturn(activeSinks(DataSinkType.FROST));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
       DataSet result = createService().release(id);
@@ -836,13 +855,193 @@ class DataSetServiceTest {
 
       assertThatThrownBy(() -> createService().postConvertToEntity(entity, input))
           .isInstanceOf(InvalidInputException.class)
-          .hasMessageContaining("at most one OWS named API");
+          .hasMessageContaining("at most 1 OWS named API");
+    }
+
+    @Test
+    @DisplayName("rejects a second STA named API on the same dataset")
+    void rejectsSecondStaNamedApi() {
+      DataSet entity = new DataSet();
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setNamedApis(
+          List.of(namedApi("traffic", ApiStandard.STA), namedApi("weather", ApiStandard.STA)));
+
+      assertThatThrownBy(() -> createService().postConvertToEntity(entity, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("at most 1 STA named API");
+    }
+
+    @Test
+    @DisplayName("adds an OWS named API to a dataset that already has two STA named APIs")
+    void addsOwsApiNextToExistingDuplicateStaApis() {
+      UUID id = UUID.randomUUID();
+      DataSet entity = new DataSet();
+      entity.setId(id);
+      entity.setNamedApis(
+          new HashSet<>(
+              Set.of(
+                  NamedApi.builder().name("t").slug("traffic").standard(ApiStandard.STA).build(),
+                  NamedApi.builder().name("w").slug("weather").standard(ApiStandard.STA).build())));
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setNamedApis(
+          List.of(
+              namedApi("traffic", ApiStandard.STA),
+              namedApi("weather", ApiStandard.STA),
+              namedApi("maps", ApiStandard.OWS)));
+      when(dataSinkRepository.findByDataSetIdAndState(id, DataSinkState.ACTIVE))
+          .thenReturn(activeSinks(DataSinkType.POSTGIS));
+      mapNamedApis();
+
+      createService().postConvertToEntity(entity, input);
+
+      assertThat(entity.getNamedApis()).hasSize(3);
+    }
+
+    @Test
+    @DisplayName("rejects a third STA named API on a dataset that already has two")
+    void rejectsThirdStaApiNextToExistingDuplicates() {
+      DataSet entity = new DataSet();
+      entity.setNamedApis(
+          new HashSet<>(
+              Set.of(
+                  NamedApi.builder().name("t").slug("traffic").standard(ApiStandard.STA).build(),
+                  NamedApi.builder().name("w").slug("weather").standard(ApiStandard.STA).build())));
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setNamedApis(
+          List.of(
+              namedApi("traffic", ApiStandard.STA),
+              namedApi("weather", ApiStandard.STA),
+              namedApi("air", ApiStandard.STA)));
+
+      assertThatThrownBy(() -> createService().postConvertToEntity(entity, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("at most 1 STA named API");
+    }
+
+    @Test
+    @DisplayName("accepts several CUSTOM named APIs without a data sink")
+    void acceptsSeveralCustomApisWithoutDataSink() {
+      DataSet entity = new DataSet();
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setNamedApis(
+          List.of(namedApi("one", ApiStandard.CUSTOM), namedApi("two", ApiStandard.CUSTOM)));
+      mapNamedApis();
+
+      createService().postConvertToEntity(entity, input);
+
+      assertThat(entity.getNamedApis()).hasSize(2);
+      verify(dataSinkRepository, never()).findByDataSetIdAndState(any(), any());
+    }
+
+    @Test
+    @DisplayName("rejects a new STA named API without an active FROST data sink")
+    void rejectsNewStaApiWithoutActiveFrostSink() {
+      UUID id = UUID.randomUUID();
+      DataSet entity = new DataSet();
+      entity.setId(id);
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setNamedApis(List.of(namedApi("sensors", ApiStandard.STA)));
+
+      assertThatThrownBy(() -> createService().postConvertToEntity(entity, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("needs an active FROST data sink");
+      assertThat(entity.getNamedApis()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("adds an OWS named API when an active POSTGIS sink exists")
+    void addsOwsApiWithActivePostgisSink() {
+      UUID id = UUID.randomUUID();
+      DataSet entity = new DataSet();
+      entity.setId(id);
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setNamedApis(List.of(namedApi("maps", ApiStandard.OWS)));
+      when(dataSinkRepository.findByDataSetIdAndState(id, DataSinkState.ACTIVE))
+          .thenReturn(activeSinks(DataSinkType.POSTGIS));
+      mapNamedApis();
+
+      createService().postConvertToEntity(entity, input);
+
+      assertThat(entity.getNamedApis())
+          .singleElement()
+          .extracting(NamedApi::getStandard)
+          .isEqualTo(ApiStandard.OWS);
+    }
+
+    @Test
+    @DisplayName("keeps an existing STA named API whose FROST sink is gone")
+    void keepsExistingStaApiWithoutRecheck() {
+      // Existing APIs are not re-checked: the removal cascade and the release check own them.
+      UUID id = UUID.randomUUID();
+      DataSet entity = new DataSet();
+      entity.setId(id);
+      entity.setNamedApis(
+          new HashSet<>(
+              Set.of(
+                  NamedApi.builder().name("s").slug("sensors").standard(ApiStandard.STA).build())));
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setNamedApis(List.of(namedApi("sensors", ApiStandard.STA)));
+
+      assertThatCode(() -> createService().postConvertToEntity(entity, input))
+          .doesNotThrowAnyException();
+      verify(dataSinkRepository, never()).findByDataSetIdAndState(any(), any());
+    }
+
+    @Test
+    @DisplayName(
+        "rejects changing an existing CUSTOM named API to STA without an active FROST sink")
+    void rejectsStandardChangeToStaWithoutActiveFrostSink() {
+      UUID id = UUID.randomUUID();
+      DataSet entity = new DataSet();
+      entity.setId(id);
+      entity.setNamedApis(
+          new HashSet<>(
+              Set.of(
+                  NamedApi.builder()
+                      .name("s")
+                      .slug("sensors")
+                      .standard(ApiStandard.CUSTOM)
+                      .build())));
+      DataSetInputDTO input = new DataSetInputDTO();
+      input.setNamedApis(List.of(namedApi("sensors", ApiStandard.STA)));
+
+      assertThatThrownBy(() -> createService().postConvertToEntity(entity, input))
+          .isInstanceOf(InvalidInputException.class)
+          .hasMessageContaining("needs an active FROST data sink");
+      assertThat(entity.getNamedApis())
+          .singleElement()
+          .extracting(NamedApi::getStandard)
+          .isEqualTo(ApiStandard.CUSTOM);
+    }
+
+    private NamedApiInputDTO namedApi(String slug, ApiStandard standard) {
+      NamedApiInputDTO dto = new NamedApiInputDTO();
+      dto.setName(slug);
+      dto.setSlug(slug);
+      dto.setStandard(standard);
+      return dto;
+    }
+
+    private void mapNamedApis() {
+      when(dataSetMapper.toNamedApiEntity(any()))
+          .thenAnswer(
+              inv -> {
+                NamedApiInputDTO dto = inv.getArgument(0);
+                return NamedApi.builder()
+                    .name(dto.getName())
+                    .slug(dto.getSlug())
+                    .standard(dto.getStandard())
+                    .build();
+              });
     }
 
     @Test
     @DisplayName("accepts one OWS named API alongside other standards")
     void acceptsOneOwsApiWithOtherStandards() {
       DataSet entity = new DataSet();
+      entity.setId(UUID.randomUUID());
+      when(dataSinkRepository.findByDataSetIdAndState(any(), any()))
+          .thenReturn(activeSinks(DataSinkType.POSTGIS, DataSinkType.FROST));
       NamedApiInputDTO maps = new NamedApiInputDTO();
       maps.setName("Maps");
       maps.setSlug("maps");
@@ -1106,6 +1305,21 @@ class DataSetServiceTest {
   @Nested
   @DisplayName("handleSagaCompleted()")
   class HandleSagaCompletedTests {
+
+    @BeforeEach
+    void initSynchronization() {
+      TransactionSynchronizationManager.initSynchronization();
+    }
+
+    @AfterEach
+    void clearSynchronization() {
+      TransactionSynchronizationManager.clearSynchronization();
+    }
+
+    private static void commit() {
+      TransactionSynchronizationUtils.invokeAfterCommit(
+          TransactionSynchronizationManager.getSynchronizations());
+    }
 
     @Test
     @DisplayName("CREATE: persists infrastructure fields and clears pendingSagaType")
@@ -1712,8 +1926,8 @@ class DataSetServiceTest {
     @EnumSource(
         value = PendingSagaType.class,
         names = {"CREATE", "UPDATE"})
-    @DisplayName("provisioning saga: marks every sink of the dataset provisioned")
-    void provisioningSagaMarksEverySinkProvisioned(PendingSagaType sagaType) {
+    @DisplayName("provisioning saga: marks every active sink of the dataset provisioned")
+    void provisioningSagaMarksEveryActiveSinkProvisioned(PendingSagaType sagaType) {
       UUID id = UUID.randomUUID();
       DataSet ds = availableDataSet(id);
       ds.setPendingSagaType(sagaType);
@@ -1723,7 +1937,8 @@ class DataSetServiceTest {
       frost.setDataSinkType(DataSinkType.FROST);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
       when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-      when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of(postgis, frost));
+      when(dataSinkRepository.findByDataSetIdAndState(id, DataSinkState.ACTIVE))
+          .thenReturn(List.of(postgis, frost));
 
       createService()
           .handleSagaCompleted(
@@ -1734,6 +1949,114 @@ class DataSetServiceTest {
       assertThat(List.of(postgis, frost)).extracting(DataSink::isProvisioned).containsOnly(true);
       verify(dataSinkRepository).save(postgis);
       verify(dataSinkRepository).save(frost);
+    }
+
+    @Test
+    @DisplayName("CREATE: deletes the pending sinks")
+    void createDeletesPendingSinks() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+      DataSink pending = pendingSink(DataSinkType.POSTGIS);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      stubPendingSinks(id, List.of(pending));
+
+      createService().handleSagaCompleted(id, emptyResult(id));
+      commit();
+
+      verify(dataSinkRepository).delete(pending);
+      verify(dataSinkRepository, never()).save(pending);
+      assertThat(ds.getProjectId()).isEqualTo("proj-1");
+    }
+
+    @Test
+    @DisplayName("CREATE: the saga reports the project deleted, the dataset forgets it")
+    void createForgetsFrostProjectReportedDeleted() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      stubPendingSinks(id, List.of(pendingSink(DataSinkType.FROST)));
+
+      createService().handleSagaCompleted(id, projectDeletedResult(id));
+
+      assertThat(ds.getProjectId()).isNull();
+      assertThat(ds.getFrostBaseUrl()).isNull();
+    }
+
+    @Test
+    @DisplayName("CREATE: without a reported deletion the dataset keeps its FROST project")
+    void createKeepsFrostProjectWithoutReportedDeletion() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.CREATE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+      stubPendingSinks(id, List.of(pendingSink(DataSinkType.FROST)));
+
+      createService().handleSagaCompleted(id, emptyResult(id));
+
+      assertThat(ds.getProjectId()).isEqualTo("proj-1");
+      assertThat(ds.getFrostBaseUrl()).isEqualTo("https://frost.example.com/Projects(1)");
+    }
+
+    @Test
+    @DisplayName("UPDATE: the saga reports the project deleted, the dataset forgets it")
+    void updateForgetsFrostProjectReportedDeleted() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.UPDATE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService().handleSagaCompleted(id, projectDeletedResult(id));
+
+      assertThat(ds.getProjectId()).isNull();
+      assertThat(ds.getFrostBaseUrl()).isNull();
+    }
+
+    @Test
+    @DisplayName("UPDATE: deletes no pending sink")
+    void updateDeletesNoPendingSink() {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(PendingSagaType.UPDATE);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService().handleSagaCompleted(id, emptyResult(id));
+
+      verify(dataSinkRepository, never())
+          .findByDataSetIdAndState(id, DataSinkState.PENDING_UNPROVISION);
+      verify(dataSinkRepository, never()).delete(any(DataSink.class));
+    }
+
+    private void stubPendingSinks(UUID id, List<DataSink> pending) {
+      when(dataSinkRepository.findByDataSetIdAndState(id, DataSinkState.ACTIVE))
+          .thenReturn(List.of());
+      when(dataSinkRepository.findByDataSetIdAndState(id, DataSinkState.PENDING_UNPROVISION))
+          .thenReturn(pending);
+    }
+
+    private static DataSink pendingSink(DataSinkType type) {
+      DataSink sink = new DataSink();
+      sink.setId(UUID.randomUUID());
+      sink.setDataSinkType(type);
+      sink.setProvisioned(true);
+      sink.markPendingUnprovision(null);
+      return sink;
+    }
+
+    private static SagaResultPayload emptyResult(UUID id) {
+      return new SagaResultPayload(
+          id.toString(), null, null, null, null, null, null, null, null, null);
+    }
+
+    private static SagaResultPayload projectDeletedResult(UUID id) {
+      return new SagaResultPayload(
+          id.toString(), null, null, true, null, null, null, null, null, null, null, null);
     }
 
     @Test
@@ -1798,6 +2121,28 @@ class DataSetServiceTest {
       verify(dataSetRepository).save(saved.capture());
       assertThat(saved.getValue().getDataSetStatus()).isEqualTo(DataSetStatus.READY);
       assertThat(saved.getValue().getPendingSagaType()).isNull();
+      assertThat(saved.getValue().getProjectId()).isEqualTo("proj-1");
+      verify(dataSinkRepository, never()).delete(any(DataSink.class));
+      verifyNoInteractions(modelRegistryGateway);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+        value = PendingSagaType.class,
+        names = {"CREATE", "UPDATE"})
+    @DisplayName("release failure: keeps the data sinks waiting for removal")
+    void releaseFailureKeepsPendingSinks(PendingSagaType sagaType) {
+      UUID id = UUID.randomUUID();
+      DataSet ds = availableDataSet(id);
+      ds.setPendingSagaType(sagaType);
+      when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
+      when(dataSetRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+      createService().handleSagaFailed(id, "deprovision-sink", "PostGIS down", false);
+
+      verify(dataSinkRepository, never())
+          .findByDataSetIdAndState(id, DataSinkState.PENDING_UNPROVISION);
+      verify(dataSinkRepository, never()).delete(any(DataSink.class));
     }
 
     @Test
@@ -2196,9 +2541,6 @@ class DataSetServiceTest {
       DataSet ds = readyDataSet(id);
       ds.setProvisioned(false);
       when(dataSetRepository.findById(id)).thenReturn(Optional.of(ds));
-      lenient()
-          .when(dataSinkRepository.existsByDataSetIdAndDataSinkType(id, DataSinkType.POSTGIS))
-          .thenReturn(true);
       when(dataSinkRepository.findByDataSetId(id)).thenReturn(List.of());
 
       createService().deleteById(id);
@@ -2360,6 +2702,9 @@ class DataSetServiceTest {
 
     @BeforeEach
     void mapIncomingApis() {
+      lenient()
+          .when(dataSinkRepository.findByDataSetIdAndState(any(), any()))
+          .thenReturn(activeSinks(DataSinkType.POSTGIS, DataSinkType.FROST));
       // Every case here adds at least one slug the entity does not carry yet, which routes through
       // the mapper.
       lenient()
@@ -2446,9 +2791,14 @@ class DataSetServiceTest {
       UUID id = UUID.randomUUID();
       DataSet entity = persistedWithOwsApi(id);
 
+      Layer layer = new Layer();
+      layer.setNamedApi(entity.getNamedApis().iterator().next());
+      when(layerRepository.findByDataSetId(id)).thenReturn(List.of(layer));
+
       createService().postConvertToEntity(entity, inputWithApis(api("maps-v2", ApiStandard.OWS)));
 
       verify(layerRepository, never()).deleteByDataSetId(any());
+      assertThat(layer.getNamedApi().getSlug()).isEqualTo("maps-v2");
     }
 
     @Test
@@ -2456,7 +2806,7 @@ class DataSetServiceTest {
     void skipsCleanupOnCreate() {
       // A create cannot have orphaned anything, and deleteByDataSetId(null) would be meaningless.
       createService()
-          .postConvertToEntity(new DataSet(), inputWithApis(api("sensors", ApiStandard.STA)));
+          .postConvertToEntity(new DataSet(), inputWithApis(api("sensors", ApiStandard.CUSTOM)));
 
       verify(layerRepository, never()).deleteByDataSetId(any());
     }

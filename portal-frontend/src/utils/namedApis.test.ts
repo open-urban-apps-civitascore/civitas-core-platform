@@ -28,7 +28,7 @@ const makeLayer = (overrides: Partial<LayerFormData> = {}): LayerFormData => ({
 const makeDataSink = (): DataSink => ({
   id: '00000000-0000-0000-0000-000000000010',
   datasetId: '00000000-0000-0000-0000-000000000020',
-  pipelineId: '00000000-0000-0000-0000-000000000030',
+  pipelineIds: ['00000000-0000-0000-0000-000000000030'],
   dataSinkType: DATASINK_TYPES.POSTGIS,
   configuration: {
     tableName: 'my_table',

@@ -1,6 +1,6 @@
 package de.civitascore.portal.repository;
 
-import de.civitascore.portal.model.embedded.DataSinkType;
+import de.civitascore.portal.model.embedded.DataSinkState;
 import de.civitascore.portal.model.entity.DataSink;
 import java.util.Collection;
 import java.util.List;
@@ -19,17 +19,19 @@ public interface DataSinkRepository extends BaseRepository<DataSink, UUID> {
    * Find a DataSink by ID with related entities eagerly fetched, preventing N+1 queries.
    *
    * @param id the DataSink ID
-   * @return the DataSink with eagerly fetched dataSet and pipeline
+   * @return the DataSink with eagerly fetched dataSet and pipelines
    */
-  @EntityGraph(attributePaths = {"dataSet", "pipeline"})
+  @EntityGraph(attributePaths = {"dataSet", "pipelines"})
   @Query("SELECT s FROM DataSink s WHERE s.id = :id")
   Optional<DataSink> findByIdWithRelations(UUID id);
 
-  List<DataSink> findByPipelineId(UUID pipelineId);
+  /** The DataSinks the given Pipeline writes into. */
+  List<DataSink> findByPipelinesId(UUID pipelineId);
 
+  /** The DataSinks of the given DataSet in every state. */
   List<DataSink> findByDataSetId(UUID dataSetId);
 
-  boolean existsByDataSetIdAndDataSinkType(UUID dataSetId, DataSinkType dataSinkType);
+  List<DataSink> findByDataSetIdAndState(UUID dataSetId, DataSinkState state);
 
   /** Whether each sink's Dataset is released, keyed by the sink's logical URN. */
   @Query(

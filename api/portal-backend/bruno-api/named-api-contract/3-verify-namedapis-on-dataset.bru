@@ -1,7 +1,7 @@
 meta {
   name: 3. Verify named APIs on the dataset resource
   type: http
-  seq: 3
+  seq: 5
 }
 
 get {
@@ -22,12 +22,12 @@ tests {
   test("Status code is 200", function() {
     expect(res.getStatus()).to.equal(200);
   });
-  test("Dataset embeds both named APIs", function() {
+  test("Dataset embeds the named API", function() {
     expect(res.body.namedApis).to.be.an('array');
-    expect(res.body.namedApis).to.have.lengthOf(2);
+    expect(res.body.namedApis).to.have.lengthOf(1);
   });
   test("Slugs round-trip exactly as submitted", function() {
-    expect(slugs).to.deep.equal(['map', 'things']);
+    expect(slugs).to.deep.equal(['things']);
   });
   test("Each named API carries a routable standard", function() {
     namedApis.forEach(function(api) {
@@ -55,10 +55,10 @@ docs {
   The route-id assertion pins an encapsulation boundary: the gateway route reference is infrastructure
   state owned by the release saga and must never surface on the output DTO, in any lifecycle status.
 
-  **Precondition:** `napiContractDataSetId` is set (step 1).
+  **Precondition:** `napiContractDataSetId` is set (step 1) and step 1b added the `STA` API.
 
-  **Expected Response:** 200 OK, `namedApis` holds exactly the `things` (STA) and `map` (OWS)
-  entries, neither exposing a route reference.
+  **Expected Response:** 200 OK, `namedApis` holds exactly the `things` (STA) entry without a route
+  reference.
 
   **Post-condition:** none.
 }

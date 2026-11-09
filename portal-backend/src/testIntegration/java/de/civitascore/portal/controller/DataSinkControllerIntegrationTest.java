@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.InstanceOfAssertFactories.type;
 
 import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.DataSinkState;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DataStructureVersionStatus;
 import de.civitascore.portal.model.embedded.PendingSagaType;
@@ -30,6 +31,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -142,7 +144,7 @@ class DataSinkControllerIntegrationTest
       assertThat(body.getId()).isEqualTo(id);
       assertThat(body.getDataSinkType()).isEqualTo(DataSinkType.FROST);
       assertThat(body.getDataSetId()).isEqualTo(testDataSetId);
-      assertThat(body.getPipelineId()).isNull();
+      assertThat(body.getPipelineIds()).isEmpty();
       assertThat(body.isInUseByPipeline()).isFalse();
       assertThat(body.isInUseByLayer()).isFalse();
       assertThat(body.isProvisioned()).isFalse();
@@ -234,7 +236,7 @@ class DataSinkControllerIntegrationTest
       Pipeline pipeline = pipelineRepository.findById(testPipelineId).orElseThrow();
       DataSink sink = new DataSink();
       sink.setDataSet(dataSet);
-      sink.setPipeline(pipeline);
+      sink.getPipelines().add(pipeline);
       sink.setDataSinkType(DataSinkType.FROST);
       UUID id = dataSinkRepository.save(sink).getId();
 
@@ -244,7 +246,7 @@ class DataSinkControllerIntegrationTest
       assertThat(response.getBody()).isNotNull();
       assertThat(response.getBody().isInUseByPipeline()).isTrue();
       assertThat(response.getBody().isInUseByLayer()).isFalse();
-      assertThat(response.getBody().getPipelineId()).isEqualTo(testPipelineId);
+      assertThat(response.getBody().getPipelineIds()).containsExactly(testPipelineId);
     }
   }
 
@@ -265,7 +267,7 @@ class DataSinkControllerIntegrationTest
       assertThat(body.getId()).isNotNull();
       assertThat(body.getDataSinkType()).isEqualTo(DataSinkType.FROST);
       assertThat(body.getDataSetId()).isEqualTo(testDataSetId);
-      assertThat(body.getPipelineId()).isNull();
+      assertThat(body.getPipelineIds()).isEmpty();
       assertThat(body.isInUseByPipeline()).isFalse();
       assertThat(body.isInUseByLayer()).isFalse();
       assertThat(dataSinkRepository.findById(body.getId()))
@@ -897,40 +899,34 @@ class DataSinkControllerIntegrationTest
       assertThat(dataSinkRepository.findById(id)).isEmpty();
     }
 
-    @Test
-    @DisplayName("DELETE returns 409 when a Layer references the DataSink")
-    void deleteReturns409WhenLayerReferencesDataSink() {
-      ensureTestData();
-      DataSet dataSet = dataSetRepository.findById(testDataSetId).orElseThrow();
-      Pipeline pipeline = pipelineRepository.findById(testPipelineId).orElseThrow();
-      DataSink sink = portalData.dataSink(dataSet, pipeline);
-      portalData.layer(dataSet, sink);
-
-      ResponseEntity<ProblemDetail> response =
-          exchangeForProblem(
-              getEndpointPath() + "/" + sink.getId(), HttpMethod.DELETE, createAuthHeaders(), null);
-
-      assertRejected(response, HttpStatus.CONFLICT, "urn:civitas:error:RESOURCE_IN_USE");
-      assertThat(dataSinkRepository.findById(sink.getId())).isPresent();
-    }
-
     /** A draft dataset holds a provisioned sink after an unrelease. */
     @Test
-    @DisplayName("DELETE returns 409 for a provisioned DataSink and keeps its configuration")
-    void deleteReturns409WhenDataSinkIsProvisioned() {
+    @DisplayName("DELETE of a provisioned DataSink needs confirmation and keeps its configuration")
+    void deleteOfProvisionedDataSinkKeepsItPending() {
       UUID id = createTestEntity();
       DataSink sink = dataSinkRepository.findById(id).orElseThrow();
       sink.setProvisioned(true);
       dataSinkRepository.save(sink);
 
-      ResponseEntity<ProblemDetail> response =
+      ResponseEntity<ProblemDetail> unconfirmed =
           exchangeForProblem(
               getEndpointPath() + "/" + id, HttpMethod.DELETE, createAuthHeaders(), null);
+      assertRejected(unconfirmed, HttpStatus.CONFLICT, "urn:civitas:error:REMOVAL_NOT_CONFIRMED");
+      assertThat(dataSinkRepository.findById(id).orElseThrow().getState())
+          .isEqualTo(DataSinkState.ACTIVE);
 
-      assertRejected(response, HttpStatus.CONFLICT, "urn:civitas:error:RESOURCE_IN_USE");
-      assertThat(response.getBody().getDetail()).doesNotContain("confirmDataLoss");
-      assertThat(dataSinkRepository.findById(id)).isPresent();
-      assertThat(modelRegistryGateway.fetchPayload(sink.getConfigurationUrn())).isPresent();
+      ResponseEntity<Void> confirmed =
+          restTemplate.exchange(
+              getEndpointPath() + "/" + id + "?confirmDataLoss=true",
+              HttpMethod.DELETE,
+              new HttpEntity<>(createAuthHeaders()),
+              Void.class);
+
+      assertThat(confirmed.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+      assertThat(dataSinkRepository.findById(id).orElseThrow().getState())
+          .isEqualTo(DataSinkState.PENDING_UNPROVISION);
+      assertThat(modelRegistryGateway.fetchPayload(sink.getConfigurationUrn())).isEmpty();
+      assertThat(performGetById(id).getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
   }
 

@@ -141,7 +141,7 @@ class CascadeBehaviorIntegrationTest extends BaseKeycloakIntegrationTest {
   private DataSink createDataSink(DataSet dataSet, Pipeline pipeline) {
     DataSink sink = new DataSink();
     sink.setDataSet(dataSet);
-    sink.setPipeline(pipeline);
+    sink.getPipelines().add(pipeline);
     sink.setDataSinkType(DataSinkType.FROST);
     return dataSinkRepository.save(sink);
   }

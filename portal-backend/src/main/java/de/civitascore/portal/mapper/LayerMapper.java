@@ -29,6 +29,7 @@ public interface LayerMapper extends DtoMapper<LayerInputDTO, LayerOutputDTO, La
 
   @Mapping(target = "dataSetId", source = "dataSet.id")
   @Mapping(target = "dataSinkId", source = "dataSink.id")
+  @Mapping(target = "namedApiId", source = "namedApi.id")
   @Mapping(target = "defaultStyleId", source = "defaultStyle.id")
   @Mapping(target = "alternativeStyleIds", ignore = true)
   @Override

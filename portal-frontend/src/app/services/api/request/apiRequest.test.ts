@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { axiosClient } from '../client/client'
-import { apiRequest } from './apiRequest'
+import { apiRequest, apiRequestAllPages } from './apiRequest'
 
 vi.mock('../client/client', () => ({
   axiosClient: {
@@ -125,5 +125,24 @@ describe('apiRequest', () => {
         method: 'DELETE',
       }),
     ).rejects.toThrow()
+  })
+})
+
+describe('apiRequestAllPages', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  // A removal dialog planned on the first page alone would hide Layers that the delete removes.
+  it('requests every page and returns all items', async () => {
+    mockedRequest
+      .mockResolvedValueOnce({ data: { content: ['a', 'b'], totalElements: 3, totalPages: 2 } })
+      .mockResolvedValueOnce({ data: { content: ['c'], totalElements: 3, totalPages: 2 } })
+
+    const result = await apiRequestAllPages<string>({ endpoint: '/items' })
+
+    expect(mockedRequest).toHaveBeenCalledTimes(2)
+    expect(mockedRequest).toHaveBeenLastCalledWith(expect.objectContaining({ url: '/api/items?page=1&size=200' }))
+    expect(result.data).toEqual(['a', 'b', 'c'])
   })
 })

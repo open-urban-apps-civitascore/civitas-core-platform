@@ -30,6 +30,7 @@ the incoming metadata, with CloudEvent type `de.civitascore.data.sql.processing.
 | `CREATE_SCHEMA` | `schemaConfig` | `DROP_SCHEMA` | `{schema, cascade?}` |
 | `CREATE_ROLE` | `roleConfig` | `DROP_ROLE` | `{role}` |
 | `PROVISION_SINK` | `datasinks`, `datasetId` | `DEPROVISION_SINK` | `datasinks`, `datasetId`, `createdTables`, `createdSchema` |
+| `UNPROVISION_SINKS` | `pendingUnprovisionDatasinks`, `datasinks`, `datasetId` | — | — |
 
 Each nested config map carries its `resourceType` discriminator, exactly as the config travels inside
 CloudEvents. Every `CREATE_*` returns its identifiers as compensation data, which the orchestrator flattens
@@ -111,6 +112,10 @@ that entry's `configuration` (`tableName`, `columns`, `geometryColumns`, `primar
   drops all of them. A compensation drops only the tables in `createdTables`, and the schema only when
   `createdSchema` is set: `PROVISION_SINK` records the objects it created, not the ones it found, so a failed
   re-release keeps the tables, roles and data of an earlier release. A delete trigger may omit `columns` and `dataStructure`.
+- **Pending sinks** — `UNPROVISION_SINKS` drops the read role and the table of every `POSTGIS` entry in
+  `pendingUnprovisionDatasinks`, in one transaction. It drops the per-dataset schema with `RESTRICT` only when
+  `datasinks` holds no `POSTGIS` entry, so the tables of the active sinks and their schema stay. Missing roles,
+  tables and schemas are absorbed. The release saga runs it; it has no compensation.
 
 Column derivation reads the root `properties`, or the property-carrying definition under
 `$defs`/`definitions`; `required` properties become `NOT NULL`.

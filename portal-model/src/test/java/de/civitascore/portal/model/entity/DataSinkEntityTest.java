@@ -41,13 +41,13 @@ class DataSinkEntityTest {
 
       DataSink sink = new DataSink();
       sink.setDataSet(dataSet);
-      sink.setPipeline(pipeline);
+      sink.getPipelines().add(pipeline);
       sink.setDataSinkType(DataSinkType.POSTGIS);
       sink.setConfigurationLogicalUrn(logicalUrn);
       sink.setConfigurationUrn(urn);
 
       assertThat(sink.getDataSet()).isSameAs(dataSet);
-      assertThat(sink.getPipeline()).isSameAs(pipeline);
+      assertThat(sink.getPipelines()).containsExactly(pipeline);
       assertThat(sink.getDataSinkType()).isEqualTo(DataSinkType.POSTGIS);
       assertThat(sink.getConfigurationLogicalUrn()).isEqualTo(logicalUrn);
       assertThat(sink.getConfigurationUrn()).isEqualTo(urn);
@@ -63,7 +63,7 @@ class DataSinkEntityTest {
       sink.setDataSinkType(DataSinkType.FROST);
 
       assertThat(sink.getDataSet()).isSameAs(dataSet);
-      assertThat(sink.getPipeline()).isNull();
+      assertThat(sink.getPipelines()).isEmpty();
       assertThat(sink.getDataSinkType()).isEqualTo(DataSinkType.FROST);
       assertThat(sink.getConfigurationLogicalUrn()).isNull();
       assertThat(sink.getConfigurationUrn()).isNull();

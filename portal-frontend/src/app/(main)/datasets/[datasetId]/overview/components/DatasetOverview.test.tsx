@@ -109,6 +109,10 @@ vi.mock('@/app/services/api/datasets/datasinks/clientRequests', () => ({
   useGetDataSinks: () => ({ data: { data: [{ id: 'sink-1', dataSinkType: 'POSTGIS' }] } }),
 }))
 
+vi.mock('@/hooks/use-data-sink-removal-state', () => ({
+  useDataSinkRemovalState: () => ({ removalState: null, isLoadingError: false }),
+}))
+
 vi.mock('@/contexts/unsaved-changes/UnsavedChangesContext', () => ({
   useUnsavedChanges: () => ({
     setHasUnsavedChanges: vi.fn(),

@@ -2,6 +2,7 @@ package de.civitascore.portal.messaging.saga;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -123,6 +124,25 @@ class DataSetSagaResultListenerTest {
                       null,
                       null,
                       null)));
+    }
+
+    @Test
+    @DisplayName("binds the reported project deletion")
+    void bindsProjectDeleted() throws Exception {
+      UUID datasetId = UUID.randomUUID();
+      String payload =
+          objectMapper.writeValueAsString(
+              Map.of(
+                  "type",
+                  "SAGA_COMPLETED",
+                  "result",
+                  Map.of("datasetId", datasetId.toString(), "projectDeleted", true)));
+
+      listener.handleSagaResult(payload);
+
+      verify(dataSetService)
+          .handleSagaCompleted(
+              eq(datasetId), argThat(result -> Boolean.TRUE.equals(result.projectDeleted())));
     }
 
     @Test

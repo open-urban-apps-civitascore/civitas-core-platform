@@ -35,6 +35,14 @@ public class Layer extends DataSetOwnedEntity {
   @JoinColumn(name = "datasink_id", nullable = false)
   @NotNull private DataSink dataSink;
 
+  /**
+   * The API that publishes this Layer. Null only for a Layer created before Layers were linked to
+   * their API in a Dataset that had no API to publish it.
+   */
+  @ManyToOne(fetch = FetchType.LAZY)
+  @JoinColumn(name = "named_api_id")
+  private NamedApi namedApi;
+
   @NotBlank @Column(name = "layer_name", nullable = false)
   private String layerName;
 

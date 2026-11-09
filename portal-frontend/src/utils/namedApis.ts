@@ -21,7 +21,7 @@ export const hasApiType = (apis: NamedApi[], apiType: ApiStandard): boolean =>
 
 export const canCreateStaApi = (apis: NamedApi[], dataSinks: DataSink[]): boolean =>
   !hasApiType(apis, API_STANDARDS.STA) &&
-  dataSinks.some(dataSink => dataSink.dataSinkType === DATASINK_TYPES.FROST && dataSink.pipelineId)
+  dataSinks.some(dataSink => dataSink.dataSinkType === DATASINK_TYPES.FROST && dataSink.pipelineIds.length > 0)
 
 export const canCreateOwsApi = (apis: NamedApi[], dataSinks: DataSink[]): boolean =>
   !hasApiType(apis, API_STANDARDS.OWS) && dataSinks.some(dataSink => dataSink.dataSinkType === DATASINK_TYPES.POSTGIS)

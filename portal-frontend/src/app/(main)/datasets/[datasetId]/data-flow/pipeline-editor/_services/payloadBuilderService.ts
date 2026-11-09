@@ -448,16 +448,6 @@ const tableNameOf = (payload: Pick<DataSinkPayload, 'configuration'>): string | 
 const elementOf = (payload: Pick<DataSinkPayload, 'configuration'>): string | undefined => payload.configuration.element
 
 /**
- * Finds data sink IDs that were in the snapshot but no longer exist in the current pipeline.
- */
-export const getRemovedDataSinkIds = (pipeline: Pipeline, snapshot: DataSinkSnapshot): string[] => {
-  const currentNodeIds = new Set(pipeline.nodes.map(n => n.id))
-  return Object.entries(snapshot)
-    .filter(([nodeId, entry]) => !currentNodeIds.has(nodeId) && entry.entityId != null)
-    .map(([, entry]) => entry.entityId as string)
-}
-
-/**
  * Merges a partial data patch into a single node's data. Returns the updated pipeline. Used to stash
  * server-assigned URNs (datasink `configurationUrn`, mapping `mappingRef`/`mappingLogicalUrn`) back
  * onto the node so they are emitted in the CORE `model` and round-trip via `styles`.

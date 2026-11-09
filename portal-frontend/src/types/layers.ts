@@ -37,6 +37,7 @@ export const LayerSchema = LayerBaseSchema.extend({
   id: z.uuid(),
   datasetId: z.uuid(),
   defaultStyleId: z.uuid().nullable(),
+  namedApiId: z.uuid().nullable(),
   nativeBoundingBox: BoundingBoxResponseSchema.nullable(),
   latLonBoundingBox: BoundingBoxResponseSchema.nullable(),
   createdAt: z.string(),

@@ -1,0 +1,44 @@
+meta {
+  name: 15a. Cleanup - Delete Pipeline with confirmation
+  type: http
+  seq: 38
+}
+
+delete {
+  url: {{baseUrl}}/datasets/:dataSetId/pipelines/:id?confirmDataLoss=true
+  body: none
+  auth: inherit
+}
+
+params:query {
+  confirmDataLoss: true
+}
+
+params:path {
+  dataSetId: {{sagaDataSetId}}
+  id: {{sagaPipelineId}}
+}
+
+tests {
+  test("Pipeline deleted", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+docs {
+  **Saga step 15a** — Delete the Pipeline with `confirmDataLoss=true`.
+
+  In one transaction the backend deletes the Pipeline, marks the FROST DataSink `PENDING_UNPROVISION` and deletes the STA API: no other active FROST DataSink backs it. The POSTGIS DataSink of step 4d has no Pipeline and stays active, and with it the OWS API. The next release, or the dataset delete in step 13, removes the FROST project.
+
+  A `204` here also shows that step 15 changed nothing: the Pipeline still existed.
+
+  **Expected Response:** 204 No Content.
+
+  **System Impact:**
+
+  | Layer | Effect |
+  |---|---|
+  | Backend | Pipeline deleted; FROST DataSink marked `PENDING_UNPROVISION`; STA API deleted |
+  | Config Adapter | — |
+  | External System | — (storage stays until the next saga) |
+}

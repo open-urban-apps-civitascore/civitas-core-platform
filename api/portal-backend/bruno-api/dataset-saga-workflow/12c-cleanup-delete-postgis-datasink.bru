@@ -1,7 +1,7 @@
 meta {
-  name: 12c. Cleanup - Delete POSTGIS DataSink
+  name: 12c. Cleanup - Delete POSTGIS DataSink without confirmation
   type: http
-  seq: 37
+  seq: 40
 }
 
 delete {
@@ -16,27 +16,26 @@ params:path {
 }
 
 tests {
-  test("Provisioned POSTGIS DataSink refused", function() {
-    const status = res.getStatus();
-    // 409=provisioned by the release in step 8, 404=already gone, 400=sagaPostgisDataSinkId never set (aborted run)
-    expect(status === 409 || status === 404 || status === 400).to.be.true;
-    if (status === 409) {
-      expect(res.getBody().type).to.equal("urn:civitas:error:RESOURCE_IN_USE");
-    }
+  const body = res.body || {};
+
+  test("Delete refused until data loss is confirmed", function() {
+    expect(res.getStatus()).to.equal(409);
+    expect(body.type).to.equal('urn:civitas:error:REMOVAL_NOT_CONFIRMED');
+    expect(body.detail).to.include('confirmDataLoss=true');
   });
 }
 
 docs {
-  **Saga step 12c** — Delete the POSTGIS DataSink (refused).
+  **Saga step 12c** — Delete the POSTGIS DataSink without `confirmDataLoss`.
 
-  The release in step 8 provisioned the DataSink created in step 4d. A provisioned DataSink keeps its storage after an unrelease, and only the DataSet teardown removes that storage, so a standalone delete is refused with `409` even though the DataSet is a draft again. The DataSink goes together with the DataSet in step 13.
+  A direct delete makes a DataSink inactive even though no Pipeline links it. The release in step 8 provisioned this DataSink, so the next release deletes its stored data. The backend refuses the delete with `409` and changes nothing.
 
-  **Expected Response:** 409 Conflict (`RESOURCE_IN_USE`). 404 if already deleted. 400 if `sagaPostgisDataSinkId` is not set (first run / aborted earlier).
+  **Expected Response:** 409 Conflict, type `urn:civitas:error:REMOVAL_NOT_CONFIRMED`, `detail` tells to set `confirmDataLoss=true`, `removal` lists the `dataSinks`, `layers` and `apis` that go.
 
   **System Impact:**
 
   | Layer | Effect |
   |---|---|
-  | Backend | — (DataSink record kept) |
+  | Backend | — (nothing changes) |
   | Config Adapter | — |
 }

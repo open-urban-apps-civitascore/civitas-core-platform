@@ -636,61 +636,43 @@ The FROST section is a fixed template that generates thing/observation upsert lo
 
 ### Save Flow
 
-`saveAllPipelines()` in `PipelineEditorProvider` saves every dirty session, one after the other. Per session:
+`saveAllPipelines()` in `PipelineEditorProvider` saves every dirty session, one after the other, in two phases.
 
-1. **Collect the removed sinks** – `getRemovedDataSinkIds()` compares the pipeline with the snapshot of the last save and collects the removed sink entity ids.
-2. **Save the data sinks** – create a sink for a node that has no `entityId`, update a changed one. The returned `configurationUrn` is stashed on the node and becomes the model's `sinkRef`.
-3. **Save the mappings** – create or version the mapping artifacts. An unchanged mapping is skipped, because the mapping API creates a new version per request.
-4. **Save the pipeline** – `POST` for a new pipeline, `PUT` for an existing one, with the ids and URNs from the steps above.
-5. **Delete the removed sinks** – the pipeline is already stored, so a failed delete gives a warning toast but keeps the save successful.
-6. **Delete the removed mappings** – `getRemovedMappingUrns()` collects the logical URNs of mapping nodes that were removed since the last save. A node that was never saved has no URN and is skipped. A failed delete gives an error toast (`mappingStillInUse` or `mappingCleanupFailed`) but keeps the save successful.
-7. **Clean the session** – mark it clean, write the new data sink and mapping snapshots, show the success toast.
+Before phase 1, `planPipelineSaves()` (`utils/dataSinkRemoval.ts`) calculates what each pipeline update removes, in save order and on the state the previous update leaves. It reads the Data sinks, Layers and APIs that `useDataSinkRemovalState()` loads, and counts a sink node without `entityId` as a new sink without a pipeline. When the updates together delete stored data, a Layer or an API, the `RemovalConfirmModal` shows the merged list once. Cancel sends nothing and the save returns `false`. The calculation mirrors the backend's `DataSinkRemovalPlan`; both run the cases in `api/portal-backend/data-sink-removal-cases.json`.
 
-**Order rule:** both deletes must stay behind the pipeline save. When they come first, the backend refuses them with `409 RESOURCE_IN_USE`, because the stored pipeline still points at the sink through `sinkRef` and at the mapping through `mappingRef`. For a sink, the pipeline could then no longer be saved at all.
+Phase 1, per session:
 
-If a step throws, the partial progress is written back to the session — still dirty — so a retry updates the artifacts that were already created instead of creating duplicates. The error is classified and reported in a toast.
+1. **Save the data sinks** – create a sink for a node that has no `entityId`, update a changed one. The returned `configurationUrn` is stashed on the node and becomes the model's `sinkRef`.
+2. **Save the mappings** – create or version the mapping artifacts. An unchanged mapping is skipped, because the mapping API creates a new version per request.
+
+Phase 2, per session:
+
+3. **Save the pipeline** – `POST` for a new pipeline, `PUT` for an existing one, with the ids and URNs from the steps above, with `confirmDataLoss` when the calculated removal of this update deletes stored data. The backend deletes or deactivates the removed sinks, their Layers and the APIs without a sink in the same request. When the update would remove a provisioned sink without `confirmDataLoss`, because the calculation missed it, the backend changes nothing and answers `409 REMOVAL_NOT_CONFIRMED` with a `removal` property that lists the `dataSinks`, `layers` and `apis` it would remove. The save keeps that list and goes on with the next session.
+4. **Delete the removed mappings** – `getRemovedMappingUrns()` collects the logical URNs of mapping nodes that were removed since the last save. A node that was never saved has no URN and is skipped. A failed delete gives an error toast (`mappingStillInUse` or `mappingCleanupFailed`) but keeps the save successful.
+5. **Clean the session** – mark it clean, write the new data sink and mapping snapshots, show the success toast.
+
+After phase 2, when the backend refused one or more updates, `mergeRemovals()` combines their lists (each item once, by id) and the `RemovalConfirmModal` shows them once, with a note when a provisioned sink loses its stored data. Confirm sends each refused update again with `confirmDataLoss=true` and handles it like steps 3 to 5; a second refusal is reported as `unconfirmedDataLossError`. Cancel restores the refused sessions (see below) and the save returns `false`. Pipelines saved before the dialog stay saved.
+
+**Order rules:** phase 1 runs for every session before any pipeline update, so the backend counts the new sinks when it plans a removal: a sink node replaced in one save keeps its API. The mapping delete stays behind the pipeline save. When it comes first, the backend refuses it with `409 RESOURCE_IN_USE`, because the stored pipeline still points at the mapping through `mappingRef`.
+
+If a step throws, the partial progress is written back to the session — still dirty — so a retry updates the artifacts that were already created instead of creating duplicates. An error is classified and reported in a toast.
+
+If the removal is cancelled, every refused session is written back the same way, except for the data sinks and mappings that phase 1 created: no pipeline references them, so they are deleted again (`DELETE /datasets/{datasetId}/datasinks/{id}`, where a sink without storage or Layers needs no confirmation, and `DELETE /datasets/{datasetId}/mappings?urn={logicalUrn}`). Their nodes lose `entityId` and `configurationUrn`, or `mappingRef` and `mappingLogicalUrn`. An artifact whose delete fails keeps its ref, so the next save links or versions it. A mapping that existed before the save keeps the version phase 1 added. A pipeline save that fails in phase 2 for another reason keeps the data sinks that phase 1 created, with their refs: pipelines saved earlier in the same run counted them as staying, and deleting them could remove an API without a confirmation.
+
+### Pipeline Delete
+
+`deletePipeline()` shows the `RemovalConfirmModal` with the delete question and the Layers, APIs and stored data that `planPipelineDelete()` calculates, then sends the `DELETE`, with `confirmDataLoss=true` when stored data goes. When the calculation missed stored data, the backend answers `409 REMOVAL_NOT_CONFIRMED`; the modal then shows the list from its `removal` property, and Confirm sends the `DELETE` again with `confirmDataLoss=true`. Cancel sends nothing more. The Dataset overview (`PipelineCard`) works the same way; both use `sendConfirmingRemoval()` from `useRemovalConfirmation()`.
 
 ### Locked Data Sinks
 
-`GET /datasets/{datasetId}/datasinks` reports two flags per sink, `provisioned` and `inUseByLayer`. `useDataSinkLocks()` reads the flags once and tells the canvas and the inspector which lock a node has. It finds the sink through the node's `entityId`, so a node without one is new and never has these two locks.
+`GET /datasets/{datasetId}/datasinks` reports two flags per sink, `provisioned` and `inUseByLayer`. `useDataSinkLocks()` reads the flags once and tells the inspector which lock a node has. It finds the sink through the node's `entityId`, so a node without one is new and never has these two locks. Every sink node can be deleted; the removal confirmation above covers what goes with it.
 
-| Flag           | Delete | Data structure       | Table name |
-| -------------- | ------ | -------------------- | ---------- |
-| `provisioned`  | locked | edit button hidden   | locked     |
-| `inUseByLayer` | locked | edit button disabled | editable   |
+| Flag           | Data structure       | Table name |
+| -------------- | -------------------- | ---------- |
+| `provisioned`  | edit button hidden   | locked     |
+| `inUseByLayer` | edit button disabled | editable   |
 
-`provisioned` wins when both apply.
-
-Two more locks protect the last sink that an API of the dataset reads from:
-
-| Lock         | API | Sink node                   |
-| ------------ | --- | --------------------------- |
-| `inUseBySta` | STA | FROST                       |
-| `inUseByOws` | OWS | Geo persistence (`POSTGIS`) |
-
-A lock applies to a sink node when all of these are true:
-
-- The dataset has the API.
-- No other pipeline has a sink node of this type. Unsaved nodes count too. This includes the nodes of a new pipeline without an id.
-- The graph of the active pipeline has only this one node of this type. This includes a new node without `entityId`.
-
-`provisioned` and `inUseByLayer` win over both.
-
-`PipelineCanvas` sets `deletable: false` on a locked node. `onBeforeDelete` shows an error toast with the reason. It also cancels a delete that removes all nodes of one type at once, when `inUseBySta` or `inUseByOws` would apply to the last of them (`getLastApiSinkLockReason`).
-
-The `PipelineInspector` shows a notice with the lock reason. In read-only mode, only the `inUseByLayer` hint is shown.
-
-`useDataSinkLocks()` also returns `pipelineDeleteBlockReason` for the active pipeline. It uses `getPipelineDeleteBlockReason` (`src/utils/pipelineDeleteGuard.ts`):
-
-| Reason               | Condition                                                                |
-| -------------------- | ------------------------------------------------------------------------ |
-| `inUseByLayer`       | A saved sink of the pipeline is used by a layer.                         |
-| `lastPostgisWithOws` | The dataset has an OWS API, and no other pipeline has a Geo sink node.   |
-| `lastFrostWithSta`   | The dataset has an STA API, and no other pipeline has a FROST sink node. |
-
-For the two last reasons, the active pipeline must have a sink of this type, saved or as a node in its graph. A new pipeline without an id is checked too. Other pipelines count the same as for the sink locks above.
-
-`PipelineToolbar` shows an info modal with the reason instead of the delete confirmation.
+`provisioned` wins when both apply. The `PipelineInspector` shows a notice with the lock reason. In read-only mode, only the `inUseByLayer` hint is shown.
 
 ### Read-only Mode
 

@@ -1,7 +1,7 @@
 meta {
   name: Create Layer
   type: http
-  seq: 1
+  seq: 5
 }
 
 post {
@@ -32,8 +32,14 @@ script:post-response {
   }
 }
 
+tests {
+  test("Status code is 201", function() {
+    expect(res.getStatus()).to.equal(201);
+  });
+}
+
 docs {
-  **Precondition:** `dataSetId`, `postgisDataSinkId` (from `datasinks/create-postgis-datasink.bru`), `defaultStyleId` (from `styles/create-style.bru`), and `alternativeStyleId` (from `styles/create-alternative-style.bru`) are all set.
+  **Precondition:** the requests before it in this folder ran: `postgisDataSinkId`, `defaultStyleId` and `alternativeStyleId` are set, and the Dataset has an OWS API.
 
   **Expected Response:** 201 Created, body contains `id` and the layer's resolved fields.
 

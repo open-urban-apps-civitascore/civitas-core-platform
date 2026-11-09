@@ -3,6 +3,7 @@ package de.civitascore.portal.controller.exception;
 import de.civitascore.portal.model.connector.MalformedDataSourceRequestException;
 import de.civitascore.portal.service.connector.ConnectorValidationException;
 import de.civitascore.portal.service.connector.StoredConnectorUnreadableException;
+import de.civitascore.portal.service.removal.RemovalNotConfirmedException;
 import de.civitascore.portal.util.ConnectionTestBusyException;
 import de.civitascore.portal.util.DataSetNotEditableException;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
@@ -205,6 +206,19 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         Encode.forJava(ex.getMessage()),
         Encode.forJava(ex.getBlockedBy().toString()));
     return createProblemDetail(HttpStatus.CONFLICT, "RESOURCE_IN_USE", ex.getMessage(), request);
+  }
+
+  @ExceptionHandler(RemovalNotConfirmedException.class)
+  @ResponseStatus(HttpStatus.CONFLICT)
+  public ProblemDetail handleRemovalNotConfirmed(
+      RemovalNotConfirmedException ex, HttpServletRequest request) {
+    log.warn("Removal not confirmed in dataset {}", ex.getDataSetId());
+    // TR-03187 W-18/W-19: only a caller that may update the Dataset gets here, and the list names
+    // only that Dataset's own Data sinks, Layers and APIs, which it can read anyway.
+    ProblemDetail problemDetail =
+        createProblemDetail(HttpStatus.CONFLICT, "REMOVAL_NOT_CONFIRMED", ex.getMessage(), request);
+    problemDetail.setProperty("removal", ex.getRemoval());
+    return problemDetail;
   }
 
   @ExceptionHandler(SagaInFlightException.class)

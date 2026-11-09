@@ -2,17 +2,17 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AxiosError } from 'axios'
 
 import { DATASINKS_QUERY_KEY } from '@/app/services/api/datasets/datasinks/clientRequests'
-import { apiRequest, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
+import { apiRequest, apiRequestAllPages, ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import { CreateLayerInput, Layer, UpdateLayerInput } from '@/types/layers'
 
-const key = 'layers'
+export const LAYERS_QUERY_KEY = 'layers'
 
+/** Loads every Layer of the Dataset. */
 export const useGetLayers = (datasetId: string) =>
   useQuery<ApiServiceResponse<Layer[]>, AxiosError>({
-    queryKey: [key, datasetId],
+    queryKey: [LAYERS_QUERY_KEY, datasetId],
     queryFn: () =>
-      apiRequest<Layer[]>({
-        method: 'GET',
+      apiRequestAllPages<Layer>({
         endpoint: `/datasets/${datasetId}/layers`,
         headers: { 'x-api-request': 'true' },
         errorMessage: 'An error occurred while loading layers.',
@@ -31,7 +31,7 @@ export const useCreateLayer = () => {
         errorMessage: 'An error occurred while creating the layer.',
       }),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: [key] })
+      queryClient.invalidateQueries({ queryKey: [LAYERS_QUERY_KEY] })
       queryClient.invalidateQueries({ queryKey: [DATASINKS_QUERY_KEY, variables.datasetId] })
     },
   })
@@ -49,7 +49,7 @@ export const useUpdateLayer = () => {
         errorMessage: 'An error occurred while updating the layer.',
       }),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: [key] })
+      queryClient.invalidateQueries({ queryKey: [LAYERS_QUERY_KEY] })
       queryClient.invalidateQueries({ queryKey: [DATASINKS_QUERY_KEY, variables.datasetId] })
     },
   })
@@ -66,7 +66,7 @@ export const useDeleteLayer = () => {
         errorMessage: 'An error occurred while deleting the layer.',
       }),
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: [key] })
+      queryClient.invalidateQueries({ queryKey: [LAYERS_QUERY_KEY] })
       queryClient.invalidateQueries({ queryKey: [DATASINKS_QUERY_KEY, variables.datasetId] })
     },
   })

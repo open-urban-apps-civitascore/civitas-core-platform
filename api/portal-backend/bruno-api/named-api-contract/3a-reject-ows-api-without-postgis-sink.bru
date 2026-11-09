@@ -1,0 +1,50 @@
+meta {
+  name: 3a. Reject an OWS API without a PostGIS DataSink
+  type: http
+  seq: 6
+}
+
+patch {
+  url: {{baseUrl}}/datasets/:id
+  body: json
+  auth: inherit
+}
+
+params:path {
+  id: {{napiContractDataSetId}}
+}
+
+body:json {
+  {
+    "namedApis": [
+      { "name": "Things", "slug": "things", "standard": "STA", "version": "1.1" },
+      { "name": "Map", "slug": "map", "standard": "OWS" }
+    ]
+  }
+}
+
+tests {
+  const body = res.body || {};
+
+  test("Status code is 400", function() {
+    expect(res.getStatus()).to.equal(400);
+  });
+  test("Response is a problem document", function() {
+    expect(body.detail !== undefined || body.title !== undefined).to.be.true;
+  });
+}
+
+docs {
+  **Contract step 3a** — Reject a new `OWS` API when the dataset has no active PostGIS DataSink.
+
+  An API exists only while an active DataSink of a kind that backs it exists: PostGIS for `OWS`,
+  FROST for `STA`. The dataset has only the FROST DataSink of step 1a. The `STA` entry is unchanged
+  from step 1b, so a 400 here can only come from the `OWS` entry.
+
+  **Precondition:** steps 1 to 1b ran.
+
+  **Expected Response:** 400 Bad Request, `application/problem+json`. The dataset keeps only the
+  `things` API.
+
+  **Post-condition:** none — the request changes nothing.
+}
