@@ -11,6 +11,9 @@ import de.civitascore.modelforge.adminui.wicket.pages.XRepositoryImportPage;
 import de.civitascore.modelforge.adminui.wicket.tree.ArtifactTree;
 import de.civitascore.modelforge.adminui.wicket.tree.ArtifactTreeProvider;
 import de.civitascore.modelforge.facade.ModelForge;
+import org.apache.wicket.Component;
+import org.apache.wicket.behavior.Behavior;
+import org.apache.wicket.markup.ComponentTag;
 import org.apache.wicket.markup.head.CssHeaderItem;
 import org.apache.wicket.markup.head.IHeaderResponse;
 import org.apache.wicket.markup.head.JavaScriptHeaderItem;
@@ -48,15 +51,40 @@ public abstract class BasePage extends WebPage {
     private ModelForge modelForge;
 
     protected BasePage() {
-        add(new BookmarkablePageLink<>("navArtifacts", ArtifactListPage.class));
-        add(new BookmarkablePageLink<>("navImport", ImportPage.class));
-        add(new BookmarkablePageLink<>("navSeed", SeedPage.class));
-        add(new BookmarkablePageLink<>("navSmartDataModels", SmartDataModelImportPage.class));
-        add(new BookmarkablePageLink<>("navXRepository", XRepositoryImportPage.class));
-        add(new BookmarkablePageLink<>("navValidate", ValidatePage.class));
-        add(new BookmarkablePageLink<>("navGraph", GraphPage.class));
-        add(new BookmarkablePageLink<>("navNew", ArtifactEditPage.class));
+        add(navLink("navArtifacts", ArtifactListPage.class));
+        add(navLink("navImport", ImportPage.class));
+        add(navLink("navSeed", SeedPage.class));
+        add(navLink("navSmartDataModels", SmartDataModelImportPage.class));
+        add(navLink("navXRepository", XRepositoryImportPage.class));
+        add(navLink("navValidate", ValidatePage.class));
+        add(navLink("navGraph", GraphPage.class));
+        add(navLink("navNew", ArtifactEditPage.class));
         add(new FeedbackPanel("feedback"));
+    }
+
+    /**
+     * The nav entry this page belongs to. A page focused on an existing artifact belongs to Browse,
+     * matching its {@code Browse › type › artifact} breadcrumb; every other page is its own entry.
+     */
+    protected Class<? extends BasePage> navSection() {
+        return currentUrn() != null ? ArtifactListPage.class : getClass();
+    }
+
+    /** A nav link marked {@code active} (and {@code aria-current}) when it is this page's section. */
+    private BookmarkablePageLink<Void> navLink(String id, Class<? extends BasePage> target) {
+        BookmarkablePageLink<Void> link = new BookmarkablePageLink<>(id, target);
+        // Decided at render time: navSection() reads subclass fields that are unassigned while the
+        // base constructor runs.
+        link.add(new Behavior() {
+            @Override
+            public void onComponentTag(Component component, ComponentTag tag) {
+                if (navSection() == target) {
+                    tag.append("class", "active", " ");
+                    tag.put("aria-current", "page");
+                }
+            }
+        });
+        return link;
     }
 
     /**

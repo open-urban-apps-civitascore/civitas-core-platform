@@ -61,6 +61,11 @@ public class SchemaViewComparisonPage extends BasePage {
     private final Label inlinedLabel;
 
     @Override
+    protected Class<? extends BasePage> navSection() {
+        return ArtifactListPage.class;
+    }
+
+    @Override
     public void renderHead(IHeaderResponse response) {
         super.renderHead(response);
         response.render(JavaScriptHeaderItem.forReference(CodeEditorPanel.HIGHLIGHTER_JS));
