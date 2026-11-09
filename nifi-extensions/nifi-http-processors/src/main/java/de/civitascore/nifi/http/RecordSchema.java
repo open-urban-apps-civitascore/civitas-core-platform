@@ -104,30 +104,35 @@ final class RecordSchema {
       Verdict verdict =
           shape instanceof ResponseShape.EntriesAt entriesAt && first != JsonToken.VALUE_NULL
               ? new EntriesReader(parser, entriesAt).read()
-              : switch (first) {
-                case START_ARRAY -> {
-                  if (shape instanceof ResponseShape.RecordObject) {
-                    parser.skipChildren();
-                    yield new Verdict.WrongType("array", shape.expected());
-                  }
-                  yield elements(parser);
-                }
-                case START_OBJECT -> {
-                  if (shape instanceof ResponseShape.RecordArray) {
-                    parser.skipChildren();
-                    yield new Verdict.WrongType("object", shape.expected());
-                  }
-                  yield object(parser, shape);
-                }
-                case VALUE_NULL -> new Verdict.Empty();
-                default -> new Verdict.WrongType(scalarType(first), shape.expected());
-              };
+              : wholeResponse(parser, first, shape);
       return parser.nextToken() == null ? verdict : new Verdict.Rejected(NOT_JSON);
     } catch (IOException e) {
       // Also CharConversionException, which Jackson throws for bytes that look like UTF-32. NiFi
       // throws a failed read of the content unchecked, so it does not end up here.
       return new Verdict.Rejected(NOT_JSON);
     }
+  }
+
+  private Verdict wholeResponse(JsonParser parser, JsonToken first, ResponseShape shape)
+      throws IOException {
+    return switch (first) {
+      case START_ARRAY -> {
+        if (shape instanceof ResponseShape.RecordObject) {
+          parser.skipChildren();
+          yield new Verdict.WrongType("array", shape.expected());
+        }
+        yield elements(parser);
+      }
+      case START_OBJECT -> {
+        if (shape instanceof ResponseShape.RecordArray) {
+          parser.skipChildren();
+          yield new Verdict.WrongType("object", shape.expected());
+        }
+        yield object(parser, shape);
+      }
+      case VALUE_NULL -> new Verdict.Empty();
+      default -> new Verdict.WrongType(scalarType(first), shape.expected());
+    };
   }
 
   private Verdict elements(JsonParser parser) throws IOException {
