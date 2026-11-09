@@ -342,13 +342,8 @@ class GetHttpApiCallTest {
   @CsvSource(
       delimiter = '|',
       quoteCharacter = '\'',
-      value = {
-        "'\"val-1f3e\"' | string",
-        "42             | number",
-        "true           | boolean",
-        "null           | null"
-      })
-  void onTrigger_whenTheResponseIsAJsonScalar_routesToStop(String body, String kind)
+      value = {"'\"val-1f3e\"' | string", "42             | number", "true           | boolean"})
+  void onTrigger_whenTheResponseIsAJsonStringNumberOrBoolean_routesToStop(String body, String kind)
       throws InitializationException {
     try (ApiEndpoint endpoint = ApiEndpoint.answering(200, body)) {
       TestRunner runner = runner(endpoint.baseUrl());
@@ -369,6 +364,7 @@ class GetHttpApiCallTest {
         "<html>val-1f3e</html>",
         "{\"stationid\":",
         "[] [\"val-1f3e\"]",
+        "null null",
         "[{\"stationid\":\"a1\"},",
         "[{\"lat\":\"x\"}] <html>val-1f3e</html>",
         // The start of an MP4 file, which Jackson takes for UTF-32 and cannot decode.
@@ -655,8 +651,8 @@ class GetHttpApiCallTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {" ", "\r\n\t "})
-  void onTrigger_whenTheBodyHoldsOnlyWhitespace_createsNoFlowFile(String body)
+  @ValueSource(strings = {" ", "\r\n\t ", "null", " null\n"})
+  void onTrigger_whenTheBodyHoldsOnlyWhitespaceOrNull_createsNoFlowFile(String body)
       throws InitializationException {
     try (ApiEndpoint endpoint = ApiEndpoint.answering(200, body)) {
       TestRunner runner = runner(endpoint.baseUrl());
@@ -915,7 +911,10 @@ class GetHttpApiCallTest {
 
   static List<Response> pagesWithoutRecords() {
     return List.of(
-        Response.json("[]"), new Response(200, Map.of(), null), new Response(204, Map.of(), null));
+        Response.json("[]"),
+        Response.json("null"),
+        new Response(200, Map.of(), null),
+        new Response(204, Map.of(), null));
   }
 
   @ParameterizedTest
@@ -1694,13 +1693,16 @@ class GetHttpApiCallTest {
     }
   }
 
-  static List<Response> responsesWithoutABody() {
-    return List.of(new Response(200, Map.of(), null), new Response(204, Map.of(), null));
+  static List<Response> responsesWithoutRecords() {
+    return List.of(
+        Response.json("null"),
+        new Response(200, Map.of(), null),
+        new Response(204, Map.of(), null));
   }
 
   @ParameterizedTest
-  @MethodSource("responsesWithoutABody")
-  void onTrigger_whenACursorResponseHasNoBody_endsTheRunWithTheEarlierPages(Response empty)
+  @MethodSource("responsesWithoutRecords")
+  void onTrigger_whenACursorResponseHasNoRecords_endsTheRunWithTheEarlierPages(Response empty)
       throws InitializationException {
     try (ApiEndpoint endpoint =
         ApiEndpoint.answeringInTurn(Response.json(cursorPage("a1", "\"abc123\"")), empty)) {
@@ -1839,6 +1841,7 @@ class GetHttpApiCallTest {
   static Stream<Arguments> countsInAResponseObject() {
     return Stream.of(
         Arguments.of("$.meta.count", countPage("1", "a1"), countPage("1", "a2"), countPage("0")),
+        Arguments.of("$.meta.count", countPage("1", "a1"), countPage("1", "a2"), countPage("null")),
         Arguments.of("$.data", countPage(null, "a1"), countPage(null, "a2"), countPage(null)));
   }
 
@@ -1876,7 +1879,7 @@ class GetHttpApiCallTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"-7", "1.5", "\"v-61b0\"", "{\"n\": 1}", "null"})
+  @ValueSource(strings = {"-7", "1.5", "\"v-61b0\"", "{\"n\": 1}"})
   void onTrigger_whenTheValueAtTheCountPathIsNotACount_routesTheRunToStopWithoutTheValue(
       String count) throws InitializationException {
     try (ApiEndpoint endpoint =
@@ -1980,8 +1983,8 @@ class GetHttpApiCallTest {
   }
 
   @ParameterizedTest
-  @MethodSource("responsesWithoutABody")
-  void onTrigger_whenALimitOffsetResponseWithACountPathHasNoBody_endsTheRunWithTheEarlierPages(
+  @MethodSource("responsesWithoutRecords")
+  void onTrigger_whenALimitOffsetResponseWithACountPathHasNoRecords_endsTheRunWithTheEarlierPages(
       Response empty) throws InitializationException {
     try (ApiEndpoint endpoint =
         ApiEndpoint.answeringInTurn(Response.json(countPage("2", "a1", "a2")), empty)) {
