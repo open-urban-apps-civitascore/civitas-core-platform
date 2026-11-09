@@ -1707,6 +1707,10 @@ paths:
       - DataSinks
   /datasets/{dataSetId}/datasinks/{id}:
     delete:
+      description: "Deletes the DataSink with its Layers, and with the APIs it is\
+        \ the last backing DataSink of. A DataSink that a Pipeline links answers 409\
+        \ RESOURCE_IN_USE; remove it from its Pipelines first. A provisioned DataSink\
+        \ is no longer listed; its stored data is deleted at the next release."
       operationId: deleteDataSink
       parameters:
       - in: path
@@ -1715,6 +1719,13 @@ paths:
         schema:
           type: string
           format: uuid
+      - description: "Must be true when the request removes a provisioned Data sink:\
+          \ its stored data is deleted at the next release. Layers and APIs that the\
+          \ request removes need no confirmation."
+        in: query
+        name: confirmDataLoss
+        schema:
+          type: boolean
       - in: path
         name: dataSetId
         required: true
@@ -1858,7 +1869,10 @@ paths:
                     type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-          description: A saga is in flight on the parent dataset
+          description: "A saga is in flight on the parent dataset (code SAGA_IN_FLIGHT),\
+            \ or the request removes a provisioned Data sink without confirmDataLoss=true\
+            \ (code REMOVAL_NOT_CONFIRMED; the property removal lists the dataSinks,\
+            \ layers and apis it would remove). Nothing changed."
         "500":
           $ref: "#/components/responses/InternalServerError"
       summary: Delete a DataSink
@@ -3399,6 +3413,8 @@ paths:
       - Pipelines
   /datasets/{dataSetId}/pipelines/{id}:
     delete:
+      description: "A DataSink whose last Pipeline this is is removed with its Layers,\
+        \ and with the APIs it is the last backing DataSink of."
       operationId: deletePipeline
       parameters:
       - in: path
@@ -3407,6 +3423,13 @@ paths:
         schema:
           type: string
           format: uuid
+      - description: "Must be true when the request removes a provisioned Data sink:\
+          \ its stored data is deleted at the next release. Layers and APIs that the\
+          \ request removes need no confirmation."
+        in: query
+        name: confirmDataLoss
+        schema:
+          type: boolean
       - in: path
         name: dataSetId
         required: true
@@ -3550,7 +3573,10 @@ paths:
                     type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-          description: A saga is in flight on the parent dataset
+          description: "A saga is in flight on the parent dataset (code SAGA_IN_FLIGHT),\
+            \ or the request removes a provisioned Data sink without confirmDataLoss=true\
+            \ (code REMOVAL_NOT_CONFIRMED; the property removal lists the dataSinks,\
+            \ layers and apis it would remove). Nothing changed."
         "500":
           $ref: "#/components/responses/InternalServerError"
       summary: Delete a pipeline
@@ -3602,6 +3628,9 @@ paths:
       tags:
       - Pipelines
     patch:
+      description: "A DataSink that loses its last Pipeline through this update is\
+        \ removed with its Layers, and with the APIs it is the last backing DataSink\
+        \ of."
       operationId: patchPipeline
       parameters:
       - in: path
@@ -3610,6 +3639,13 @@ paths:
         schema:
           type: string
           format: uuid
+      - description: "Must be true when the request removes a provisioned Data sink:\
+          \ its stored data is deleted at the next release. Layers and APIs that the\
+          \ request removes need no confirmation."
+        in: query
+        name: confirmDataLoss
+        schema:
+          type: boolean
       - in: path
         name: dataSetId
         required: true
@@ -3763,13 +3799,19 @@ paths:
                     type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-          description: A saga is in flight on the parent dataset
+          description: "A saga is in flight on the parent dataset (code SAGA_IN_FLIGHT),\
+            \ or the request removes a provisioned Data sink without confirmDataLoss=true\
+            \ (code REMOVAL_NOT_CONFIRMED; the property removal lists the dataSinks,\
+            \ layers and apis it would remove). Nothing changed."
         "500":
           $ref: "#/components/responses/InternalServerError"
       summary: Partially update a pipeline
       tags:
       - Pipelines
     put:
+      description: "A DataSink that loses its last Pipeline through this update is\
+        \ removed with its Layers, and with the APIs it is the last backing DataSink\
+        \ of."
       operationId: updatePipeline
       parameters:
       - in: path
@@ -3778,6 +3820,13 @@ paths:
         schema:
           type: string
           format: uuid
+      - description: "Must be true when the request removes a provisioned Data sink:\
+          \ its stored data is deleted at the next release. Layers and APIs that the\
+          \ request removes need no confirmation."
+        in: query
+        name: confirmDataLoss
+        schema:
+          type: boolean
       - in: path
         name: dataSetId
         required: true
@@ -3931,7 +3980,10 @@ paths:
                     type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-          description: A saga is in flight on the parent dataset
+          description: "A saga is in flight on the parent dataset (code SAGA_IN_FLIGHT),\
+            \ or the request removes a provisioned Data sink without confirmDataLoss=true\
+            \ (code REMOVAL_NOT_CONFIRMED; the property removal lists the dataSinks,\
+            \ layers and apis it would remove). Nothing changed."
         "500":
           $ref: "#/components/responses/InternalServerError"
       summary: Replace a pipeline
@@ -7374,6 +7426,99 @@ paths:
       tags:
       - Data Structure Versions
   /datastructures/{dataStructureId}/versions/{id}:
+    delete:
+      description: "Deletes a DRAFT or AVAILABLE version that nothing uses, and its\
+        \ model with every revision of it from the model registry. A deleted version\
+        \ number is not given out again. The data structure stays, also without versions."
+      operationId: deleteDataStructureVersion
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: dataStructureId
+        required: true
+        schema:
+          format: uuid
+      responses:
+        "204":
+          description: Data structure version deleted successfully
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          content:
+            application/problem+json:
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datastructures/{dataStructureId}/versions/{id}"
+                    status: 404
+                    title: Not Found
+                    type: urn:civitas:error:NOT_FOUND
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Data structure version not found in this data structure
+        "409":
+          content:
+            application/problem+json:
+              examples:
+                foreign_key_violation:
+                  summary: foreign_key_violation
+                  value:
+                    detail: Referenced entity does not exist
+                    instance: "/datastructures/{dataStructureId}/versions/{id}"
+                    status: 409
+                    title: Conflict
+                    type: urn:civitas:error:FOREIGN_KEY_VIOLATION
+                model_missing:
+                  summary: model_missing
+                  value:
+                    detail: DataStructureVersion model is missing from the model registry
+                    instance: "/datastructures/{dataStructureId}/versions/{id}"
+                    status: 409
+                    title: Conflict
+                    type: urn:civitas:error:MODEL_MISSING
+                resource_in_use:
+                  summary: resource_in_use
+                  value:
+                    detail: "Cannot delete: resource is referenced by other entities"
+                    instance: "/datastructures/{dataStructureId}/versions/{id}"
+                    status: 409
+                    title: Conflict
+                    type: urn:civitas:error:RESOURCE_IN_USE
+                saga_in_flight:
+                  summary: saga_in_flight
+                  value:
+                    detail: "Cannot write while a saga is in-flight: CREATE"
+                    instance: "/datastructures/{dataStructureId}/versions/{id}"
+                    pendingSagaType: CREATE
+                    status: 409
+                    title: Conflict
+                    type: urn:civitas:error:SAGA_IN_FLIGHT
+                unique_constraint:
+                  summary: unique_constraint
+                  value:
+                    detail: A resource with this name already exists
+                    instance: "/datastructures/{dataStructureId}/versions/{id}"
+                    status: 409
+                    title: Conflict
+                    type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "The version is in use: a Data source, Data sink, Mapping or\
+            \ other model references it"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+      summary: Delete a data structure version
+      tags:
+      - Data Structure Versions
     get:
       operationId: getDataStructureVersion
       parameters:
@@ -7753,6 +7898,176 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
       summary: Replace a data structure version
+      tags:
+      - Data Structure Versions
+  /datastructures/{dataStructureId}/versions/{versionId}/duplicate:
+    post:
+      description: "Creates a new DRAFT version with the description, model name and\
+        \ imported structures of the source version. The model registry copies the\
+        \ source's model with its styles and references to the next major version\
+        \ after the highest existing one. A source without a model gives a copy without\
+        \ a model. Any version can be duplicated."
+      operationId: duplicateDataStructureVersion
+      parameters:
+      - in: path
+        name: dataStructureId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: versionId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataStructureVersionOutputDTO"
+          description: Data structure version duplicated successfully
+        "400":
+          content:
+            application/problem+json:
+              examples:
+                dataset_not_editable:
+                  summary: dataset_not_editable
+                  value:
+                    detail: A dataset and its sub-entities can only be changed while
+                      the dataset is DRAFT. Unstage or unrelease the dataset first.
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/duplicate"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:DATASET_NOT_EDITABLE
+                invalid_input:
+                  summary: invalid_input
+                  value:
+                    detail: "Validation failed: name must not be blank"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/duplicate"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:INVALID_INPUT
+                malformed_request:
+                  summary: malformed_request
+                  value:
+                    detail: Failed to read request body
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/duplicate"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MALFORMED_REQUEST
+                model_member_unreachable:
+                  summary: model_member_unreachable
+                  value:
+                    detail: "DataStructureVersion model has members that its root\
+                      \ Element does not reach: Orphan"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/duplicate"
+                    memberNames:
+                    - Orphan
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_MEMBER_UNREACHABLE
+                model_reference_not_available:
+                  summary: model_reference_not_available
+                  value:
+                    detail: "A referenced model is not available: it must exist, be\
+                      \ readable, and be referenced with a version"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/duplicate"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE
+                model_root_missing:
+                  summary: model_root_missing
+                  value:
+                    detail: DataStructureVersion model must designate exactly one
+                      root Element before releasing
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/duplicate"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:MODEL_ROOT_MISSING
+                validation_failed:
+                  summary: validation_failed
+                  value:
+                    detail: Request body validation failed
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/duplicate"
+                    status: 400
+                    title: Bad Request
+                    type: urn:civitas:error:VALIDATION_FAILED
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The source version's model references a model that is not available
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          content:
+            application/problem+json:
+              examples:
+                not_found:
+                  summary: not_found
+                  value:
+                    detail: "Resource not found: 550e8400-e29b-41d4-a716-446655440000"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/duplicate"
+                    status: 404
+                    title: Not Found
+                    type: urn:civitas:error:NOT_FOUND
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Data structure version not found
+        "409":
+          content:
+            application/problem+json:
+              examples:
+                foreign_key_violation:
+                  summary: foreign_key_violation
+                  value:
+                    detail: Referenced entity does not exist
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/duplicate"
+                    status: 409
+                    title: Conflict
+                    type: urn:civitas:error:FOREIGN_KEY_VIOLATION
+                model_missing:
+                  summary: model_missing
+                  value:
+                    detail: DataStructureVersion model is missing from the model registry
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/duplicate"
+                    status: 409
+                    title: Conflict
+                    type: urn:civitas:error:MODEL_MISSING
+                resource_in_use:
+                  summary: resource_in_use
+                  value:
+                    detail: "Cannot delete: resource is referenced by other entities"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/duplicate"
+                    status: 409
+                    title: Conflict
+                    type: urn:civitas:error:RESOURCE_IN_USE
+                saga_in_flight:
+                  summary: saga_in_flight
+                  value:
+                    detail: "Cannot write while a saga is in-flight: CREATE"
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/duplicate"
+                    pendingSagaType: CREATE
+                    status: 409
+                    title: Conflict
+                    type: urn:civitas:error:SAGA_IN_FLIGHT
+                unique_constraint:
+                  summary: unique_constraint
+                  value:
+                    detail: A resource with this name already exists
+                    instance: "/datastructures/{dataStructureId}/versions/{versionId}/duplicate"
+                    status: 409
+                    title: Conflict
+                    type: urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "The source version's model is missing from the model registry,\
+            \ or the new version number is already taken"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+      summary: Duplicate a data structure version
       tags:
       - Data Structure Versions
   /datastructures/{dataStructureId}/versions/{versionId}/release:
@@ -11694,9 +12009,12 @@ components:
           description: Timestamp when the resource was last modified
           example: 2025-06-15T14:22:00
           readOnly: true
-        pipelineId:
-          type: string
-          format: uuid
+        pipelineIds:
+          type: array
+          description: "Ids of the Pipelines that write into this DataSink, sorted"
+          items:
+            type: string
+            format: uuid
         provisioned:
           type: boolean
           description: True if this DataSink's storage physically exists. Set once
@@ -12447,17 +12765,21 @@ components:
           countPath:
             type: string
             description: "JSON path in the response to the number of records, or to\
-              \ an array whose length is that number. Only member names and array\
-              \ indexes. Absent or null counts the elements of the response, which\
-              \ must then be an array."
+              \ an array whose length is that number. The number is the count of records\
+              \ in this response, not the total of the API. Only member names and\
+              \ array indexes. With countPath, the response must be a JSON object,\
+              \ which is one record. Absent or null counts the elements of the response,\
+              \ which must then be an array."
             example: $.meta.count
             pattern: "^\\$(\\.[A-Za-z_][A-Za-z0-9_-]*|\\['[^'\\\\]+'\\]|\\[[0-9]+\\\
               ])+$"
           limit:
             type: integer
             format: int32
-            description: Number of records per request. At least 1. Required with
-              limitParameter.
+            description: "Number of records per request. At least 1. Required with\
+              \ limitParameter. It must not be larger than the maximum page size of\
+              \ the API. With a larger limit, the run stops after the first page without\
+              \ an error."
             example: 100
             minimum: 1
           limitParameter:
@@ -12484,6 +12806,36 @@ components:
       description: "Limit/offset pagination, with limit and offset as query parameters.\
         \ Without a limit, the API pages by its default page size, and the offset\
         \ grows by the number of records of each response."
+      required:
+      - type
+    HttpConnectorNextLinkPagination:
+      allOf:
+      - $ref: "#/components/schemas/HttpConnectorPagination"
+      - type: object
+        properties:
+          maxLinks:
+            type: integer
+            format: int32
+            description: "Maximum number of links to follow. At least 1. Absent or\
+              \ null follows all links. A run sends at most 1000 requests and stops\
+              \ with an error when the last one still holds a link, so a value above\
+              \ 999 has no effect."
+            example: 10
+            minimum: 1
+          nextLinkPath:
+            type: string
+            description: "JSON path to the next link, a string or an object with a\
+              \ string href. Only member names and array indexes. An absent, null\
+              \ or empty link ends the run."
+            example: $.links.next
+            pattern: "^\\$(\\.[A-Za-z_][A-Za-z0-9_-]*|\\['[^'\\\\]+'\\]|\\[[0-9]+\\\
+              ])+$"
+          type:
+            type: string
+            enum:
+            - NEXT_LINK
+      description: "Next link pagination: each response is one record and holds the\
+        \ URL of the next request. Links must have the scheme, host and port of baseUrl."
       required:
       - type
     HttpConnectorNoAuthentication:
@@ -12531,36 +12883,6 @@ components:
             - OAUTH2
       description: "OAuth 2.0 with the client credentials grant: an access token from\
         \ the token endpoint, sent as 'Authorization: Bearer <token>'."
-      required:
-      - type
-    HttpConnectorNextLinkPagination:
-      allOf:
-      - $ref: "#/components/schemas/HttpConnectorPagination"
-      - type: object
-        properties:
-          maxLinks:
-            type: integer
-            format: int32
-            description: "Maximum number of links to follow. At least 1. Absent or\
-              \ null follows all links. A run sends at most 1000 requests and stops\
-              \ with an error when the last one still holds a link, so a value above\
-              \ 999 has no effect."
-            example: 10
-            minimum: 1
-          nextLinkPath:
-            type: string
-            description: "JSON path to the next link, a string or an object with a\
-              \ string href. Only member names and array indexes. An absent, null\
-              \ or empty link ends the run."
-            example: $.links.next
-            pattern: "^\\$(\\.[A-Za-z_][A-Za-z0-9_-]*|\\['[^'\\\\]+'\\]|\\[[0-9]+\\\
-              ])+$"
-          type:
-            type: string
-            enum:
-            - NEXT_LINK
-      description: "Next link pagination: each response is one record and holds the\
-        \ URL of the next request. Links must have the scheme, host and port of baseUrl."
       required:
       - type
     HttpConnectorPageNumberPagination:
@@ -12644,6 +12966,13 @@ components:
             type: string
         cqlFilter:
           type: string
+          description: "Optional ECQL condition restricting the rows the layer publishes,\
+            \ e.g. status = 'frei' AND kapazitaet > 50. Rejected on save when its\
+            \ syntax is invalid; column and function names are not checked. Max 500\
+            \ characters."
+          example: status = 'frei'
+          maxLength: 500
+          minLength: 0
         crs:
           type: string
         dataSinkId:
@@ -12735,6 +13064,11 @@ components:
           description: Timestamp when the resource was last modified
           example: 2025-06-15T14:22:00
           readOnly: true
+        namedApiId:
+          type: string
+          format: uuid
+          description: ID of the named API that publishes this layer; the layer goes
+            with it
         nativeBoundingBox:
           type: object
           additionalProperties: {}
@@ -12895,6 +13229,12 @@ components:
           type: string
           description: Optional free-form description of the named API. Max 150 characters.
           example: Live traffic counter readings from city sensors.
+        id:
+          type: string
+          format: uuid
+          description: Id of the named API; a Layer names the API that publishes it
+            by this id.
+          readOnly: true
         name:
           type: string
           description: Human-readable display label for this named API.
@@ -13531,6 +13871,13 @@ components:
             type: string
         cqlFilter:
           type: string
+          description: "Optional ECQL condition restricting the rows the layer publishes,\
+            \ e.g. status = 'frei' AND kapazitaet > 50. Rejected on save when its\
+            \ syntax is invalid; column and function names are not checked. Max 500\
+            \ characters."
+          example: status = 'frei'
+          maxLength: 500
+          minLength: 0
         crs:
           type: string
         dataSinkId:
