@@ -94,7 +94,7 @@ final class RecordSchema {
     try (JsonParser parser = RECORD_READER.createParser(response)) {
       JsonToken first = parser.nextToken();
       if (first == null) {
-        return new Verdict.Blank();
+        return new Verdict.NoRecords();
       }
       Verdict verdict =
           switch (first) {
@@ -112,6 +112,7 @@ final class RecordSchema {
               }
               yield object(parser, shape);
             }
+            case VALUE_NULL -> new Verdict.NoRecords();
             default -> new Verdict.WrongType(scalarType(first), shape.expected());
           };
       return parser.nextToken() == null ? verdict : new Verdict.Rejected(NOT_JSON);
@@ -162,15 +163,18 @@ final class RecordSchema {
       case VALUE_STRING -> "string";
       case VALUE_NUMBER_INT, VALUE_NUMBER_FLOAT -> "number";
       case VALUE_TRUE, VALUE_FALSE -> "boolean";
-      default -> "null";
+      default -> throw new IllegalArgumentException("not a JSON scalar: " + scalar);
     };
   }
 
   /** What the records of one response gave. */
   sealed interface Verdict {
 
-    /** The response holds only JSON whitespace. */
-    record Blank() implements Verdict {}
+    /**
+     * The response holds only JSON whitespace, or only {@code null}, which some APIs send for an
+     * empty result.
+     */
+    record NoRecords() implements Verdict {}
 
     record Agrees(PageContent content) implements Verdict {}
 

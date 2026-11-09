@@ -141,9 +141,10 @@ class LimitOffsetPaginationTest {
         "0                   | 0",
         "3000000000          | 3000000000",
         "'[\"a\", \"b\"]'    | 2",
-        "[]                  | 0"
+        "[]                  | 0",
+        "null                | 0"
       })
-  void next_withACountPath_takesTheCountFromAWholeNumberOrAnArray(String value, long count)
+  void next_withACountPath_takesTheCountFromAWholeNumberAnArrayOrNull(String value, long count)
       throws JsonProcessingException {
     LimitOffsetPagination pagination = withoutLimit(10, Optional.of(COUNT_PATH));
 
@@ -162,17 +163,7 @@ class LimitOffsetPaginationTest {
 
   @ParameterizedTest
   @ValueSource(
-      strings = {
-        "-1",
-        "1.5",
-        "\"3\"",
-        "true",
-        "{}",
-        "null",
-        "absent",
-        "1e19",
-        "12345678901234567890"
-      })
+      strings = {"-1", "1.5", "\"3\"", "true", "{}", "absent", "1e19", "12345678901234567890"})
   void next_withACountPathValueThatIsNotACount_rejectsWithoutTheValue(String value)
       throws JsonProcessingException {
     LimitOffsetPagination pagination = withLimit(0, Optional.of(COUNT_PATH));

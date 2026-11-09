@@ -115,7 +115,7 @@ final class PageLoop {
 
   /**
    * Adds the FlowFile of a page with records, or gives the failure that ends the run. A page
-   * without a body, or past the last page, ends the run.
+   * without records, or past the last page, ends the run.
    */
   private PageRead accept(
       ProcessSession session,
@@ -137,7 +137,7 @@ final class PageLoop {
         yield new PageRead.Failed(failure);
       }
       case ApiCallOutcome.NoBody noBody -> {
-        logNoBody(page, noBody.status());
+        logNoRecords(page, noBody.status());
         yield new PageRead.Read(Optional.empty());
       }
       case ApiCallOutcome.Body body -> {
@@ -171,9 +171,9 @@ final class PageLoop {
     }
     Pagination pagination = apiCall.pagination();
     return switch (recordSchema.verdict(session, flowFile, pagination.shape())) {
-      case RecordSchema.Verdict.Blank() -> {
+      case RecordSchema.Verdict.NoRecords() -> {
         session.remove(flowFile);
-        logNoBody(page, body.status());
+        logNoRecords(page, body.status());
         yield new PageRead.Read(Optional.empty());
       }
       case RecordSchema.Verdict.Rejected(String reason) -> {
@@ -225,9 +225,9 @@ final class PageLoop {
     return attributes;
   }
 
-  private void logNoBody(Page page, int status) {
+  private void logNoRecords(Page page, int status) {
     log.debug(
-        "{} {}{} returned {} without a body",
+        "{} {}{} returned {} without records",
         apiCall.method().name(),
         apiCall.path(),
         page.title().map(title -> " " + title).orElse(""),

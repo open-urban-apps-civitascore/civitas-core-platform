@@ -334,12 +334,12 @@ attempt. `stop` carries an error that the next run cannot repair: the flow stops
 | Result | Relationship | Log level |
 |---|---|---|
 | 2xx, each record agrees with the `Record Schema` | `success`, the body unchanged, `mime.type` `application/json` | none |
-| 2xx without a body or with only whitespace, for example 204 | none, no FlowFile | debug |
+| 2xx without a body, or with only whitespace or `null`, for example 204 | none, no FlowFile | debug |
 | 3xx, 4xx except 408 and 429, of the API or the OAuth2 token endpoint | `stop` | error |
 | 2xx of the OAuth2 token endpoint without an access token | `stop` | error |
 | A TLS handshake that refuses the client certificate, status `0` | `stop` | error |
 | A request that the web client refuses, status `0` | `stop` | error |
-| 2xx, the body is not JSON, or is a JSON scalar | `stop` | error |
+| 2xx, the body is not JSON, or is a JSON string, number or boolean | `stop` | error |
 | 2xx, a record violates the `Record Schema` | `stop` | error |
 | 408, 429, 5xx, any other status, of the API or the OAuth2 token endpoint | `failure` | warn |
 | Connection error, timeout, TLS error, body read error, status `0` | `failure` | warn |
@@ -406,11 +406,12 @@ alone.
 
 The processor writes a 2xx body into its FlowFile and then reads it one record at a time, so only
 one record is in memory. A JSON array holds one record in each element, and `[]` holds none. A JSON
-object is one record. A JSON scalar, or a body that is not JSON, goes to `stop`. Each record is
-validated against `Record Schema`; one invalid record sends the whole response to `stop`, and no
-FlowFile goes to `success`. An array element that is not a JSON object is an invalid record with the
-keyword `type`, also when `Record Schema` allows it. A body that passes is an object or an array of
-objects, so the record reader behind the processor skips no data.
+object is one record. `null` holds no records, as a body without content: some APIs send it for an
+empty result. A JSON string, number or boolean, or a body that is not JSON, goes to `stop`. Each
+record is validated against `Record Schema`; one invalid record sends the whole response to `stop`,
+and no FlowFile goes to `success`. An array element that is not a JSON object is an invalid record
+with the keyword `type`, also when `Record Schema` allows it. A body that passes is an object or an
+array of objects, so the record reader behind the processor skips no data.
 
 The cause names the number of invalid records and at most the first 3 violations: the index of the
 record from 0, the JSON Pointer inside the record and the keyword. In the JSON Pointer, a property
@@ -464,8 +465,8 @@ object is one record, and `[]` gives one FlowFile `[]`.
 | 2xx response of a page | Result |
 |---|---|
 | A JSON array, each record agrees with the `Record Schema` | one FlowFile on `success`, the body unchanged |
-| `[]`, or no body | no FlowFile; the run stops there |
-| A JSON object, a JSON scalar, or not JSON | `stop` |
+| `[]`, `null`, or no body | no FlowFile; the run stops there |
+| A JSON object, string, number or boolean, or not JSON | `stop` |
 | An array with a record that violates the `Record Schema` | `stop` |
 
 **Known limit:** a `pageSize` larger than the maximum page size of the API ends the run after the
@@ -499,11 +500,11 @@ pass as the record validation, from the record that it validates.
 |---|---|
 | A JSON object that agrees with the `Record Schema`, with a string or number cursor | one FlowFile on `success`, the body unchanged; the run sends the next request |
 | The same, with the cursor absent, `null` or `""` | one FlowFile on `success`; the run stops there |
-| No body | no FlowFile; the run stops there |
+| `null`, or no body | no FlowFile; the run stops there |
 | A cursor that is a JSON object, array or boolean | `stop` |
 | A cursor in a header with a character outside printable ASCII | `stop` |
 | A cursor that the run already sent | `stop` |
-| A JSON array, a JSON scalar, or not JSON | `stop` |
+| A JSON array, string, number or boolean, or not JSON | `stop` |
 | An object that violates the `Record Schema` | `stop` |
 
 A 400 or 404 on a request after the first does not end the run: the cursor comes from the API, so
@@ -530,8 +531,9 @@ Any path of this form is accepted.
 
 A non-empty string, or an object with a string `href`, gives the next link. An absent value, `null`
 or an empty string ends the run. The records of that response are part of the run. Any other value
-stops the Pipeline. Each response is one record, as with cursor pagination. A JSON array, scalar
-or non-JSON body stops the Pipeline. A 2xx response without a body ends the run.
+stops the Pipeline. Each response is one record, as with cursor pagination. A JSON array, string,
+number, boolean or non-JSON body stops the Pipeline. A 2xx response without a body, or with only
+`null`, ends the run.
 
 Relative links resolve against the URL of the request that returned them, by RFC 3986 section 5.
 Each followed link must have the scheme, host and port of `baseUrl`. An omitted port means the
@@ -571,7 +573,8 @@ The record count of a response:
   page-number pagination, and the count is the number of elements.
 - With `countPath`, the response must be a JSON object. It is one record, so the `Record Schema`
   describes the whole response. The value at `countPath` gives the record count: a whole number of
-  at least 0, for example `5` or `5.0`, or an array, whose length is the count. **The count is the
+  at least 0, for example `5` or `5.0`, an array, whose length is the count, or `null`, which
+  counts 0. An absent value stops the Pipeline, so a wrong path shows. **The count is the
   number of records in this response, not the total of the API.** The processor reads the count in
   the same pass as the record validation, from the record that it validates.
 
@@ -591,10 +594,10 @@ and the next offset would read some of its records again. The offset is a `long`
 |---|---|
 | Without `countPath`: a JSON array, each record agrees with the `Record Schema` | one FlowFile on `success`, the body unchanged |
 | With `countPath`: a JSON object that agrees with the `Record Schema`, with a count above 0 | one FlowFile on `success`, the body unchanged |
-| `[]`, a count of 0, or no body | no FlowFile; the run stops there |
-| Without `countPath` a JSON object, with `countPath` a JSON array; a JSON scalar, or not JSON | `stop` |
+| `[]`, `null`, a count of 0, or no body | no FlowFile; the run stops there |
+| Without `countPath` a JSON object, with `countPath` a JSON array; a JSON string, number or boolean, or not JSON | `stop` |
 | With a `limit`, more records than the `limit` | `stop` |
-| A value at `countPath` that is absent, `null`, below 0, a fraction, a string, a boolean or an object | `stop` |
+| A value at `countPath` that is absent, below 0, a fraction, a string, a boolean or an object | `stop` |
 | A count that makes the next offset larger than 9223372036854775807 | `stop` |
 | A record that violates the `Record Schema` | `stop` |
 

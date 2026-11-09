@@ -83,6 +83,9 @@ record LimitOffsetPagination(
       return OptionalLong.of(content.records());
     }
     JsonNode value = content.values().get(countPath.get());
+    if (value.isNull()) {
+      return OptionalLong.of(0);
+    }
     if (value.isArray()) {
       return OptionalLong.of(value.size());
     }
