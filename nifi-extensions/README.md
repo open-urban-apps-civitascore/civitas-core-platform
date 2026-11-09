@@ -371,6 +371,7 @@ API call "Get stations": OAuth2 token request to auth.example.org/realms/city/to
 API call "Get stations": OAuth2 token request to auth.example.org/realms/city/token failed: ConnectException
 API call "Get stations": OAuth2 token request to auth.example.org/realms/city/token failed: status 200 without an access token in a JSON object
 API call "Get stations": 2 of 50 records violate the Data structure: record 3: /lat type; record 7: required stationid
+API call "Get stations": 2 of 50 records at $.data violate the Data structure: record 3: /lat type; record 7: required stationid
 API call "Get stations": the response is a JSON string, not an object or an array
 API call "Get stations": the response is not JSON
 API call "Get stations": GET /stations page 3 failed with status 403 (API Token)

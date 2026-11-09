@@ -174,13 +174,16 @@ final class RecordSchema {
     private final NumberTextParser parser;
     private final JsonPath entriesPath;
     private final List<JsonPath> paths;
+    private final String expected;
     private final Map<JsonPath, JsonNode> values = new HashMap<>();
-    private final Violations violations = new Violations();
+    private final Violations violations;
 
     EntriesReader(JsonParser parser, ResponseShape.EntriesAt shape) {
       this.parser = new NumberTextParser(parser, shape.paths());
       this.entriesPath = shape.entriesPath();
       this.paths = shape.paths();
+      this.expected = shape.expected();
+      this.violations = new Violations("records at " + entriesPath);
       for (JsonPath path : paths) {
         values.put(path, MissingNode.getInstance());
       }
@@ -239,7 +242,8 @@ final class RecordSchema {
                 + entriesPath
                 + " is a JSON "
                 + scalarType(token)
-                + ", not an object or an array");
+                + ", not "
+                + expected);
       }
       if (parser.currentTokenLocation().getByteOffset() < 0) {
         return Optional.of("the response is not UTF-8");
@@ -360,9 +364,18 @@ final class RecordSchema {
 
   private static final class Violations {
 
+    private final String recordsLabel;
     private int records;
     private int invalid;
     private final List<String> reported = new ArrayList<>();
+
+    Violations() {
+      this("records");
+    }
+
+    Violations(String recordsLabel) {
+      this.recordsLabel = recordsLabel;
+    }
 
     void add(List<String> recordViolations) {
       if (!recordViolations.isEmpty()) {
@@ -387,7 +400,9 @@ final class RecordSchema {
           invalid
               + " of "
               + records
-              + " records violate the Data structure: "
+              + " "
+              + recordsLabel
+              + " violate the Data structure: "
               + String.join("; ", reported));
     }
   }

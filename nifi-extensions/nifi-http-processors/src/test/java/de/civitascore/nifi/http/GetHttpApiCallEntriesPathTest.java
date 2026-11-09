@@ -91,8 +91,29 @@ class GetHttpApiCallEntriesPathTest {
           runner,
           GetHttpApiCall.STOP,
           200,
-          "API call \"Stations\": 1 of 2 records violate the Data structure: record 1: required"
-              + " stationid");
+          "API call \"Stations\": 1 of 2 records at $.data violate the Data structure: record 1:"
+              + " required stationid");
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"7", "\"val-1f3e\"", "true", "null", "[]", "[{\"stationid\":\"a0\"}]"})
+  void onTrigger_whenAnEntryIsNotAnObjectAndTheSchemaAllowsIt_routesTheRunToStop(String element)
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answering(200, "{\"data\":[" + element + "," + A1 + "]}")) {
+      TestRunner runner = runner(endpoint, "$.data", null);
+      runner.setProperty(GetHttpApiCall.RECORD_SCHEMA, "{\"required\": [\"stationid\"]}");
+
+      runner.run();
+
+      assertRouted(
+          runner,
+          GetHttpApiCall.STOP,
+          200,
+          "API call \"Stations\": 1 of 2 records at $.data violate the Data structure: record 0:"
+              + " type");
+      assertTrue(visible(runner).stream().noneMatch(text -> text.contains("val-1f3e")));
     }
   }
 
