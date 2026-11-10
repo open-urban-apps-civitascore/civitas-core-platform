@@ -16,7 +16,8 @@ import java.util.Optional;
 /**
  * What a page whose records agree with the Record Schema gave.
  *
- * @param records the number of records: the elements of an array, 1 for an object
+ * @param records the number of records: the elements of an array, 1 for an object, 0 for {@code
+ *     null} at the path to entries
  * @param values the value at each path of {@link ResponseShape.RecordObject} or {@link
  *     ResponseShape.EntriesAt}, a {@code MissingNode} where the response has none; empty for any
  *     other shape

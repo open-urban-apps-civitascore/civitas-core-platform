@@ -89,10 +89,9 @@ final class RecordSchema {
   }
 
   /**
-   * Reads the response one record at a time: a JSON array holds one record in each element, a JSON
-   * object is one record. The type comes before the records, so a response of the wrong type for
-   * the shape gets no record violation. The values at the paths of the shape come from the same
-   * read.
+   * Reads the response one record at a time, where the shape says that the records lie. The type
+   * comes before the records, so a response of the wrong type for the shape gets no record
+   * violation. The values at the paths of the shape come from the same read.
    */
   Verdict verdict(InputStream response, ResponseShape shape) {
     try (JsonParser parser = RECORD_READER.createParser(response)) {

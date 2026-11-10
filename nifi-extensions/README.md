@@ -446,7 +446,12 @@ value at the path gives the records:
 
 - A JSON array: each element is one record.
 - A JSON object: one record.
-- `[]` or `null`: no records. The run continues as for a response `[]` with the same pagination.
+- `[]` or `null`: no records. Without pagination, the run gives one FlowFile `[]`. With page-number
+  pagination, or limit/offset pagination without a `countPath`, the run ends there, as for a
+  response `[]`. With cursor or next link pagination, the page gives no FlowFile and the run
+  follows the value at the top of the response. With limit/offset pagination with a `countPath`,
+  the count at that path decides, as on any page: a count of 0 gives no FlowFile, and a higher
+  count gives a FlowFile `[]`.
 - No value, or a JSON number, string or boolean: `stop`. The cause names the path and the type it
   found, never a value of the response.
 - A response that holds the path twice, through a repeated member name: `stop`.
@@ -454,8 +459,8 @@ value at the path gives the records:
 
 The FlowFile on `success` holds the value at the path with the bytes of the response: an array
 stays an array, an object stays an object, and `null` gives `[]`. The rest of the response is not
-in the FlowFile, and `Record Schema` validates only the records. Without an `entriesPath`, each
-pagination reads the response as its section below says.
+in the FlowFile, and `Record Schema` validates only the records. Without an
+`entriesPath`, each pagination reads the response as its section below says.
 
 `cursorPath`, `nextLinkPath` and `countPath` start at the top of the response, not at the path to
 entries. Without a `countPath`, page-number and limit/offset pagination count the records at the
@@ -680,9 +685,10 @@ pages of the run and sends one FlowFile to `failure`, as for a transient error. 
 process group waits for one page at most, not for the whole run.
 
 The request code knows no NiFi session. The page loop asks a `Pagination` for the first page, and
-for the shape that each response must have: a JSON array of records, a JSON object that is one
-record, or, without pagination, either. A `ResponseShape` of one object also names the JSON paths
-whose values the pagination reads. From the record count and those values of a page, the
+the API call for the shape that each response must have: a JSON array of records, a JSON object that
+is one record, the records at the path to entries, or, without pagination, an array or an object. A
+`ResponseShape` of one object or of a path to entries also names the JSON paths whose values the
+pagination reads. From the record count and those values of a page, the
 `Pagination` gives the next page, the end of the run, or a cause for `stop`. A page carries the query
 parameters and the headers that its request adds, or the URL of its own request. A new pagination
 method adds an implementation of `Pagination`, and the page loop and the request code stay as they are.

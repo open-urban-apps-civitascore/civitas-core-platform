@@ -20,7 +20,7 @@ sealed interface ResponseShape {
   /** The type the body must have, for a cause, for example {@code an array}. */
   String expected();
 
-  /** The paths whose values the pagination reads from a response that is one record. */
+  /** The paths whose values the pagination reads from each response. */
   default List<JsonPath> paths() {
     return List.of();
   }
