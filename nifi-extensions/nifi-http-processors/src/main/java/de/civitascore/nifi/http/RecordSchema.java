@@ -227,11 +227,6 @@ final class RecordSchema {
      * @param found whether the response had a value at the path to entries before {@code token}
      */
     private Optional<String> rejection(JsonToken token, JsonStreamContext location, boolean found) {
-      Optional<JsonPath> holder = paths.stream().filter(path -> path.isAt(location)).findFirst();
-      if (token.isStructStart() && holdsEntries(location) && holder.isPresent()) {
-        return Optional.of(
-            "the value at " + holder.get() + " must not hold the path to entries " + entriesPath);
-      }
       if (!entriesPath.isAt(location)) {
         return Optional.empty();
       }

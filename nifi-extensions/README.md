@@ -461,8 +461,8 @@ pagination reads the response as its section below says.
 entries. Without a `countPath`, page-number and limit/offset pagination count the records at the
 path. A `countPath` that leads to the same value as `entriesPath`, also when one of them quotes a
 member name, counts those records. Any other pagination path that leads to the value at
-`entriesPath`, or to a value around it, goes to `stop`, because its value would be the records. A
-pagination path inside a record reads its value from that record.
+`entriesPath`, or to a value around it, makes the processor invalid, because its value would be the
+records. A pagination path inside a record reads its value from that record.
 
 The processor reads the response one token at a time and keeps at most one record in memory, as for
 a response that is a JSON array. It reads the values at the pagination paths in the same read, and

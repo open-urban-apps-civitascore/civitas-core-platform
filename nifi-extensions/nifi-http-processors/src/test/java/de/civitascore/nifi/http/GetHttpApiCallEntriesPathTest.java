@@ -356,32 +356,31 @@ class GetHttpApiCallEntriesPathTest {
   @CsvSource(
       delimiter = '|',
       value = {
-        "$.data | {\"data\":[]}",
-        "$.data | {\"data\":{\"stationid\":\"a1\"}}",
-        "$.page | {\"page\":{\"data\":[]}}",
+        "$.data | {\"type\":\"CURSOR\",\"cursorPath\":\"$.data\",\"cursorParameter\":\"c\","
+            + "\"cursorIn\":\"QUERY\"} | pagination.cursorPath",
+        "$.page.data | {\"type\":\"CURSOR\",\"cursorPath\":\"$['page']\",\"cursorParameter\":\"c\","
+            + "\"cursorIn\":\"QUERY\"} | pagination.cursorPath",
+        "$.value | {\"type\":\"NEXT_LINK\",\"nextLinkPath\":\"$.value\"} | pagination.nextLinkPath",
+        "$.page.data | {\"type\":\"LIMIT_OFFSET\",\"offsetParameter\":\"offset\","
+            + "\"countPath\":\"$.page\"} | pagination.countPath",
       })
-  void onTrigger_whenTheCursorPathHoldsTheEntries_routesTheRunToStop(
-      String cursorPath, String response) throws InitializationException {
-    String entriesPath = "$.page".equals(cursorPath) ? "$.page.data" : "$.data";
-    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, response)) {
-      TestRunner runner =
-          runner(
-              endpoint,
-              entriesPath,
-              "{\"type\":\"CURSOR\",\"cursorPath\":\""
-                  + cursorPath
-                  + "\",\"cursorParameter\":\"cursor\",\"cursorIn\":\"QUERY\"}");
+  void validate_withAPaginationPathAtOrAroundTheEntries_namesTheKey(
+      String entriesPath, String pagination, String keyPath) throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answering(200, "{}")) {
+      TestRunner runner = runner(endpoint, entriesPath, pagination);
 
-      runner.run();
-
-      assertRouted(
-          runner,
-          GetHttpApiCall.STOP,
-          200,
-          "API call \"Stations\": request 1: the value at "
-              + cursorPath
-              + " must not hold the path to entries "
-              + entriesPath);
+      runner.assertNotValid();
+      assertTrue(
+          invalid(runner).stream()
+              .anyMatch(
+                  result ->
+                      result
+                          .getExplanation()
+                          .contains(
+                              keyPath
+                                  + " must not lead to the value at entriesPath or to a value"
+                                  + " around it")),
+          () -> invalid(runner).toString());
     }
   }
 

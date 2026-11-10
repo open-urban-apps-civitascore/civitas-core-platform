@@ -73,6 +73,12 @@ final class JsonPath {
     return segments.equals(other.segments);
   }
 
+  /** Whether the value at {@code other} is the value at the path or lies inside it. */
+  boolean holds(JsonPath other) {
+    return other.segments.size() >= segments.size()
+        && other.segments.subList(0, segments.size()).equals(segments);
+  }
+
   /** The value at the path, or a {@link MissingNode} when a step finds nothing. */
   JsonNode valueIn(JsonNode root) {
     return valueIn(root, 0);
