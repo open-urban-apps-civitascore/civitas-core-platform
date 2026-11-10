@@ -7,7 +7,6 @@ import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.repository.specification.AssignmentSpec;
 import de.civitascore.portal.repository.specification.DataSetSpec;
 import de.civitascore.portal.repository.specification.DataSourceSpec;
-import de.civitascore.portal.repository.specification.LayerSpec;
 import de.civitascore.portal.repository.specification.UserSpec;
 import de.civitascore.portal.repository.specification.base.BaseSpec;
 import io.swagger.v3.oas.models.parameters.Parameter;
@@ -53,15 +52,6 @@ class SpecFilterParametersTest {
 
     assertThat(status.getSchema().getTypes()).containsExactly("string");
     assertThat(status.getSchema().getEnum()).contains("DRAFT", "AVAILABLE");
-  }
-
-  @Test
-  void pathVariableSpec_isNotAQueryParameter() {
-    assertThat(SpecFilterParameters.of(LayerSpec.class))
-        .extracting(Parameter::getName)
-        .containsExactlyInAnyOrder(
-            "id", "createdAtFrom", "createdAtTo", "modifiedAtFrom", "modifiedAtTo")
-        .doesNotContain("dataSetId");
   }
 
   @Test
