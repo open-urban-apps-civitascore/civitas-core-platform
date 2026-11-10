@@ -19,7 +19,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.MissingNode;
-import com.fasterxml.jackson.databind.node.NullNode;
 import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaException;
 import com.networknt.schema.ValidationMessage;
@@ -301,8 +300,7 @@ final class RecordSchema {
       int depth = JsonPath.depth(location);
       List<JsonPath> within =
           paths.stream().filter(path -> path.isAt(location) || path.isInside(location)).toList();
-      JsonNode value = RECORD_READER.readTree(parser);
-      JsonNode tree = value == null ? NullNode.getInstance() : value;
+      JsonNode tree = RECORD_READER.readTree(parser);
       for (JsonPath path : within) {
         values.put(path, path.valueIn(tree, depth));
       }
