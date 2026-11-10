@@ -17,7 +17,7 @@ public class RemovalNotConfirmedException extends ProblemException {
   private final transient UnconfirmedRemoval removal;
 
   public RemovalNotConfirmedException(UUID dataSetId, UnconfirmedRemoval removal, String message) {
-    super(ProblemType.REMOVAL_NOT_CONFIRMED, message, message);
+    super(ProblemType.REMOVAL_NOT_CONFIRMED, message);
     this.dataSetId = dataSetId;
     this.removal = removal;
   }

@@ -8,6 +8,8 @@ import de.civitascore.portal.problem.ProblemType;
 import de.civitascore.portal.problem.TestProblemDetails;
 import de.civitascore.portal.service.connector.ConnectorValidationException;
 import de.civitascore.portal.service.connector.ConnectorViolation;
+import de.civitascore.portal.service.removal.RemovalNotConfirmedException;
+import de.civitascore.portal.service.removal.UnconfirmedRemoval;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.ModelMemberUnreachableException;
 import de.civitascore.portal.util.PipelineClosureValidationException;
@@ -43,7 +45,11 @@ class ProblemExamplesTest {
         new SagaInFlightException(
             id, PendingSagaType.CREATE, "Cannot write while a saga is in-flight: CREATE"),
         new DataSourceScopeViolationException(List.of(id)),
-        new PipelineClosureValidationException(List.of(id)));
+        new PipelineClosureValidationException(List.of(id)),
+        new RemovalNotConfirmedException(
+            id,
+            new UnconfirmedRemoval(List.of(), List.of(), List.of()),
+            "This request deletes stored data of the Dataset; set confirmDataLoss=true to proceed"));
   }
 
   @Test

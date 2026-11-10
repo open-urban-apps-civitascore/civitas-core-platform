@@ -1,11 +1,18 @@
 package de.civitascore.portal.configuration.openapi;
 
+import de.civitascore.portal.model.embedded.ApiStandard;
+import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.problem.FieldError;
 import de.civitascore.portal.problem.ProblemDetails;
 import de.civitascore.portal.problem.ProblemType;
+import de.civitascore.portal.service.removal.UnconfirmedRemoval;
+import de.civitascore.portal.service.removal.UnconfirmedRemoval.RemovedApi;
+import de.civitascore.portal.service.removal.UnconfirmedRemoval.RemovedDataSink;
+import de.civitascore.portal.service.removal.UnconfirmedRemoval.RemovedLayer;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.ProblemDetail;
@@ -48,9 +55,18 @@ class ProblemExamples {
           Map.of("fieldErrors", List.of(new FieldError("name", "must not be blank")));
       case MODEL_MEMBER_UNREACHABLE -> Map.of("memberNames", List.of("Orphan"));
       case SAGA_IN_FLIGHT -> Map.of("pendingSagaType", "CREATE");
+      case REMOVAL_NOT_CONFIRMED -> Map.of("removal", exampleRemoval());
       case DATASOURCE_SCOPE_VIOLATION -> Map.of("offendingDataSourceIds", List.of(EXAMPLE_ID));
       case PIPELINE_CLOSURE_INVALID -> Map.of("offendingPipelineIds", List.of(EXAMPLE_ID));
       default -> Map.of();
     };
+  }
+
+  private static UnconfirmedRemoval exampleRemoval() {
+    UUID id = UUID.fromString(EXAMPLE_ID);
+    return new UnconfirmedRemoval(
+        List.of(new RemovedDataSink(id, DataSinkType.POSTGIS, true)),
+        List.of(new RemovedLayer(id, "roads", "Roads")),
+        List.of(new RemovedApi(id, "roads", "Roads", ApiStandard.OWS)));
   }
 }

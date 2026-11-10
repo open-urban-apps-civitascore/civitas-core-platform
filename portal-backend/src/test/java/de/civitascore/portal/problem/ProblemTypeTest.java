@@ -38,6 +38,7 @@ class ProblemTypeTest {
           UNIQUE_CONSTRAINT_VIOLATION   | 409
           FOREIGN_KEY_VIOLATION         | 409
           RESOURCE_IN_USE               | 409
+          REMOVAL_NOT_CONFIRMED         | 409
           SAGA_IN_FLIGHT                | 409
           MODEL_MISSING                 | 409
           PAYLOAD_TOO_LARGE             | 413
