@@ -116,6 +116,16 @@ connection-test:
   # Tests that wait on one backend instance at the same time; each holds a request thread.
   max-concurrent: ${CONNECTION_TEST_MAX_CONCURRENT:4}
 
+# Dashboard export for sharing, run by config-adapter, which holds the Superset session.
+# The topics must match its dashboardexport.kafka.*-topic.
+dashboard-export:
+  request-topic: ${DASHBOARD_EXPORT_REQUEST_TOPIC:de.civitascore.dashboardexport.request}
+  result-topic: ${DASHBOARD_EXPORT_RESULT_TOPIC:de.civitascore.dashboardexport.result}
+  # How long an export waits for its result (seconds).
+  wait-seconds: ${DASHBOARD_EXPORT_WAIT_SECONDS:30}
+  # Exports that wait on one backend instance at the same time; each holds a request thread.
+  max-concurrent: ${DASHBOARD_EXPORT_MAX_CONCURRENT:2}
+
 # Model Forge — embedded schema/model registry.
 # Reuses the host spring.datasource; owns a separate `model_forge` schema migrated by its own
 # Flyway instance (does not touch the host db/migration). portal-backend owns workflow/status.

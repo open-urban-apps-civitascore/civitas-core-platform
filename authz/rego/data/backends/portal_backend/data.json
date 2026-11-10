@@ -134,6 +134,9 @@
       "PUT": "DATASET_UPDATE",
       "DELETE": "DATASET_UPDATE"
     },
+    "/v1/datasets/{id}/visualizations/{id}/export": {
+      "GET": "DATASET_UPDATE"
+    },
     "/v1/datasets/{id}/pipelines": {
       "GET": "DATASET_READ",
       "POST": "DATASET_UPDATE"

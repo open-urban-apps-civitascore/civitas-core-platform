@@ -206,6 +206,15 @@ it in sync by hand.
 
 > **Create both connection test topics with a short retention.** A result carries up to 8 KB of what the source returned: up to five rows or the start of a response body. A request carries the connector, with its secrets as `ENC(...)`. Both are needed for seconds only. A topic that the broker creates on first use keeps them for its default retention. Create both topics with `retention.ms=60000`, `segment.ms=60000` and `cleanup.policy=delete`. Kafka deletes only closed segments. Without the short `segment.ms`, a steady flow of tests keeps the open segment, and every record in it, for up to 7 days.
 
+| Property | Default | Description |
+|---|---|---|
+| `DASHBOARD_EXPORT_REQUEST_TOPIC` | `de.civitascore.dashboardexport.request` | Topic for dashboard export requests to config-adapter. Must match its `dashboardexport.kafka.request-topic`. |
+| `DASHBOARD_EXPORT_RESULT_TOPIC` | `de.civitascore.dashboardexport.result` | Topic of the dashboard export results. Must match config-adapter's `dashboardexport.kafka.result-topic`. Consumer groups as for the connection test: `<SPRING_KAFKA_CONSUMER_GROUP_ID>-dashboard-export-<random>`. |
+| `DASHBOARD_EXPORT_WAIT_SECONDS` | `30` | Seconds an export waits for its result. Then it answers 504. The gateway's read timeout for the export path must be longer. |
+| `DASHBOARD_EXPORT_MAX_CONCURRENT` | `2` | Exports that wait on one backend instance at the same time. An export beyond it answers 429. Each waiting export holds a request thread and a database connection. |
+
+> **Create both dashboard export topics with a short retention** (`retention.ms=60000`, `segment.ms=60000`, `cleanup.policy=delete`). A result carries the user's dashboard, up to 512 KB, and is needed for seconds only.
+
 > **Result topic consumer groups.** Every backend instance reads the result topic from the latest offset, in a consumer group of its own: `<SPRING_KAFKA_CONSUMER_GROUP_ID>-connection-test-<random>`. Thus the instance that waits for a result receives it. The group of a stopped instance stays empty, and its lag grows until the broker expires its offsets (`offsets.retention.minutes`, 7 days). Leave these groups out of lag alerts. An instance stops reading results when it shuts down, so a test that runs during the shutdown ends with 504.
 
 ---

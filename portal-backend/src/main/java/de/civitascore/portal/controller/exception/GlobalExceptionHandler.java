@@ -4,6 +4,9 @@ import de.civitascore.portal.model.connector.MalformedDataSourceRequestException
 import de.civitascore.portal.service.connector.ConnectorValidationException;
 import de.civitascore.portal.service.connector.StoredConnectorUnreadableException;
 import de.civitascore.portal.util.ConnectionTestBusyException;
+import de.civitascore.portal.util.DashboardExportBusyException;
+import de.civitascore.portal.util.DashboardExportRefusedException;
+import de.civitascore.portal.util.DashboardNotExportableException;
 import de.civitascore.portal.util.DataSetNotEditableException;
 import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.ExternalSystemRejectionException;
@@ -414,6 +417,37 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
       ConnectionTestBusyException ex, HttpServletRequest request) {
     log.warn("Connection test rejected: {}", Encode.forJava(ex.getMessage()));
     // TR-03187 W-18/W-19: the detail is one of two fixed constants with no runtime data.
+    return createProblemDetail(
+        HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_REQUESTS", ex.getMessage(), request);
+  }
+
+  @ExceptionHandler(DashboardNotExportableException.class)
+  @ResponseStatus(HttpStatus.CONFLICT)
+  public ProblemDetail handleDashboardNotExportable(
+      DashboardNotExportableException ex, HttpServletRequest request) {
+    log.info("Dashboard export rejected: {}", Encode.forJava(ex.getMessage()));
+    // TR-03187 W-18/W-19: the detail is one of two fixed constants with no runtime data.
+    return createProblemDetail(
+        HttpStatus.CONFLICT, "DASHBOARD_NOT_EXPORTABLE", ex.getMessage(), request);
+  }
+
+  @ExceptionHandler(DashboardExportRefusedException.class)
+  @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
+  public ProblemDetail handleDashboardExportRefused(
+      DashboardExportRefusedException ex, HttpServletRequest request) {
+    log.info("Dashboard export refused: {}", Encode.forJava(ex.getMessage()));
+    // TR-03187 W-18/W-19: config-adapter writes the detail from fixed texts and the file names of
+    // the caller's own dashboard; it holds no secret and no platform internal.
+    return createProblemDetail(
+        HttpStatus.UNPROCESSABLE_ENTITY, "DASHBOARD_EXPORT_REFUSED", ex.getMessage(), request);
+  }
+
+  @ExceptionHandler(DashboardExportBusyException.class)
+  @ResponseStatus(HttpStatus.TOO_MANY_REQUESTS)
+  public ProblemDetail handleDashboardExportBusy(
+      DashboardExportBusyException ex, HttpServletRequest request) {
+    log.warn("Dashboard export rejected: {}", Encode.forJava(ex.getMessage()));
+    // TR-03187 W-18/W-19: the detail is a fixed constant with no runtime data.
     return createProblemDetail(
         HttpStatus.TOO_MANY_REQUESTS, "TOO_MANY_REQUESTS", ex.getMessage(), request);
   }

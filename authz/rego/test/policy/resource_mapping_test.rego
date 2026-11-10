@@ -277,6 +277,9 @@ test_6_segment_paths if {
 
 	result2 := resource_mapping.path_pattern with input as portal_request("POST", "/v1/datastructures/abc/versions/xyz/unrelease")
 	result2 == "/v1/datastructures/{id}/versions/{id}/unrelease"
+
+	result3 := resource_mapping.path_pattern with input as portal_request("GET", "/v1/datasets/abc/visualizations/xyz/export")
+	result3 == "/v1/datasets/{id}/visualizations/{id}/export"
 }
 
 # Test: Dataspaces and catalogs do NOT resolve (removed from v2.0, see #989)

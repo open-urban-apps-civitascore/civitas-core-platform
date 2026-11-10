@@ -5,11 +5,13 @@ import de.civitascore.portal.model.input.DashboardInputDTO;
 import de.civitascore.portal.model.output.DashboardOutputDTO;
 import de.civitascore.portal.model.output.assembler.DashboardAssembler;
 import de.civitascore.portal.repository.specification.VisualizationSpec;
+import de.civitascore.portal.service.DashboardExportService;
 import de.civitascore.portal.service.DashboardService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.io.IOException;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +22,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -38,6 +41,7 @@ public class VisualizationController
 
   private final DashboardService dashboardService;
   private final DashboardAssembler dashboardAssembler;
+  private final DashboardExportService dashboardExportService;
 
   @Override
   protected DashboardService getService() {
@@ -85,6 +89,22 @@ public class VisualizationController
   public void delete(@PathVariable UUID id) {
     dashboardService.findByIdAndDataSetOrThrow(id, extractDataSetId());
     super.delete(id);
+  }
+
+  /**
+   * The dashboard as it is shared: Superset's export, cleaned by config-adapter of what names this
+   * instance. OPA admits only callers who may change the dataset.
+   */
+  @GetMapping("/{id}/export")
+  @Operation(
+      operationId = "exportVisualization",
+      summary = "Export a visualization for sharing",
+      description =
+          "Returns the Superset export of the dashboard as one JSON document: tool and files, each"
+              + " file path without the export's root folder mapped to the parsed file. 409 if"
+              + " Superset does not hold the dashboard, 422 if it holds what must not be shared.")
+  public ResponseEntity<Map<String, Object>> export(@PathVariable UUID id) {
+    return ResponseEntity.ok(dashboardExportService.export(extractDataSetId(), id));
   }
 
   // Visualizations are replace-only (PUT); disabling PATCH here is also what makes the assembler's
