@@ -29,7 +29,7 @@ class HttpConnectorConfigurationTest {
   }
 
   private static ApiCall apiCall(List<Parameter> queryParameters, List<Parameter> headers) {
-    return new ApiCall("calls", null, "/x", queryParameters, headers, null);
+    return new ApiCall("calls", null, "/x", queryParameters, headers, null, null);
   }
 
   @ParameterizedTest
@@ -96,7 +96,7 @@ class HttpConnectorConfigurationTest {
   @Test
   void constructor_withNullOrBlankValues_appliesDefaults() {
     HttpConnectorConfiguration connector = new HttpConnectorConfiguration(" ", null, null);
-    ApiCall apiCall = new ApiCall(" ", null, "", null, null, null);
+    ApiCall apiCall = new ApiCall(" ", null, "", null, null, " ", null);
     PageNumber page = new PageNumber(" ", "", null, null, null);
 
     assertThat(connector.baseUrl()).isNull();
@@ -105,6 +105,7 @@ class HttpConnectorConfigurationTest {
     assertThat(apiCall.name()).isNull();
     assertThat(apiCall.path()).isNull();
     assertThat(apiCall.queryParameters()).isNull();
+    assertThat(apiCall.entriesPath()).isNull();
     assertThat(apiCall.pagination()).isNull();
     assertThat(new Basic(" ", Secret.of("")).username()).isNull();
     assertThat(page.pageParameter()).isNull();

@@ -326,6 +326,16 @@ public record HttpConnectorConfiguration(
                   Parameter>
               headers,
       @Schema(
+              description =
+                  "JSON path in the response to the entries. Only member names and array"
+                      + " indexes. An array at the path holds one entry in each element, an object"
+                      + " is one entry, and [] or null holds none. The Data structure describes one"
+                      + " entry, and the pipeline receives only the entries. The paths of the"
+                      + " pagination start at the top of the response. Absent or null takes the"
+                      + " whole response.",
+              example = "$.data")
+          @Pattern(regexp = JSON_PATH, message = "'entriesPath'" + JSON_PATH_MESSAGE) String entriesPath,
+      @Schema(
               description = "Pagination of the API call. Absent or null is no pagination.",
               oneOf = {PageNumber.class, LimitOffset.class, Cursor.class, NextLink.class})
           @Valid Pagination pagination) {
@@ -336,6 +346,7 @@ public record HttpConnectorConfiguration(
       path = ConnectorValues.blankToNull(path);
       queryParameters = ConnectorValues.listOf(queryParameters, "queryParameters");
       headers = ConnectorValues.listOf(headers, "headers");
+      entriesPath = ConnectorValues.blankToNull(entriesPath);
     }
   }
 
@@ -473,10 +484,11 @@ public record HttpConnectorConfiguration(
               description =
                   "JSON path in the response to the number of records, or to an array whose length"
                       + " is that number. The number is the count of records in this response, not"
-                      + " the total of the API. Only member names and array indexes. With"
-                      + " countPath, the response must be a JSON object, which is one record."
-                      + " Absent or null counts the elements of the response, which must then be"
-                      + " an array.",
+                      + " the total of the API. Only member names and array indexes. Without"
+                      + " entriesPath, the response with countPath must be a JSON object, which is"
+                      + " one record, and absent or null counts the elements of the response,"
+                      + " which must then be an array. With entriesPath, absent or null counts the"
+                      + " entries.",
               example = "$.meta.count")
           @Pattern(regexp = JSON_PATH, message = "'countPath'" + JSON_PATH_MESSAGE) String countPath)
       implements Pagination {
@@ -501,9 +513,9 @@ public record HttpConnectorConfiguration(
   @Schema(
       name = "HttpConnectorCursorPagination",
       description =
-          "Cursor pagination: each request sends the cursor that the previous response holds. Each"
-              + " response is one record, so the Data structure describes the whole response,"
-              + " cursor included.")
+          "Cursor pagination: each request sends the cursor that the previous response holds."
+              + " Without entriesPath, each response is one record, so the Data structure"
+              + " describes the whole response, cursor included.")
   public record Cursor(
       @Schema(
               description =
@@ -550,8 +562,9 @@ public record HttpConnectorConfiguration(
   @Schema(
       name = "HttpConnectorNextLinkPagination",
       description =
-          "Next link pagination: each response is one record and holds the URL of the next"
-              + " request. Links must have the scheme, host and port of baseUrl.")
+          "Next link pagination: each response holds the URL of the next request. Without"
+              + " entriesPath, each response is one record. Links must have the scheme, host and"
+              + " port of baseUrl.")
   public record NextLink(
       @Schema(
               description =

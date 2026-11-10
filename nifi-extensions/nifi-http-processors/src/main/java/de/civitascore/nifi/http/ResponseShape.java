@@ -20,7 +20,7 @@ sealed interface ResponseShape {
   /** The type the body must have, for a cause, for example {@code an array}. */
   String expected();
 
-  /** The paths whose values the pagination reads from a response that is one record. */
+  /** The paths whose values the pagination reads from each response. */
   default List<JsonPath> paths() {
     return List.of();
   }
@@ -57,6 +57,24 @@ sealed interface ResponseShape {
     @Override
     public String expected() {
       return "an object";
+    }
+  }
+
+  /**
+   * The value at a path holds the records: a JSON array one in each element, a JSON object one,
+   * {@code null} none. The rest of the response holds no record.
+   *
+   * @param paths the paths whose values the pagination reads from the response
+   */
+  record EntriesAt(JsonPath entriesPath, List<JsonPath> paths) implements ResponseShape {
+
+    public EntriesAt {
+      paths = List.copyOf(paths);
+    }
+
+    @Override
+    public String expected() {
+      return "an object or an array";
     }
   }
 

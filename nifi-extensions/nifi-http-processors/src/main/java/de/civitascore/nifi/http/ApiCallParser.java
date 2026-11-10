@@ -74,14 +74,23 @@ final class ApiCallParser {
     List<Parameter> queryParameters =
         parameters(call.queryParameters(), "queryParameters", false, violations);
     List<Parameter> headers = parameters(call.headers(), "headers", true, violations);
+    Optional<JsonPath> entriesPath =
+        JsonPath.optional(call.entriesPath(), "entriesPath", violations);
     Optional<Pagination> pagination =
-        PaginationParser.parse(call.pagination(), queryParameters, headers, violations);
+        PaginationParser.parse(
+            call.pagination(), queryParameters, headers, entriesPath, violations);
 
     if (!violations.isEmpty()) {
       throw new InvalidApiCallException(violations);
     }
     return new ApiCall(
-        call.name(), method, call.path(), queryParameters, headers, pagination.orElseThrow());
+        call.name(),
+        method,
+        call.path(),
+        queryParameters,
+        headers,
+        entriesPath,
+        pagination.orElseThrow());
   }
 
   /** Reads the JSON shape, or adds the one violation that stops the reading. */
@@ -213,6 +222,7 @@ final class ApiCallParser {
       String path,
       List<JsonParameter> queryParameters,
       List<JsonParameter> headers,
+      String entriesPath,
       PaginationParser.JsonPagination pagination) {}
 
   record JsonParameter(String name, String value) {}

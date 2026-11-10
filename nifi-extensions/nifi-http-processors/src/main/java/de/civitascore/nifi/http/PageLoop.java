@@ -9,6 +9,7 @@
  */
 package de.civitascore.nifi.http;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,6 +30,8 @@ import org.apache.nifi.processor.exception.FlowFileAccessException;
 final class PageLoop {
 
   private static final String JSON = "application/json";
+
+  private static final byte[] NO_ENTRIES = "[]".getBytes(StandardCharsets.UTF_8);
 
   private final ApiCall apiCall;
   private final ApiCallClient client;
@@ -170,7 +173,7 @@ final class PageLoop {
               apiCall.label(), body.status(), title(page), title(earlier.get())));
     }
     Pagination pagination = apiCall.pagination();
-    return switch (recordSchema.verdict(session, flowFile, pagination.shape())) {
+    return switch (recordSchema.verdict(session, flowFile, apiCall.shape())) {
       case RecordSchema.Verdict.Empty() -> {
         session.remove(flowFile);
         logEmptyBody(page, body.status());
@@ -199,7 +202,10 @@ final class PageLoop {
             }
             case Pagination.Progress.Accepted(long records, Optional<Page> next) -> {
               if (records > 0 || pagination.shape() instanceof ResponseShape.ObjectOrArray) {
-                pages.add(session.putAllAttributes(flowFile, attributes(page, body.status())));
+                pages.add(
+                    session.putAllAttributes(
+                        entries(session, flowFile, agrees.content()),
+                        attributes(page, body.status())));
               } else {
                 session.remove(flowFile);
               }
@@ -207,6 +213,23 @@ final class PageLoop {
             }
           };
     };
+  }
+
+  /**
+   * The FlowFile that holds what the page delivers: the response, or with a path to entries the
+   * value at the path. {@code null} at the path delivers no entries, as {@code []} does.
+   */
+  private FlowFile entries(ProcessSession session, FlowFile response, PageContent content) {
+    if (apiCall.entriesPath().isEmpty()) {
+      return response;
+    }
+    if (content.entries().isEmpty()) {
+      return session.write(response, out -> out.write(NO_ENTRIES));
+    }
+    PageContent.Span span = content.entries().get();
+    FlowFile entries = session.clone(response, span.offset(), span.length());
+    session.remove(response);
+    return entries;
   }
 
   /** The title of the page, or its position in a run whose pages have no names. */

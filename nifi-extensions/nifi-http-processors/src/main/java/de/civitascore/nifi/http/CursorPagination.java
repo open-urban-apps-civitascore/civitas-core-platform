@@ -17,9 +17,9 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Sends the cursor of each response with the next request, until a response has none. Each response
- * is one record. A cause names a page by its request number, never by its cursor, because the
- * cursor is data of the API host.
+ * Sends the cursor of each response with the next request, until a response has none. Without a
+ * path to entries, each response is one record. A cause names a page by its request number, never
+ * by its cursor, because the cursor is data of the API host.
  */
 record CursorPagination(
     JsonPath cursorPath, String cursorParameter, ParameterLocation cursorIn, Optional<Limit> limit)

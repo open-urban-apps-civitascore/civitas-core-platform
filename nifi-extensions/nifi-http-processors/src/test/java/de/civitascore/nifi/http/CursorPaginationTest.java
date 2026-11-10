@@ -93,7 +93,10 @@ class CursorPaginationTest {
     CursorPagination pagination = inQuery(Optional.empty());
     PageContent content =
         new PageContent(
-            1, Map.of(CURSOR_PATH, MAPPER.readTree(number)), Map.of(CURSOR_PATH, number));
+            1,
+            Map.of(CURSOR_PATH, MAPPER.readTree(number)),
+            Map.of(CURSOR_PATH, number),
+            Optional.empty());
 
     Page next = nextPage(pagination, pagination.first(), content);
 
@@ -184,7 +187,7 @@ class CursorPaginationTest {
   }
 
   private static PageContent content(JsonNode cursor) {
-    return new PageContent(1, Map.of(CURSOR_PATH, cursor), Map.of());
+    return new PageContent(1, Map.of(CURSOR_PATH, cursor), Map.of(), Optional.empty());
   }
 
   private static Page nextPage(CursorPagination pagination, Page page, JsonNode cursor) {

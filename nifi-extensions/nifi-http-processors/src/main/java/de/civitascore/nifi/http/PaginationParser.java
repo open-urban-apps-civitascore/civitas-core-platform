@@ -42,6 +42,8 @@ final class PaginationParser {
    *     the pagination must not repeat
    * @param headers the headers of the API call, which the header names of the pagination must not
    *     repeat
+   * @param entriesPath no path of the pagination may hold the value at it, except a count path that
+   *     leads to the same value: that one counts the entries, as no count path does
    * @param violations receives one violation for each broken rule
    * @return {@link SinglePage} when the pagination is absent, empty when it breaks a rule
    */
@@ -49,6 +51,7 @@ final class PaginationParser {
       JsonPagination pagination,
       List<Parameter> queryParameters,
       List<Parameter> headers,
+      Optional<JsonPath> entriesPath,
       List<String> violations) {
     if (pagination == null) {
       return Optional.of(new SinglePage());
@@ -56,9 +59,9 @@ final class PaginationParser {
     PaginationNames names = new PaginationNames(queryParameters, headers);
     return switch (pagination.type()) {
       case PAGE_NUMBER -> pageNumber(pagination, names, violations);
-      case CURSOR -> cursor(pagination, names, violations);
-      case LIMIT_OFFSET -> limitOffset(pagination, names, violations);
-      case NEXT_LINK -> nextLink(pagination, violations);
+      case CURSOR -> cursor(pagination, names, entriesPath, violations);
+      case LIMIT_OFFSET -> limitOffset(pagination, names, entriesPath, violations);
+      case NEXT_LINK -> nextLink(pagination, entriesPath, violations);
       case null, default -> {
         violations.add(
             "pagination.type must be "
@@ -96,10 +99,12 @@ final class PaginationParser {
                 : OptionalInt.of(pagination.endPage())));
   }
 
-  private static Optional<Pagination> nextLink(JsonPagination pagination, List<String> violations) {
+  private static Optional<Pagination> nextLink(
+      JsonPagination pagination, Optional<JsonPath> entriesPath, List<String> violations) {
     int before = violations.size();
     Optional<JsonPath> path =
         JsonPath.required(pagination.nextLinkPath(), NEXT_LINK_PATH, violations);
+    checkNotHoldingTheEntries(path, NEXT_LINK_PATH, entriesPath, violations);
     if (pagination.maxLinks() != null && pagination.maxLinks() < 1) {
       violations.add(MAX_LINKS + " must be at least 1");
     }
@@ -114,10 +119,14 @@ final class PaginationParser {
   }
 
   private static Optional<Pagination> cursor(
-      JsonPagination pagination, PaginationNames names, List<String> violations) {
+      JsonPagination pagination,
+      PaginationNames names,
+      Optional<JsonPath> entriesPath,
+      List<String> violations) {
     int before = violations.size();
     Optional<JsonPath> cursorPath =
         JsonPath.required(pagination.cursorPath(), CURSOR_PATH, violations);
+    checkNotHoldingTheEntries(cursorPath, CURSOR_PATH, entriesPath, violations);
     boolean hasCursorParameter =
         ApiCallParser.notBlank(pagination.cursorParameter(), CURSOR_PARAMETER, violations);
     Optional<ParameterLocation> cursorIn = location(pagination.cursorIn(), violations);
@@ -138,7 +147,10 @@ final class PaginationParser {
   }
 
   private static Optional<Pagination> limitOffset(
-      JsonPagination pagination, PaginationNames names, List<String> violations) {
+      JsonPagination pagination,
+      PaginationNames names,
+      Optional<JsonPath> entriesPath,
+      List<String> violations) {
     int before = violations.size();
     Optional<Limit> limit = limit(pagination, names, violations);
     addRequiredQueryName(pagination.offsetParameter(), OFFSET_PARAMETER, names, violations);
@@ -147,16 +159,26 @@ final class PaginationParser {
     if (offset < 0) {
       violations.add("pagination.offset must be at least 0");
     }
-    String countPathText = blankToNull(pagination.countPath());
     Optional<JsonPath> countPath =
-        countPathText == null
-            ? Optional.empty()
-            : JsonPath.required(countPathText, COUNT_PATH, violations);
+        JsonPath.optional(pagination.countPath(), COUNT_PATH, violations)
+            .filter(path -> entriesPath.filter(path::leadsToTheSameValueAs).isEmpty());
+    checkNotHoldingTheEntries(countPath, COUNT_PATH, entriesPath, violations);
     if (violations.size() > before) {
       return Optional.empty();
     }
     return Optional.of(
         new LimitOffsetPagination(pagination.offsetParameter(), offset, limit, countPath));
+  }
+
+  private static void checkNotHoldingTheEntries(
+      Optional<JsonPath> path,
+      String keyPath,
+      Optional<JsonPath> entriesPath,
+      List<String> violations) {
+    if (path.isPresent() && entriesPath.filter(path.get()::holds).isPresent()) {
+      violations.add(
+          keyPath + " must not lead to the value at entriesPath or to a value around it");
+    }
   }
 
   private static Optional<ParameterLocation> location(String text, List<String> violations) {

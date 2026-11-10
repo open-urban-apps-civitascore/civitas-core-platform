@@ -254,7 +254,9 @@ null, or of the type `PAGE_NUMBER`, `CURSOR` or `LIMIT_OFFSET`:
   A `limitParameter` and a `limit` of at least 1 are optional, but one needs the other. A
   `countPath` is optional; a blank one is absent.
 
-A JSON path such as `cursorPath` or `countPath` starts with `$` and holds only member names
+An `entriesPath` is optional; a blank one is absent.
+
+A JSON path such as `entriesPath`, `cursorPath` or `countPath` starts with `$` and holds only member names
 (`$.next_cursor`), quoted member names (`$['next cursor']`) and array indexes (`$.data[0].id`). This
 is the grammar of the portal backend; the processor evaluates no filter, wildcard or recursive
 descent. The names that a pagination sends differ from each other and from the names of the API call
@@ -369,6 +371,7 @@ API call "Get stations": OAuth2 token request to auth.example.org/realms/city/to
 API call "Get stations": OAuth2 token request to auth.example.org/realms/city/token failed: ConnectException
 API call "Get stations": OAuth2 token request to auth.example.org/realms/city/token failed: status 200 without an access token in a JSON object
 API call "Get stations": 2 of 50 records violate the Data structure: record 3: /lat type; record 7: required stationid
+API call "Get stations": 2 of 50 records at $.data violate the Data structure: record 3: /lat type; record 7: required stationid
 API call "Get stations": the response is a JSON string, not an object or an array
 API call "Get stations": the response is not JSON
 API call "Get stations": GET /stations page 3 failed with status 403 (API Token)
@@ -435,6 +438,42 @@ processor stays valid and scheduled but sends no request, NiFi raises an error b
 `Failed to properly initialize Processor` with the `InvalidRecordSchemaException` as its cause and
 tries again after the `Administrative Yield Duration`. The runtime monitor publishes this bulletin
 as an `ERROR` event of the Pipeline.
+
+### Path to entries
+
+With an `entriesPath`, for example `$.data`, the records of each response lie at that path. The
+value at the path gives the records:
+
+- A JSON array: each element is one record.
+- A JSON object: one record.
+- `[]` or `null`: no records. Without pagination, the run gives one FlowFile `[]`. With page-number
+  pagination, or limit/offset pagination without a `countPath`, the run ends there, as for a
+  response `[]`. With cursor or next link pagination, the page gives no FlowFile and the run
+  follows the value at the top of the response. With limit/offset pagination with a `countPath`,
+  the count at that path decides, as on any page: a count of 0 gives no FlowFile, and a higher
+  count gives a FlowFile `[]`.
+- No value, or a JSON number, string or boolean: `stop`. The cause names the path and the type it
+  found, never a value of the response.
+- A response that holds the path twice, through a repeated member name: `stop`.
+- A response that is only `null`: no records, as without an `entriesPath`.
+
+The FlowFile on `success` holds the value at the path with the bytes of the response: an array
+stays an array, an object stays an object, and `null` gives `[]`. The rest of the response is not
+in the FlowFile, and `Record Schema` validates only the records. Without an
+`entriesPath`, each pagination reads the response as its section below says.
+
+`cursorPath`, `nextLinkPath` and `countPath` start at the top of the response, not at the path to
+entries. Without a `countPath`, page-number and limit/offset pagination count the records at the
+path. A `countPath` that leads to the same value as `entriesPath`, also when one of them quotes a
+member name, counts those records. Any other pagination path that leads to the value at
+`entriesPath`, or to a value around it, makes the processor invalid, because its value would be the
+records. A pagination path inside a record reads its value from that record.
+
+The processor reads the response one token at a time and keeps at most one record in memory, as for
+a response that is a JSON array. It reads the values at the pagination paths in the same read, and
+skips every other part of the response. It cuts the FlowFile from the byte offsets of the value, so
+a response with an `entriesPath` must be UTF-8, as RFC 8259 section 8.1 requires; any other encoding
+goes to `stop`.
 
 ### Pagination
 
@@ -646,9 +685,10 @@ pages of the run and sends one FlowFile to `failure`, as for a transient error. 
 process group waits for one page at most, not for the whole run.
 
 The request code knows no NiFi session. The page loop asks a `Pagination` for the first page, and
-for the shape that each response must have: a JSON array of records, a JSON object that is one
-record, or, without pagination, either. A `ResponseShape` of one object also names the JSON paths
-whose values the pagination reads. From the record count and those values of a page, the
+the API call for the shape that each response must have: a JSON array of records, a JSON object that
+is one record, the records at the path to entries, or, without pagination, an array or an object. A
+`ResponseShape` of one object or of a path to entries also names the JSON paths whose values the
+pagination reads. From the record count and those values of a page, the
 `Pagination` gives the next page, the end of the run, or a cause for `stop`. A page carries the query
 parameters and the headers that its request adds, or the URL of its own request. A new pagination
 method adds an implementation of `Pagination`, and the page loop and the request code stay as they are.

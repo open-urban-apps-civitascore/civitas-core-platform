@@ -18,6 +18,9 @@
     <!-- The processor declares its annotations, properties, validators and session handling in one
          class, as NiFi expects of a processor. -->
     <exclude name="ExcessiveImports"/>
+    <exclude name="LawOfDemeter"/>               <!-- Jackson gives the parse position only through getter chains -->
+    <exclude name="TooManyMethods"/>             <!-- JsonPath parses its grammar and matches it against trees and parser positions -->
+    <exclude name="CouplingBetweenObjects"/>     <!-- RecordSchema and PageLoop join the Jackson, JSON Schema and NiFi types of a page -->
   </rule>
 
   <!-- Error Prone -->

@@ -127,7 +127,8 @@ public class GetHttpApiCall extends AbstractProcessor {
           .name("API Call")
           .displayName("API Call")
           .description(
-              "The API call as JSON: name, method, path, queryParameters, headers and pagination.")
+              "The API call as JSON: name, method, path, queryParameters, headers, entriesPath and"
+                  + " pagination.")
           .required(true)
           .addValidator(StandardValidators.NON_BLANK_VALIDATOR)
           .build();

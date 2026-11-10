@@ -28,4 +28,8 @@ tests {
       cursorIn: "HEADER", limitParameter: "limit", limit: 20
     });
   });
+  test("The path to entries reads back as sent, and as null when unset", function() {
+    expect(res.body.connector.apiCalls[0].entriesPath).to.equal("$.data");
+    expect(res.body.connector.apiCalls[1].entriesPath).to.equal(null);
+  });
 }

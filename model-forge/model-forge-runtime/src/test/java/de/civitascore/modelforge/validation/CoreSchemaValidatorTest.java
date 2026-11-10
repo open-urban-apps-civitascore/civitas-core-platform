@@ -245,6 +245,16 @@ class CoreSchemaValidatorTest {
         assertThat(validator.validate(ArtifactKind.DATA_SOURCE, document)).isEmpty();
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"\"$.data\"", "null"})
+    @DisplayName("An HTTP/REST DataSource with a path to entries the host stores is accepted")
+    void httpDataSourceWithAnEntriesPathIsAccepted(String entriesPath) {
+        ObjectNode document = (ObjectNode) Fixtures.json(mapper, "api/datasource-http.json");
+        ((ObjectNode) document.path("apiCalls").path(0)).set("entriesPath", mapper.readTree(entriesPath));
+
+        assertThat(validator.validate(ArtifactKind.DATA_SOURCE, document)).isEmpty();
+    }
+
     // ── DataSet ─────────────────────────────────────────────────────────────────
 
     @Test

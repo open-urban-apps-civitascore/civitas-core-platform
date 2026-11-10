@@ -24,7 +24,10 @@ sealed interface Pagination
   /** The page that each run starts with. */
   Page first();
 
-  /** What each 2xx body of the run must be, and the JSON paths that {@link #next} reads. */
+  /**
+   * What each 2xx body of the run must be without a path to entries, and the JSON paths that {@link
+   * #next} reads. {@link ApiCall#shape} gives the shape of a run.
+   */
   ResponseShape shape();
 
   /**

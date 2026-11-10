@@ -93,6 +93,7 @@ class ConnectorValidatorTest {
                     "stations",
                     parameters,
                     parameters,
+                    null,
                     new PageNumber("page", null, 0, -1, -1))));
 
     assertThat(validator.validate(connector, ConnectorValidator.Stage.DRAFT))
@@ -121,6 +122,7 @@ class ConnectorValidatorTest {
                     null,
                     parameters,
                     parameters,
+                    null,
                     new PageNumber(null, null, null, null, null))));
 
     assertThat(validator.validate(connector, ConnectorValidator.Stage.RELEASE))
@@ -262,7 +264,7 @@ class ConnectorValidatorTest {
   }
 
   private static ApiCall paged(Pagination pagination) {
-    return new ApiCall("a", null, "/x", null, null, pagination);
+    return new ApiCall("a", null, "/x", null, null, null, pagination);
   }
 
   @ParameterizedTest(name = "{0} accepted: {1}")
@@ -275,7 +277,8 @@ class ConnectorValidatorTest {
             null,
             List.of(
                 paged(new Cursor(jsonPath, "c", ParameterLocation.QUERY, "l", 1)),
-                paged(new LimitOffset(null, null, null, null, jsonPath))));
+                paged(new LimitOffset(null, null, null, null, jsonPath)),
+                new ApiCall("e", null, "/x", null, null, jsonPath, null)));
 
     assertThat(validator.validate(connector, ConnectorValidator.Stage.DRAFT))
         .extracting(ConnectorViolation::path)
@@ -284,7 +287,21 @@ class ConnectorValidatorTest {
                 ? List.of()
                 : List.of(
                     "connector.apiCalls[0].pagination.cursorPath",
-                    "connector.apiCalls[1].pagination.countPath"));
+                    "connector.apiCalls[1].pagination.countPath",
+                    "connector.apiCalls[2].entriesPath"));
+  }
+
+  @Test
+  void validate_invalidEntriesPathAtRelease_namesTheField() {
+    HttpConnectorConfiguration connector =
+        new HttpConnectorConfiguration(
+            "https://api.example.org",
+            null,
+            List.of(new ApiCall("a", null, "/x", null, null, "$..data", null)));
+
+    assertThat(validator.validate(connector, ConnectorValidator.Stage.RELEASE))
+        .extracting(ConnectorViolation::path)
+        .containsExactly("connector.apiCalls[0].entriesPath");
   }
 
   private static Stream<Arguments> jsonPaths() {
@@ -389,6 +406,7 @@ class ConnectorValidatorTest {
                 path,
                 List.of(),
                 List.of(new Parameter(headerName, headerValue)),
+                null,
                 new PageNumber("page", "size", 1, 0, null))));
   }
 

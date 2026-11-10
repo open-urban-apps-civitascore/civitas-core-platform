@@ -25,8 +25,9 @@ import java.util.OptionalLong;
  * cause names a page by its offset, so that a Data Steward can send the same request again; without
  * a limit, the offset thus carries the record counts of the earlier responses.
  *
- * @param countPath where a response that is one record holds its record count; empty when each
- *     response is an array of records
+ * @param countPath where the response holds its record count, from the top of the response; empty
+ *     when the number of records is the count, also for a count path that leads to the same value
+ *     as the path to entries
  */
 record LimitOffsetPagination(
     String offsetParameter, int startOffset, Optional<Limit> limit, Optional<JsonPath> countPath)

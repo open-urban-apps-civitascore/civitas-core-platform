@@ -204,7 +204,7 @@ export const HttpLimitOffsetPaginationSchema = z
     limit: z.union([z.number().int(), z.null()]).optional(),
     /** Offset of the first request; null is 0. */
     offset: z.union([z.number().int(), z.null()]).optional(),
-    /** JSON path in the response to the number of records, or to an array whose length is that number; null counts the elements of the response, which is then an array. */
+    /** JSON path in the response to the number of records, or to an array whose length is that number; null counts the elements of the response, which is then an array, or with entriesPath the entries. */
     countPath: z.union([z.string(), z.null()]).optional(),
   })
   .strict()
@@ -247,6 +247,8 @@ export const HttpApiCallSchema = z
     queryParameters: z.union([z.array(HttpParameterSchema), z.null()]).optional(),
     /** Request headers, in clear text. */
     headers: z.union([z.array(HttpParameterSchema), z.null()]).optional(),
+    /** Restricted JSON path in the response to the entries: an array holds one entry in each element, an object is one entry, [] or null holds none. The paths of the pagination start at the top of the response. Null takes the whole response. */
+    entriesPath: z.union([z.string(), z.null()]).optional(),
     /** Pagination of the API call, chosen by 'type'; null for none. */
     pagination: z
       .union([

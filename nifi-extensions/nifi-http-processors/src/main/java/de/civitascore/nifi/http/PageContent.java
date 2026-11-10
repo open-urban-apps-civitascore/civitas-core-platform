@@ -11,19 +11,31 @@ package de.civitascore.nifi.http;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * What a page whose records agree with the Record Schema gave.
  *
- * @param records the number of records: the elements of an array, 1 for an object
- * @param values the value at each path of {@link ResponseShape.RecordObject}, a {@code MissingNode}
- *     where the response has none; empty for any other shape
+ * @param records the number of records: the elements of an array, 1 for an object, 0 for {@code
+ *     null} at the path to entries
+ * @param values the value at each path of {@link ResponseShape.RecordObject} or {@link
+ *     ResponseShape.EntriesAt}, a {@code MissingNode} where the response has none; empty for any
+ *     other shape
  * @param numberTexts the JSON text of each number in {@code values}, as the response writes it
+ * @param entries where the value at the path to entries lies in the response; empty without a path
+ *     to entries, and for {@code null} at the path
  */
-record PageContent(int records, Map<JsonPath, JsonNode> values, Map<JsonPath, String> numberTexts) {
+record PageContent(
+    int records,
+    Map<JsonPath, JsonNode> values,
+    Map<JsonPath, String> numberTexts,
+    Optional<Span> entries) {
 
   PageContent {
     values = Map.copyOf(values);
     numberTexts = Map.copyOf(numberTexts);
   }
+
+  /** The bytes of a value in the response, from the first byte of the value. */
+  record Span(long offset, long length) {}
 }

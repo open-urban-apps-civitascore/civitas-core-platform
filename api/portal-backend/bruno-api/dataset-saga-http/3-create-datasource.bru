@@ -88,6 +88,15 @@ body:json {
             "type": "NEXT_LINK",
             "nextLinkPath": "$.properties.next"
           }
+        },
+        {
+          "name": "entries",
+          "path": "/entries",
+          "entriesPath": "$.data",
+          "pagination": {
+            "type": "NEXT_LINK",
+            "nextLinkPath": "$.links.next"
+          }
         }
       ]
     },

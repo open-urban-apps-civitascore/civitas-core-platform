@@ -22,6 +22,7 @@ body:json {
         {
           "name": "items",
           "path": "/items",
+          "entriesPath": "$.data",
           "pagination": { "type": "LIMIT_OFFSET", "limitParameter": "limit", "offsetParameter": "offset", "limit": 20, "countPath": "$.meta.count" }
         },
         {
@@ -68,9 +69,14 @@ tests {
       cursorIn: "HEADER", limitParameter: "limit", limit: 20
     });
   });
+  test("The path to entries reads back as sent, and as null when unset", function() {
+    expect(res.body.connector.apiCalls[0].entriesPath).to.equal("$.data");
+    expect(res.body.connector.apiCalls[1].entriesPath).to.equal(null);
+  });
 }
 
 docs {
   Creates an HTTP/REST Data source with limit/offset, cursor and next link
-  pagination and reads them back. The cursor travels in a header.
+  pagination and a path to entries, and reads them back. The cursor travels
+  in a header.
 }
