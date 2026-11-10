@@ -181,6 +181,24 @@ class GetHttpApiCallEntriesPathTest {
     }
   }
 
+  @Test
+  void onTrigger_withPageNumberPaginationAndAnObjectAtThePath_countsOneEntry()
+      throws InitializationException {
+    try (ApiEndpoint endpoint = ApiEndpoint.answeringInTurn(Response.json(wrapped(A1)))) {
+      TestRunner runner =
+          runner(
+              endpoint,
+              "$.data",
+              "{\"type\":\"PAGE_NUMBER\",\"pageParameter\":\"page\","
+                  + "\"pageSizeParameter\":\"size\",\"pageSize\":2}");
+
+      runner.run();
+
+      assertDelivered(runner, A1);
+      assertEquals(1, endpoint.requests().size());
+    }
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"[]", "null"})
   void onTrigger_withPageNumberPaginationAndNoEntries_endsTheRunWithTheEarlierPages(String entries)
@@ -221,13 +239,17 @@ class GetHttpApiCallEntriesPathTest {
     }
   }
 
-  @Test
-  void onTrigger_withLimitOffsetPaginationAndACountPath_advancesByTheCountAtTheTop()
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "{\"meta\":{\"count\":2},\"data\":[" + A1 + "]}",
+        "{\"data\":[" + A1 + "],\"meta\":{\"count\":2}}"
+      })
+  void onTrigger_withLimitOffsetPaginationAndACountPath_advancesByTheCountAtTheTop(String first)
       throws InitializationException {
     try (ApiEndpoint endpoint =
         ApiEndpoint.answeringInTurn(
-            Response.json("{\"meta\":{\"count\":2},\"data\":[" + A1 + "]}"),
-            Response.json("{\"meta\":{\"count\":0},\"data\":[]}"))) {
+            Response.json(first), Response.json("{\"meta\":{\"count\":0},\"data\":[]}"))) {
       TestRunner runner =
           runner(
               endpoint,
@@ -239,6 +261,27 @@ class GetHttpApiCallEntriesPathTest {
 
       assertEquals(List.of("offset=0", "offset=2"), rawQueries(endpoint));
       assertDelivered(runner, "[" + A1 + "]");
+    }
+  }
+
+  @Test
+  void onTrigger_withLimitOffsetPaginationACountPathAndAnObjectOrNullAtThePath_deliversTheObject()
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json("{\"meta\":{\"count\":1},\"data\":" + A1 + "}"),
+            Response.json("{\"meta\":{\"count\":0},\"data\":null}"))) {
+      TestRunner runner =
+          runner(
+              endpoint,
+              "$.data",
+              "{\"type\":\"LIMIT_OFFSET\",\"offsetParameter\":\"offset\","
+                  + "\"countPath\":\"$.meta.count\"}");
+
+      runner.run();
+
+      assertEquals(List.of("offset=0", "offset=1"), rawQueries(endpoint));
+      assertDelivered(runner, A1);
     }
   }
 
@@ -280,6 +323,27 @@ class GetHttpApiCallEntriesPathTest {
 
       assertEquals("cursor=c2", rawQueries(endpoint).get(1));
       assertDelivered(runner, "[" + A1 + "]", A2);
+    }
+  }
+
+  @Test
+  void onTrigger_withCursorPaginationAndNullAtThePath_followsTheCursorWithoutAFlowFile()
+      throws InitializationException {
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.answeringInTurn(
+            Response.json("{\"data\":null,\"next_cursor\":\"c2\"}"),
+            Response.json("{\"data\":[" + A1 + "],\"next_cursor\":null}"))) {
+      TestRunner runner =
+          runner(
+              endpoint,
+              "$.data",
+              "{\"type\":\"CURSOR\",\"cursorPath\":\"$.next_cursor\","
+                  + "\"cursorParameter\":\"cursor\",\"cursorIn\":\"QUERY\"}");
+
+      runner.run();
+
+      assertEquals("cursor=c2", rawQueries(endpoint).get(1));
+      assertDelivered(runner, "[" + A1 + "]");
     }
   }
 
@@ -344,6 +408,28 @@ class GetHttpApiCallEntriesPathTest {
               endpoint,
               "$.value",
               "{\"type\":\"NEXT_LINK\"," + "\"nextLinkPath\":\"$['@odata.nextLink']\"}");
+
+      runner.run();
+
+      assertEquals("skip=1", rawQueries(endpoint).get(1));
+      assertDelivered(runner, "[" + A1 + "]");
+    }
+  }
+
+  @Test
+  void onTrigger_withNextLinkPaginationAndNullAtThePath_followsTheLinkWithoutAFlowFile()
+      throws Exception {
+    AtomicReference<String> apiUrl = new AtomicReference<>();
+    try (ApiEndpoint endpoint =
+        ApiEndpoint.startHttp(
+            index ->
+                Response.json(
+                    index == 0
+                        ? "{\"value\":null,\"next\":\"" + apiUrl.get() + "/stations?skip=1\"}"
+                        : "{\"value\":[" + A1 + "]}"))) {
+      apiUrl.set(endpoint.baseUrl());
+      TestRunner runner =
+          runner(endpoint, "$.value", "{\"type\":\"NEXT_LINK\",\"nextLinkPath\":\"$.next\"}");
 
       runner.run();
 

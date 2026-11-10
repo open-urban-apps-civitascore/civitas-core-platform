@@ -788,18 +788,7 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
         })
     @DisplayName("creates, reads, updates and releases the path to entries")
     void entriesPathIsStoredAndReleased(String entriesPath, String stored) throws Exception {
-      JSONObject apiCall =
-          new JSONObject()
-              .put("name", "items")
-              .put("path", "/items")
-              .put("entriesPath", entriesPath)
-              .put(
-                  "pagination",
-                  new JSONObject(
-                      "{\"type\":\"CURSOR\",\"cursorPath\":"
-                          + "\"$.next\",\"cursorParameter\":\"c\",\"cursorIn\":\"QUERY\"}"));
-      String connector =
-          new JSONObject(connector("p")).put("apiCalls", new JSONArray().put(apiCall)).toString();
+      String connector = connectorWithEntriesPath(entriesPath);
       UUID dsvId = createAvailableDataStructureVersionId();
       String path = DATASOURCES_ENDPOINT + "/";
       List<String> responses = new ArrayList<>();
@@ -823,6 +812,56 @@ class DataSourceContractIntegrationTest extends BaseKeycloakIntegrationTest {
           .isEqualTo(stored);
       exchange(HttpMethod.POST, path + id + "/unrelease", null);
       exchange(HttpMethod.DELETE, path + id, null);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(
+        delimiter = '|',
+        value = {
+          "$.items | $.items",
+          "' ' | ",
+          " | ",
+        })
+    @DisplayName("updates the path to entries to another path, and clears it")
+    void updateChangesOrClearsTheEntriesPath(String updated, String stored) throws Exception {
+      UUID dsvId = createAvailableDataStructureVersionId();
+      String path = DATASOURCES_ENDPOINT + "/";
+      String id =
+          JsonPath.read(
+              exchange(
+                  HttpMethod.POST,
+                  DATASOURCES_ENDPOINT,
+                  body("contract_http_entries_update", connectorWithEntriesPath("$.data"), dsvId)),
+              "$.id");
+
+      String response =
+          exchange(
+              HttpMethod.PUT,
+              path + id,
+              body("contract_http_entries_update", connectorWithEntriesPath(updated), dsvId));
+
+      assertThat((String) JsonPath.read(response, "$.connector.apiCalls[0].entriesPath"))
+          .isEqualTo(stored);
+      assertThat((String) JsonPath.read(readStoredConfiguration(id), "$.apiCalls[0].entriesPath"))
+          .isEqualTo(stored);
+      exchange(HttpMethod.DELETE, path + id, null);
+    }
+
+    /** {@code null} leaves the key out of the API call. */
+    private static String connectorWithEntriesPath(String entriesPath) throws JSONException {
+      JSONObject apiCall =
+          new JSONObject()
+              .put("name", "items")
+              .put("path", "/items")
+              .put("entriesPath", entriesPath)
+              .put(
+                  "pagination",
+                  new JSONObject(
+                      "{\"type\":\"CURSOR\",\"cursorPath\":"
+                          + "\"$.next\",\"cursorParameter\":\"c\",\"cursorIn\":\"QUERY\"}"));
+      return new JSONObject(connector("p"))
+          .put("apiCalls", new JSONArray().put(apiCall))
+          .toString();
     }
 
     @ParameterizedTest(name = "{1}")
