@@ -115,6 +115,8 @@ Confirm the deployed image tag and environment values in that repository before 
 
 The connection test is a second workload of the same image ([DEPLOYMENT.md §2.5](DEPLOYMENT.md#25-connection-test)). Its topic names must match portal-backend's `connection-test.*-topic`, and its pods must not carry config-adapter's labels.
 
+The dashboard export runs inside config-adapter when the Superset saga handler is deployed ([DEPLOYMENT.md §2.6](DEPLOYMENT.md#26-dashboard-export)). Its topic names must match portal-backend's `dashboard-export.*-topic`.
+
 ## Extending
 
 Depend on `config-adapter-api` and extend `AbstractConfigAdapter`, which owns topic parsing and validation, result publishing and failure wrapping. Subclasses supply the adapter name, the result type and the per-event logic:

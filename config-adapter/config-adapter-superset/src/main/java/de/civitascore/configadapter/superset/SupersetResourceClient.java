@@ -1413,6 +1413,32 @@ final class SupersetResourceClient {
     }
   }
 
+  /**
+   * The export ZIP of one dashboard, as Superset's export endpoint returns it: YAML files under one
+   * root folder. The export reads only; it changes nothing in Superset.
+   *
+   * @return the ZIP, or null if Superset does not know the dashboard
+   */
+  byte[] exportDashboardZip(int dashboardId) {
+    Map<String, String> query = Map.of("q", "!(" + dashboardId + ")");
+    Response response = null;
+    try {
+      response = getBinary("/api/v1/dashboard/export/", query);
+      if (response.getStatus() == 401) {
+        response = closeAndReauth(response, () -> getBinary("/api/v1/dashboard/export/", query));
+      }
+      if (response.getStatus() == 404) {
+        return null;
+      }
+      checkStatus(response, "export dashboard");
+      byte[] zip = response.readEntity(byte[].class);
+      LOG.info("Exported Superset dashboard id={} ({} bytes)", dashboardId, zip.length);
+      return zip;
+    } finally {
+      closeQuietly(response);
+    }
+  }
+
   private static byte[] multipartBody(String boundary, byte[] zip) {
     String head =
         "--"
@@ -1534,6 +1560,18 @@ final class SupersetResourceClient {
     }
     return target
         .request(MediaType.APPLICATION_JSON)
+        .header(AUTH_HEADER, "Bearer " + session.getAccessToken())
+        .get();
+  }
+
+  /** A GET whose answer is a file, such as the ZIP of a dashboard export. */
+  private Response getBinary(String path, Map<String, String> queryParams) {
+    var target = client.target(baseUrl).path(path);
+    for (var entry : queryParams.entrySet()) {
+      target = target.queryParam(entry.getKey(), entry.getValue());
+    }
+    return target
+        .request(MediaType.WILDCARD)
         .header(AUTH_HEADER, "Bearer " + session.getAccessToken())
         .get();
   }

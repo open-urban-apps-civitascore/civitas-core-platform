@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.application;
 
+import de.civitascore.configadapter.adapter.DashboardExporter;
 import de.civitascore.configadapter.adapter.SagaCommandHandler;
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.configuration.AppConfig;
@@ -17,6 +18,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.ServiceLoader;
 import org.owasp.encoder.Encode;
 import org.slf4j.Logger;
@@ -71,7 +73,21 @@ class SagaComponentFactory {
           e);
     }
     logger.info("FlowableSagaOrchestrator initialized successfully");
-    return SagaComponents.flowable(flowable);
+    return SagaComponents.flowable(flowable, dashboardExporter(handlers));
+  }
+
+  /** The handler that exports dashboards for sharing, if a dashboard tool is deployed. */
+  private static Optional<DashboardExporter> dashboardExporter(
+      Map<String, SagaCommandHandler> handlers) {
+    Optional<DashboardExporter> exporter =
+        handlers.values().stream()
+            .filter(DashboardExporter.class::isInstance)
+            .map(DashboardExporter.class::cast)
+            .findFirst();
+    if (exporter.isEmpty()) {
+      logger.info("No saga handler exports dashboards; dashboard export requests stay unanswered");
+    }
+    return exporter;
   }
 
   private Map<String, SagaCommandHandler> discoverSagaHandlers(AdapterConfig config) {

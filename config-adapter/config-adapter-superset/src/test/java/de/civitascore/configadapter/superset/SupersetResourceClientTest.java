@@ -9,7 +9,9 @@
  */
 package de.civitascore.configadapter.superset;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -162,6 +164,60 @@ class SupersetResourceClientTest {
 
       assertEquals(Map.of("table_1", 2), resources.findPostgisDatasetsByCivitasId("target"));
       assertEquals(2, requests.get());
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
+  void exportDashboardZip_asksForTheOneDashboardAndReturnsTheZip() throws Exception {
+    byte[] zip = {0x50, 0x4b, 0x03, 0x04, 1, 2, 3};
+    AtomicReference<String> askedFor = new AtomicReference<>();
+    HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    server.createContext(
+        "/api/v1/dashboard/export/",
+        exchange -> {
+          askedFor.set(
+              URLDecoder.decode(exchange.getRequestURI().getRawQuery(), StandardCharsets.UTF_8));
+          exchange.getResponseHeaders().set("Content-Type", "application/zip");
+          exchange.sendResponseHeaders(200, zip.length);
+          try (var responseBody = exchange.getResponseBody()) {
+            responseBody.write(zip);
+          }
+        });
+    server.start();
+    try (Client client = ClientBuilder.newClient()) {
+      SupersetSession session = mock(SupersetSession.class);
+      when(session.getAccessToken()).thenReturn("test-token");
+      SupersetResourceClient resources =
+          new SupersetResourceClient(
+              client, session, "http://127.0.0.1:" + server.getAddress().getPort(), 1);
+
+      assertArrayEquals(zip, resources.exportDashboardZip(7));
+      assertEquals("q=!(7)", askedFor.get());
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
+  void exportDashboardZip_returnsNullForADashboardSupersetDoesNotKnow() throws Exception {
+    HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    server.createContext(
+        "/api/v1/dashboard/export/",
+        exchange -> {
+          exchange.sendResponseHeaders(404, -1);
+          exchange.close();
+        });
+    server.start();
+    try (Client client = ClientBuilder.newClient()) {
+      SupersetSession session = mock(SupersetSession.class);
+      when(session.getAccessToken()).thenReturn("test-token");
+      SupersetResourceClient resources =
+          new SupersetResourceClient(
+              client, session, "http://127.0.0.1:" + server.getAddress().getPort(), 1);
+
+      assertNull(resources.exportDashboardZip(7));
     } finally {
       server.stop(0);
     }

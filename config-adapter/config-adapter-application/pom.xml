@@ -42,6 +42,11 @@
             <artifactId>event-handler-kafka</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- The dashboard export consumer reads and writes Kafka directly -->
+        <dependency>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>de.civitas-core</groupId>

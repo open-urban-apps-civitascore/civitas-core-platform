@@ -9,6 +9,7 @@
  */
 package de.civitascore.configadapter.application;
 
+import de.civitascore.configadapter.adapter.DashboardExporter;
 import de.civitascore.configadapter.flowable.common.FlowableSagaOrchestrator;
 import java.util.Optional;
 
@@ -19,10 +20,21 @@ import java.util.Optional;
  * Optional} exists so the construction-only bootstrap tests can inject an empty value to skip the
  * costly engine bootstrap (see {@code ApplicationTest}), and so {@link Application#run} degrades
  * gracefully if no orchestrator is wired.
+ *
+ * <p>{@code dashboardExporter} is the saga handler that exports dashboards for sharing; it is empty
+ * when no dashboard tool is deployed, and then no dashboard export consumer runs.
  */
-record SagaComponents(Optional<FlowableSagaOrchestrator> flowableOrchestrator) {
+record SagaComponents(
+    Optional<FlowableSagaOrchestrator> flowableOrchestrator,
+    Optional<DashboardExporter> dashboardExporter) {
 
-  static SagaComponents flowable(FlowableSagaOrchestrator flowable) {
-    return new SagaComponents(Optional.of(flowable));
+  /** Components without a dashboard exporter. */
+  SagaComponents(Optional<FlowableSagaOrchestrator> flowableOrchestrator) {
+    this(flowableOrchestrator, Optional.empty());
+  }
+
+  static SagaComponents flowable(
+      FlowableSagaOrchestrator flowable, Optional<DashboardExporter> dashboardExporter) {
+    return new SagaComponents(Optional.of(flowable), dashboardExporter);
   }
 }

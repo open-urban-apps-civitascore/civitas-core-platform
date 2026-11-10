@@ -10,11 +10,14 @@
 package de.civitascore.configadapter.superset;
 
 import de.civitascore.configadapter.adapter.AbstractSagaCommandHandler;
+import de.civitascore.configadapter.adapter.DashboardExporter;
 import de.civitascore.configadapter.adapter.SagaCommandMessage;
 import de.civitascore.configadapter.adapter.SagaCommandResult;
 import de.civitascore.configadapter.configuration.AdapterConfig;
 import de.civitascore.configadapter.exception.FatalAdapterException;
 import de.civitascore.configadapter.exception.RetryableAdapterException;
+import de.civitascore.configadapter.model.dashboardexport.DashboardExportException;
+import de.civitascore.configadapter.model.dashboardexport.DashboardExportResult.Reason;
 import de.civitascore.configadapter.model.dataset.DatasetSchemaNames;
 import jakarta.ws.rs.client.Client;
 import jakarta.ws.rs.client.ClientBuilder;
@@ -25,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import org.owasp.encoder.Encode;
 
 /**
@@ -67,13 +71,20 @@ import org.owasp.encoder.Encode;
  * physical UUID schema used by GeoServer and exposes the table through a readable per-dataset view
  * schema for Trino. FROST uses the same readable naming rule for its project-scoped views. OPA
  * resolves either schema name back to the CORE dataset before checking permission.
+ *
+ * <p>Outside the sagas, the handler exports a dashboard for sharing ({@link #exportDashboard}),
+ * with the same admin session. The application calls it for each dashboard export request; see
+ * {@link SupersetDashboardExport} for what the export keeps.
  */
-public class SupersetSagaHandler extends AbstractSagaCommandHandler {
+public class SupersetSagaHandler extends AbstractSagaCommandHandler implements DashboardExporter {
 
   private static final String ADAPTER_NAME = "superset";
   private static final String COMPENSATE_TYPE = "COMPENSATE_STEP";
   private static final String DATASINK_TYPE_POSTGIS = "POSTGIS";
   private static final String DATASINK_TYPE_FROST = "FROST";
+
+  /** A Superset dashboard id as the portal stores it; nine digits keep it an {@code int}. */
+  private static final Pattern SUPERSET_DASHBOARD_ID = Pattern.compile("\\d{1,9}");
 
   /**
    * FROST lives in its own Postgres database (see {@code
@@ -177,9 +188,11 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
    * {@link SupersetSession} declares checked adapter exceptions (a leftover from its original
    * Kafka-adapter caller); {@code doHandle} can't add checked exceptions to an override whose
    * superclass signature has none, so a failure here is wrapped as an unchecked {@link
-   * SagaApiException} — caught by {@link #handle} like any other Superset API failure.
+   * SagaApiException} — caught by {@link #handle} like any other Superset API failure. Synchronized
+   * because the saga steps and {@link #exportDashboard} run on different threads and must create
+   * the session once.
    */
-  private void ensureAuthenticated() {
+  private synchronized void ensureAuthenticated() {
     if (session == null) {
       session = new SupersetSession(supersetClient, baseUrl, adminUsername, adminPassword);
       resourceClient =
@@ -203,6 +216,29 @@ public class SupersetSagaHandler extends AbstractSagaCommandHandler {
       supersetClient.close();
       supersetClient = null;
     }
+  }
+
+  // ── EXPORT (sharing) ─────────────────────────────────────────────────────
+
+  /**
+   * Exports one dashboard for sharing and cleans it ({@link SupersetDashboardExport}). The portal
+   * has checked that the caller may change the dataset the dashboard belongs to, and gives the id
+   * that it stores for the dashboard.
+   */
+  @Override
+  public Map<String, Object> exportDashboard(String externalDashboardId) {
+    if (externalDashboardId == null
+        || !SUPERSET_DASHBOARD_ID.matcher(externalDashboardId).matches()) {
+      throw new DashboardExportException(
+          Reason.NOT_FOUND, "The dashboard has no Superset id that the export can use.");
+    }
+    int dashboardId = Integer.parseInt(externalDashboardId);
+    ensureAuthenticated();
+    byte[] zip = resourceClient.exportDashboardZip(dashboardId);
+    if (zip == null) {
+      throw new DashboardExportException(Reason.NOT_FOUND, "Superset does not know the dashboard.");
+    }
+    return SupersetDashboardExport.fromZip(zip);
   }
 
   // ── REGISTER_DATASET ─────────────────────────────────────────────────────

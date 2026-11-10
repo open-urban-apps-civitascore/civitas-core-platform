@@ -306,6 +306,25 @@ java $JAVA_OPTS -cp /civitas/config-adapter.jar de.civitascore.configadapter.app
 - It must not reach platform services, the Kubernetes API, node addresses or other namespaces. Ingress rules alone do not ensure this: node addresses and namespaces without a default-deny policy answer every client. The workload therefore needs an egress rule.
 - If the cluster cannot enforce egress rules, set `connectiontest.denied-networks` to the pod, service and node networks. This also refuses tenant sources in the cluster.
 
+### 2.6 Dashboard Export
+
+The dashboard export answers the portal's `GET /v1/datasets/{id}/visualizations/{id}/export`, which the marketplace calls to share a dashboard. It exports the dashboard from Superset and removes what names this instance: the address and user of the database connection, the schema, catalog and SQL of each dataset, and every `extra` field but `frostView`. A dataset with its own SQL that is not a FROST view of the platform, an export format other than `1.0.0`, more than one database and an export above 512 KB are refused. `SupersetDashboardExport` holds the rules.
+
+It runs **inside config-adapter**, because it uses the Superset admin session of the Superset saga handler. It starts only when that handler is deployed; then no extra setting is required.
+
+| Property | Env var | Default | Description |
+|---|---|---|---|
+| `dashboardexport.kafka.request-topic` | `DASHBOARDEXPORT_KAFKA_REQUEST_TOPIC` | `de.civitascore.dashboardexport.request` | Must match portal-backend's `dashboard-export.request-topic`. |
+| `dashboardexport.kafka.result-topic` | `DASHBOARDEXPORT_KAFKA_RESULT_TOPIC` | `de.civitascore.dashboardexport.result` | Must match portal-backend's `dashboard-export.result-topic`. |
+| `dashboardexport.kafka.group.id` | `DASHBOARDEXPORT_KAFKA_GROUP_ID` | `config-adapter-dashboard-export` | Consumer group on the request topic. |
+
+**Kafka**
+
+- The consumer starts at the latest offset and commits automatically. A request whose `expiresAt` has passed is dropped.
+- Exports run one at a time per replica. All replicas share one consumer group.
+- On SIGTERM the consumer leaves its group at once, from a shutdown hook.
+- config-adapter creates no topics. Create both topics with `retention.ms=60000` and `segment.ms=60000`: a result carries the user's dashboard, up to 512 KB, and is needed for seconds only.
+
 ## 3. Security Hardening
 
 Four settings ship with development-friendly defaults that are wrong for production.

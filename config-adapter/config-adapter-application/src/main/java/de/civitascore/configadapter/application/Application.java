@@ -46,6 +46,9 @@ public class Application {
   private final List<EventConsumer> consumers;
   private final SagaComponents sagaComponents;
 
+  /** Answers dashboard export requests; null when no saga handler exports dashboards. */
+  private final DashboardExportConsumer dashboardExportConsumer;
+
   /**
    * Creates a new Application instance with the specified configuration file.
    *
@@ -77,6 +80,11 @@ public class Application {
     appConfig = new AppConfig(requireNonNull(configFileName));
     consumers = new ConsumerFactory().createAll(appConfig);
     sagaComponents = sagaComponentFactory.create(appConfig);
+    dashboardExportConsumer =
+        sagaComponents
+            .dashboardExporter()
+            .map(exporter -> DashboardExportConsumer.create(appConfig, exporter))
+            .orElse(null);
   }
 
   /**
@@ -108,6 +116,15 @@ public class Application {
 
       sagaComponents.flowableOrchestrator().ifPresent(FlowableSagaOrchestrator::start);
 
+      if (dashboardExportConsumer != null) {
+        // A SIGTERM runs only shutdown hooks, not the finally below. Closing in a hook leaves the
+        // consumer group at once, so another pod takes the partitions without waiting.
+        Runtime.getRuntime()
+            .addShutdownHook(
+                new Thread(dashboardExportConsumer::close, "dashboard-export-shutdown"));
+        dashboardExportConsumer.start();
+      }
+
       healthCheckServer.markReady();
 
       logger.info(
@@ -124,6 +141,15 @@ public class Application {
       System.exit(1);
     } finally {
       logger.info("Shutting down {} consumer(s)", consumers.size());
+
+      // Closed before the orchestrator, which closes the saga handler that the export uses.
+      if (dashboardExportConsumer != null) {
+        try {
+          dashboardExportConsumer.close();
+        } catch (Exception e) {
+          logger.error("Error closing dashboard export consumer", e);
+        }
+      }
 
       sagaComponents
           .flowableOrchestrator()
