@@ -60,6 +60,10 @@ final class SupersetResourceClient {
   // Package-visible: SupersetSagaHandler builds the extraFields map these key names go into.
   static final String CIVITAS_DATASET_ID_KEY = "civitasDatasetId";
   static final String FROST_VIEW_KEY = "frostView";
+  // Flask-AppBuilder's default FAB_API_MAX_PAGE_SIZE: a list call never gets more per page.
+  private static final int LIST_PAGE_SIZE = 100;
+  // Ends a list that never ends: 100 pages are 10,000 entries.
+  private static final int MAX_LIST_PAGES = 100;
 
   private final Client client;
   private final SupersetSession session;
@@ -284,51 +288,37 @@ final class SupersetResourceClient {
   }
 
   private Map<String, Integer> findPermissionViewMenuIds(Map<String, String> desired) {
-    Response response = null;
-    try {
-      response =
-          getJson(
-              "/api/v1/security/permissions-resources/", Map.of("q", "(page:0,page_size:1000)"));
-      if (response.getStatus() == 401) {
-        response =
-            closeAndReauth(
-                response,
-                () ->
-                    getJson(
-                        "/api/v1/security/permissions-resources/",
-                        Map.of("q", "(page:0,page_size:1000)")));
+    // Superset has more than 100 permissions out of the box, and one created late (database_access
+    // on the CORE database) is on a later page.
+    List<JsonNode> permissions =
+        listAllPages(
+            "/api/v1/security/permissions-resources/", "()", "list Superset permission resources");
+    Map<String, Integer> found = new LinkedHashMap<>();
+    for (JsonNode permission : permissions) {
+      String permissionName = permission.path("permission").path("name").asText();
+      String viewMenuName = permission.path("view_menu").path("name").asText();
+      String key = permissionName + "\u0000" + viewMenuName;
+      if (desired.containsKey(permissionName)
+          && desired.get(permissionName).equals(viewMenuName)
+          && permission.path("id").canConvertToInt()) {
+        found.put(key, permission.path("id").asInt());
       }
-      checkStatus(response, "list Superset permission resources");
-      JsonNode result = readTree(response).path("result");
-      Map<String, Integer> found = new LinkedHashMap<>();
-      for (JsonNode permission : result) {
-        String permissionName = permission.path("permission").path("name").asText();
-        String viewMenuName = permission.path("view_menu").path("name").asText();
-        String key = permissionName + "\u0000" + viewMenuName;
-        if (desired.containsKey(permissionName)
-            && desired.get(permissionName).equals(viewMenuName)
-            && permission.path("id").canConvertToInt()) {
-          found.put(key, permission.path("id").asInt());
-        }
-      }
-      for (Map.Entry<String, String> entry : desired.entrySet()) {
-        if (!found.containsKey(entry.getKey() + "\u0000" + entry.getValue())) {
-          throw new SagaApiException(
-              "Required Superset permission is unavailable: "
-                  + entry.getKey()
-                  + " on "
-                  + Encode.forJava(entry.getValue()),
-              503);
-        }
-      }
-      Map<String, Integer> ordered = new LinkedHashMap<>();
-      desired.forEach(
-          (permission, viewMenu) ->
-              ordered.put(permission, found.get(permission + "\u0000" + viewMenu)));
-      return ordered;
-    } finally {
-      closeQuietly(response);
     }
+    for (Map.Entry<String, String> entry : desired.entrySet()) {
+      if (!found.containsKey(entry.getKey() + "\u0000" + entry.getValue())) {
+        throw new SagaApiException(
+            "Required Superset permission is unavailable: "
+                + entry.getKey()
+                + " on "
+                + Encode.forJava(entry.getValue()),
+            503);
+      }
+    }
+    Map<String, Integer> ordered = new LinkedHashMap<>();
+    desired.forEach(
+        (permission, viewMenu) ->
+            ordered.put(permission, found.get(permission + "\u0000" + viewMenu)));
+    return ordered;
   }
 
   private Set<Integer> getRolePermissionIds(int roleId) {
@@ -1480,28 +1470,46 @@ final class SupersetResourceClient {
   }
 
   private List<JsonNode> listDatasets(String filterQuery) {
-    List<JsonNode> datasets = new ArrayList<>();
-    for (int page = 0; ; page++) {
-      String pagedQuery =
-          filterQuery.substring(0, filterQuery.length() - 1) + ",page:" + page + ",page_size:1000)";
-      Map<String, String> query = Map.of("q", pagedQuery);
+    return listAllPages("/api/v1/dataset/", filterQuery, "list datasets");
+  }
+
+  /**
+   * Reads every page of a Superset list endpoint. Flask-AppBuilder cuts each list response to
+   * {@code FAB_API_MAX_PAGE_SIZE} (100 by default) and reports no error, so one call with a larger
+   * page size silently misses the rest. The client asks for exactly that page size, so each page
+   * starts where the one before ended.
+   *
+   * @param path the list endpoint
+   * @param risonQuery the rison query without paging, for example {@code (filters:!(...))} or
+   *     {@code ()}
+   * @param action what the call does, for the error message
+   */
+  List<JsonNode> listAllPages(String path, String risonQuery, String action) {
+    String filter = risonQuery.substring(1, risonQuery.length() - 1);
+    String prefix = filter.isEmpty() ? "(" : "(" + filter + ",";
+    List<JsonNode> items = new ArrayList<>();
+    for (int page = 0; page < MAX_LIST_PAGES; page++) {
+      Map<String, String> query =
+          Map.of("q", prefix + "page:" + page + ",page_size:" + LIST_PAGE_SIZE + ")");
       Response response = null;
       try {
-        response = getJson("/api/v1/dataset/", query);
+        response = getJson(path, query);
         if (response.getStatus() == 401) {
-          response = closeAndReauth(response, () -> getJson("/api/v1/dataset/", query));
+          response = closeAndReauth(response, () -> getJson(path, query));
         }
-        checkStatus(response, "list datasets");
+        checkStatus(response, action);
         JsonNode body = readTree(response);
         JsonNode result = body.path("result");
-        result.forEach(datasets::add);
-        if (result.isEmpty() || datasets.size() >= body.path("count").asInt(Integer.MAX_VALUE)) {
-          return datasets;
+        result.forEach(items::add);
+        if (result.isEmpty() || items.size() >= body.path("count").asInt(Integer.MAX_VALUE)) {
+          return items;
         }
       } finally {
         closeQuietly(response);
       }
     }
+    throw new SagaApiException(
+        "Superset list did not end after " + MAX_LIST_PAGES + " pages: " + action, 502);
   }
 
   private String extractExtraField(JsonNode item, String key) {

@@ -15,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import jakarta.ws.rs.client.Client;
@@ -22,10 +23,14 @@ import jakarta.ws.rs.client.ClientBuilder;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
 class SupersetResourceClientTest {
@@ -164,6 +169,62 @@ class SupersetResourceClientTest {
 
       assertEquals(Map.of("table_1", 2), resources.findPostgisDatasetsByCivitasId("target"));
       assertEquals(2, requests.get());
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @Test
+  void listAllPages_readsEveryPageOfAListThatSupersetCutsTo100() throws Exception {
+    ObjectMapper mapper = new ObjectMapper();
+    Pattern paging = Pattern.compile("page:(\\d+),page_size:(\\d+)");
+    List<String> queries = new CopyOnWriteArrayList<>();
+    HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+    server.createContext(
+        "/api/v1/security/permissions-resources/",
+        exchange -> {
+          String query =
+              URLDecoder.decode(exchange.getRequestURI().getRawQuery(), StandardCharsets.UTF_8);
+          queries.add(query);
+          Matcher matcher = paging.matcher(query);
+          int first = 0;
+          int pageSize = 0;
+          if (matcher.find()) {
+            // Like Flask-AppBuilder: the page size never exceeds FAB_API_MAX_PAGE_SIZE (100).
+            pageSize = Math.min(Integer.parseInt(matcher.group(2)), 100);
+            first = Integer.parseInt(matcher.group(1)) * pageSize;
+          }
+          List<Map<String, Object>> result = new ArrayList<>();
+          for (int id = first + 1; id <= Math.min(first + pageSize, 271); id++) {
+            result.add(Map.of("id", id));
+          }
+          byte[] body = mapper.writeValueAsBytes(Map.of("count", 271, "result", result));
+          exchange.getResponseHeaders().set("Content-Type", "application/json");
+          exchange.sendResponseHeaders(200, body.length);
+          try (var responseBody = exchange.getResponseBody()) {
+            responseBody.write(body);
+          }
+        });
+    server.start();
+    try (Client client = ClientBuilder.newClient()) {
+      SupersetSession session = mock(SupersetSession.class);
+      when(session.getAccessToken()).thenReturn("test-token");
+      SupersetResourceClient resources =
+          new SupersetResourceClient(
+              client, session, "http://127.0.0.1:" + server.getAddress().getPort(), 1);
+
+      List<JsonNode> permissions =
+          resources.listAllPages(
+              "/api/v1/security/permissions-resources/",
+              "()",
+              "list Superset permission resources");
+
+      assertEquals(271, permissions.size());
+      assertEquals(237, permissions.get(236).path("id").asInt());
+      assertEquals(
+          List.of(
+              "q=(page:0,page_size:100)", "q=(page:1,page_size:100)", "q=(page:2,page_size:100)"),
+          queries);
     } finally {
       server.stop(0);
     }
