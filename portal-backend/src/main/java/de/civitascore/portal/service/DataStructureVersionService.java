@@ -302,7 +302,7 @@ public class DataStructureVersionService
    * @throws InvalidInputException if the version is DRAFT
    */
   @Transactional
-  public DataStructureVersion updateReleasedMeta(UUID id, DataStructureVersionMetaInputDTO meta) {
+  DataStructureVersion updateReleasedMeta(UUID id, DataStructureVersionMetaInputDTO meta) {
     DataStructureVersion existingEntity = findByIdOrThrow(id);
     if (existingEntity.getDataStructureVersionStatus() == DataStructureVersionStatus.DRAFT) {
       throw new InvalidInputException(
@@ -339,7 +339,7 @@ public class DataStructureVersionService
    *     caller may not use
    */
   @Transactional
-  public DataStructureVersion release(UUID id) {
+  DataStructureVersion release(UUID id) {
     DataStructureVersion version = findByIdOrThrow(id);
 
     // Validate that version is currently in DRAFT status
@@ -376,7 +376,7 @@ public class DataStructureVersionService
    *     may not use
    */
   @Transactional
-  public DataStructureVersion duplicate(UUID sourceVersionId) {
+  DataStructureVersion duplicate(UUID sourceVersionId) {
     DataStructureVersion source = findByIdOrThrow(sourceVersionId);
     UUID dataStructureId = source.getDataStructure().getId();
     ModelRegistryGateway.ModelPin pin = null;
@@ -411,7 +411,7 @@ public class DataStructureVersionService
    * @throws ResourceInUseException if a released entity references the version
    */
   @Transactional
-  public DataStructureVersion unrelease(UUID id) {
+  DataStructureVersion unrelease(UUID id) {
     DataStructureVersion version = findByIdOrThrow(id);
 
     // Validate that version is currently released
