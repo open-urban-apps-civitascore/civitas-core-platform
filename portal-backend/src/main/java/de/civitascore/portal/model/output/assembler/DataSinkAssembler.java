@@ -14,7 +14,6 @@ import de.civitascore.portal.repository.LayerRepository;
 import de.civitascore.portal.service.GoverningVersionLookup;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.owasp.encoder.Encode;
@@ -37,7 +36,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutputDTO, UUID> {
+public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutputDTO> {
 
   private final DataSinkMapper dataSinkMapper;
   private final ModelRegistryGateway modelRegistryGateway;
@@ -70,17 +69,15 @@ public class DataSinkAssembler implements BaseAssembler<DataSink, DataSinkOutput
   }
 
   /**
-   * {@inheritDoc} Converts a DataSink entity back to its input DTO for PATCH operations. The
-   * current configuration is read from the registry (an empty map when none is stored, e.g. FROST
-   * sinks, satisfying the input's not-null constraint).
+   * Converts a DataSink entity back to its input DTO for PATCH operations. The current
+   * configuration is read from the registry (an empty map when none is stored, e.g. FROST sinks,
+   * satisfying the input's not-null constraint).
    */
-  @Override
-  @SuppressWarnings("unchecked")
-  public <I> I toInput(DataSink entity) {
+  public DataSinkInputDTO toInput(DataSink entity) {
     DataSinkInputDTO input = dataSinkMapper.toInput(entity);
     Map<String, Object> configuration = fetchConfiguration(entity);
     input.setConfiguration(configuration != null ? configuration : new HashMap<>());
-    return (I) input;
+    return input;
   }
 
   /**

@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class StyleAssembler implements BaseAssembler<Style, StyleOutputDTO, UUID> {
+public class StyleAssembler implements BaseAssembler<Style, StyleOutputDTO> {
 
   private final StyleMapper styleMapper;
   private final LayerRepository layerRepository;
@@ -25,11 +25,5 @@ public class StyleAssembler implements BaseAssembler<Style, StyleOutputDTO, UUID
     UUID styleId = entity.getId();
     dto.setInUse(layerRepository.existsByDefaultStyleIdOrAlternativeStylesId(styleId, styleId));
     return dto;
-  }
-
-  @Override
-  @SuppressWarnings("unchecked")
-  public <I> I toInput(Style entity) {
-    return (I) styleMapper.toInput(entity);
   }
 }

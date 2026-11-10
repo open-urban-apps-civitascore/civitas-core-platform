@@ -5,11 +5,11 @@ import de.civitascore.portal.mapper.GroupMapper;
 import de.civitascore.portal.mapper.UserMapper;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.Group;
+import de.civitascore.portal.model.input.GroupInputDTO;
 import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.GroupOutputDTO;
 import de.civitascore.portal.service.AssignmentService;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class GroupAssembler implements BaseAssembler<Group, GroupOutputDTO, UUID> {
+public class GroupAssembler implements BaseAssembler<Group, GroupOutputDTO> {
 
   private final GroupMapper groupMapper;
   private final UserMapper userMapper;
@@ -60,10 +60,8 @@ public class GroupAssembler implements BaseAssembler<Group, GroupOutputDTO, UUID
     return output;
   }
 
-  /** {@inheritDoc} Converts a group entity back to its input DTO for PATCH operations. */
-  @Override
-  @SuppressWarnings("unchecked")
-  public <I> I toInput(Group entity) {
-    return (I) groupMapper.toInput(entity);
+  /** Converts a group entity back to its input DTO for PATCH operations. */
+  public GroupInputDTO toInput(Group entity) {
+    return groupMapper.toInput(entity);
   }
 }

@@ -4,12 +4,12 @@ import de.civitascore.portal.mapper.DataStructureMapper;
 import de.civitascore.portal.mapper.DataStructureVersionMapper;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
+import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.model.output.DataStructureOutputDTO;
 import de.civitascore.portal.model.output.summary.DataStructureVersionUsageSummaryDTO;
 import de.civitascore.portal.service.ArtifactUsageLookup;
 import de.civitascore.portal.service.ArtifactUsageLookup.ArtifactUsage;
 import de.civitascore.portal.service.ArtifactUsageLookup.DataStructureUsage;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class DataStructureAssembler
-    implements BaseAssembler<DataStructure, DataStructureOutputDTO, UUID> {
+    implements BaseAssembler<DataStructure, DataStructureOutputDTO> {
 
   private final DataStructureMapper dataStructureMapper;
   private final DataStructureVersionMapper dataStructureVersionMapper;
@@ -56,10 +56,8 @@ public class DataStructureAssembler
     return row;
   }
 
-  /** {@inheritDoc} Converts a data structure entity back to its input DTO for PATCH operations. */
-  @Override
-  @SuppressWarnings("unchecked")
-  public <I> I toInput(DataStructure entity) {
-    return (I) dataStructureMapper.toInput(entity);
+  /** Converts a data structure entity back to its input DTO for PATCH operations. */
+  public DataStructureInputDTO toInput(DataStructure entity) {
+    return dataStructureMapper.toInput(entity);
   }
 }

@@ -25,7 +25,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class PipelineAssembler implements BaseAssembler<Pipeline, PipelineOutputDTO, UUID> {
+public class PipelineAssembler implements BaseAssembler<Pipeline, PipelineOutputDTO> {
 
   private final PipelineMapper pipelineMapper;
   private final DataSinkRepository dataSinkRepository;
@@ -60,13 +60,10 @@ public class PipelineAssembler implements BaseAssembler<Pipeline, PipelineOutput
   }
 
   /**
-   * {@inheritDoc} Converts a pipeline entity back to its input DTO for PATCH operations. The
-   * current model/styles are read from the registry so a partial patch still carries the full
-   * definition forward.
+   * Converts a pipeline entity back to its input DTO for PATCH operations. The current model/styles
+   * are read from the registry so a partial patch still carries the full definition forward.
    */
-  @Override
-  @SuppressWarnings("unchecked")
-  public <I> I toInput(Pipeline entity) {
+  public PipelineInputDTO toInput(Pipeline entity) {
     PipelineInputDTO input = pipelineMapper.toInput(entity);
     input.setDataSinkIds(new HashSet<>(findDataSinkIds(entity)));
     input.setDataSourceIds(new HashSet<>(findDataSourceIds(entity)));
@@ -79,7 +76,7 @@ public class PipelineAssembler implements BaseAssembler<Pipeline, PipelineOutput
                 input.setStyles(document.styles());
               });
     }
-    return (I) input;
+    return input;
   }
 
   private List<UUID> findDataSinkIds(Pipeline entity) {

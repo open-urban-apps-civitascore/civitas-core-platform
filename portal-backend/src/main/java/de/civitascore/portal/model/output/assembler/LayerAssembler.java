@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class LayerAssembler implements BaseAssembler<Layer, LayerOutputDTO, UUID> {
+public class LayerAssembler implements BaseAssembler<Layer, LayerOutputDTO> {
 
   private final LayerMapper layerMapper;
 
@@ -25,11 +25,5 @@ public class LayerAssembler implements BaseAssembler<Layer, LayerOutputDTO, UUID
     List<UUID> altIds = entity.getAlternativeStyles().stream().map(BaseEntity::getId).toList();
     dto.setAlternativeStyleIds(altIds);
     return dto;
-  }
-
-  @Override
-  @SuppressWarnings("unchecked")
-  public <I> I toInput(Layer entity) {
-    return (I) layerMapper.toInput(entity);
   }
 }

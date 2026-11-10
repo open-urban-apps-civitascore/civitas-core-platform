@@ -8,10 +8,10 @@ import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.Group;
 import de.civitascore.portal.model.entity.Role;
 import de.civitascore.portal.model.entity.User;
+import de.civitascore.portal.model.input.RoleInputDTO;
 import de.civitascore.portal.model.output.RoleOutputDTO;
 import de.civitascore.portal.service.AssignmentService;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -22,7 +22,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class RoleAssembler implements BaseAssembler<Role, RoleOutputDTO, UUID> {
+public class RoleAssembler implements BaseAssembler<Role, RoleOutputDTO> {
 
   private final RoleMapper roleMapper;
   private final PermissionMapper permissionMapper;
@@ -48,11 +48,9 @@ public class RoleAssembler implements BaseAssembler<Role, RoleOutputDTO, UUID> {
     return output;
   }
 
-  /** {@inheritDoc} Converts a role entity back to its input DTO for PATCH operations. */
-  @Override
-  @SuppressWarnings("unchecked")
-  public <I> I toInput(Role entity) {
-    return (I) roleMapper.toInput(entity);
+  /** Converts a role entity back to its input DTO for PATCH operations. */
+  public RoleInputDTO toInput(Role entity) {
+    return roleMapper.toInput(entity);
   }
 
   /** {@inheritDoc} Computes and sets group and user counts by traversing assignments. */

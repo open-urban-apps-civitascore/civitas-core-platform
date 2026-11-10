@@ -6,7 +6,6 @@ import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.model.output.DataStructureVersionOutputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.service.ArtifactUsageLookup;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -23,7 +22,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public class DataStructureVersionAssembler
-    implements BaseAssembler<DataStructureVersion, DataStructureVersionOutputDTO, UUID> {
+    implements BaseAssembler<DataStructureVersion, DataStructureVersionOutputDTO> {
 
   private final DataStructureVersionMapper dataStructureVersionMapper;
   private final ArtifactUsageLookup artifactUsageLookup;
@@ -60,13 +59,11 @@ public class DataStructureVersionAssembler
   }
 
   /**
-   * {@inheritDoc} Converts a data structure version entity back to its input DTO for PATCH
-   * operations. The current model/styles are read from the registry so a partial patch (e.g. styles
-   * only) still carries the full content forward.
+   * Converts a data structure version entity back to its input DTO for PATCH operations. The
+   * current model/styles are read from the registry so a partial patch (e.g. styles only) still
+   * carries the full content forward.
    */
-  @Override
-  @SuppressWarnings("unchecked")
-  public <I> I toInput(DataStructureVersion entity) {
+  public DataStructureVersionInputDTO toInput(DataStructureVersion entity) {
     DataStructureVersionInputDTO input = dataStructureVersionMapper.toInput(entity);
     if (entity.getModelUrn() != null) {
       modelRegistryGateway
@@ -77,6 +74,6 @@ public class DataStructureVersionAssembler
                 input.setStyles(document.styles());
               });
     }
-    return (I) input;
+    return input;
   }
 }
