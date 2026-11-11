@@ -1,5 +1,5 @@
 meta {
-  name: Get All Data Structure Versions (disabled)
+  name: Get All Data Structure Versions (no such route)
   type: http
   seq: 8
 }
@@ -21,13 +21,13 @@ params:query {
 }
 
 tests {
-  test("Status code is 405 (endpoint disabled)", function() {
-    expect(res.getStatus()).to.equal(405);
+  test("Status code is 403 (no such route)", function() {
+    expect(res.getStatus()).to.equal(403);
   });
 }
 
 docs {
   **Precondition:** `dataStructureId` is set.
 
-  **Expected Response:** 200 OK, body contains a paginated list of versions for the given DataStructure.
+  **Expected Response:** 403 Forbidden. The gateway denies the route as an unknown endpoint: the OPA route table has no GET on the versions collection, and the backend does not serve it.
 }

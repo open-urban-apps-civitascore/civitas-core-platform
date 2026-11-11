@@ -3,6 +3,7 @@ package de.civitascore.portal.configuration;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.config.BaseKeycloakIntegrationTest;
+import de.civitascore.portal.problem.ProblemType;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -10,6 +11,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiConsumer;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -27,6 +30,13 @@ import tools.jackson.databind.node.ObjectNode;
 
 @DisplayName("OpenAPI Spec Integration Tests")
 class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
+
+  private static final String PROBLEM_JSON = "application/problem+json";
+  private static final String PROBLEM_DETAIL_SCHEMA = "#/components/schemas/ProblemDetail";
+  private static final String EXAMPLES_REF = "#/components/examples/";
+  private static final List<String> OPERATION_METHODS =
+      List.of("get", "put", "post", "patch", "delete");
+  private static final Pattern TICKET_NUMBER = Pattern.compile("(?<![\\w&])[#!]\\d+\\b");
 
   private JsonNode spec;
 
@@ -235,6 +245,202 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
     assertThat(discriminator.path("propertyName").asString()).isEqualTo("connectorType");
     assertThat(discriminator.path("mapping").propertyNames())
         .containsExactlyInAnyOrder("MQTT", "SQL", "HTTP");
+  }
+
+  @Test
+  void everyOperation_documentsExactlyOneSuccessResponse() {
+    List<String> offenders = new ArrayList<>();
+    forEachOperation(
+        (name, operation) -> {
+          long successes =
+              operation.path("responses").propertyNames().stream()
+                  .filter(code -> code.startsWith("2"))
+                  .count();
+          if (successes != 1) {
+            offenders.add(name + " documents " + successes + " 2xx responses");
+          }
+        });
+
+    assertThat(offenders).isEmpty();
+  }
+
+  @Test
+  void componentExamples_coverEveryCatalogTypeWithItsUrnAndStatus() {
+    JsonNode examples = spec.path("components").path("examples");
+
+    assertThat(ProblemType.values())
+        .allSatisfy(
+            type -> {
+              JsonNode example = examples.path(type.name()).path("value");
+              assertThat(example.path("type").asString())
+                  .as(type.name())
+                  .isEqualTo(type.type().toString());
+              assertThat(example.path("status").asInt())
+                  .as(type.name())
+                  .isEqualTo(type.status().value());
+              assertThat(example.path("title").asString()).as(type.name()).isNotBlank();
+              assertThat(example.path("detail").asString()).as(type.name()).isNotBlank();
+            });
+  }
+
+  @Test
+  void everyErrorResponse_usesProblemJsonAndOnlyCatalogExamples() {
+    List<String> offenders = new ArrayList<>();
+    forEachOperation(
+        (name, operation) ->
+            operation
+                .path("responses")
+                .properties()
+                .forEach(
+                    response -> {
+                      String code = response.getKey();
+                      if (code.startsWith("4") || code.startsWith("5")) {
+                        collectNonCatalogContent(
+                            name + " " + code, code, responseOf(response.getValue()), offenders);
+                      }
+                    }));
+
+    assertThat(offenders).isEmpty();
+  }
+
+  @Test
+  void layerItemOperations_documentExactlyTheirDeclaredAndImplicitStatuses() {
+    JsonNode getLayer =
+        spec.path("paths").path("/datasets/{dataSetId}/layers/{layerId}").path("get");
+
+    assertThat(getLayer.path("responses").propertyNames())
+        .containsExactlyInAnyOrder("200", "400", "401", "403", "404", "500");
+    assertThat(
+            responseOf(getLayer.path("responses").path("404"))
+                .path("content")
+                .path(PROBLEM_JSON)
+                .path("examples")
+                .propertyNames())
+        .containsExactly("NOT_FOUND");
+  }
+
+  private JsonNode responseOf(JsonNode responseOrRef) {
+    JsonNode ref = responseOrRef.path("$ref");
+    return ref.isString() ? resolve(ref.asString()) : responseOrRef;
+  }
+
+  private void collectNonCatalogContent(
+      String location, String code, JsonNode response, List<String> offenders) {
+    JsonNode content = response.path("content");
+    if (!new HashSet<>(content.propertyNames()).equals(Set.of(PROBLEM_JSON))) {
+      offenders.add(location + " has content " + content.propertyNames());
+      return;
+    }
+    JsonNode problemJson = content.path(PROBLEM_JSON);
+    if (!problemJson.path("schema").path("$ref").asString().equals(PROBLEM_DETAIL_SCHEMA)) {
+      offenders.add(location + " has no ProblemDetail schema");
+    }
+    if (problemJson.path("examples").isEmpty()) {
+      offenders.add(location + " has no example");
+    }
+    problemJson
+        .path("examples")
+        .values()
+        .forEach(
+            example -> {
+              JsonNode value = resolve(example.path("$ref").asString()).path("value");
+              if (!example.path("$ref").asString().startsWith(EXAMPLES_REF)
+                  || !String.valueOf(value.path("status").asInt()).equals(code)) {
+                offenders.add(location + " has the example " + example);
+              }
+            });
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "/assignments, roleId, string, uuid",
+    "/datasets, datapoolIds, array, uuid",
+    "/datasets/{dataSetId}/layers, createdAtFrom, string, date-time"
+  })
+  void listOperations_documentTheFiltersOfTheirSpec(
+      String path, String name, String type, String format) {
+    JsonNode parameter =
+        spec.path("paths").path(path).path("get").path("parameters").values().stream()
+            .filter(candidate -> candidate.path("name").asString().equals(name))
+            .findFirst()
+            .orElseThrow();
+    JsonNode schema = parameter.path("schema");
+
+    assertThat(parameter.path("in").asString()).isEqualTo("query");
+    assertThat(parameter.path("description").asString()).isNotBlank();
+    assertThat(schema.path("type").asString()).isEqualTo(type);
+    assertThat((type.equals("array") ? schema.path("items") : schema).path("format").asString())
+        .isEqualTo(format);
+  }
+
+  @Test
+  void operationIds_areUniqueWithoutNumericSuffix() {
+    List<String> operationIds = new ArrayList<>();
+    forEachOperation(
+        (name, operation) -> operationIds.add(operation.path("operationId").asString()));
+
+    assertThat(operationIds).doesNotHaveDuplicates().noneMatch(id -> id.matches(".*_\\d+$"));
+  }
+
+  @Test
+  void everyParameter_hasAType() {
+    List<String> untyped = new ArrayList<>();
+    spec.path("paths")
+        .properties()
+        .forEach(
+            path -> {
+              collectUntypedParameters(path.getKey(), path.getValue(), untyped);
+              for (String method : OPERATION_METHODS) {
+                collectUntypedParameters(
+                    method + " " + path.getKey(), path.getValue().path(method), untyped);
+              }
+            });
+
+    assertThat(untyped).isEmpty();
+  }
+
+  @Test
+  void descriptionsAndSummaries_containNoTicketNumbers() {
+    List<String> withTicketNumbers = new ArrayList<>();
+    collectTicketNumbers(spec, withTicketNumbers);
+
+    assertThat(withTicketNumbers).isEmpty();
+  }
+
+  private void forEachOperation(BiConsumer<String, JsonNode> action) {
+    spec.path("paths")
+        .properties()
+        .forEach(
+            path -> {
+              for (String method : OPERATION_METHODS) {
+                JsonNode operation = path.getValue().path(method);
+                if (!operation.isMissingNode()) {
+                  action.accept(method.toUpperCase() + " " + path.getKey(), operation);
+                }
+              }
+            });
+  }
+
+  private static void collectUntypedParameters(
+      String location, JsonNode pathItemOrOperation, List<String> untyped) {
+    for (JsonNode parameter : pathItemOrOperation.path("parameters")) {
+      JsonNode schema = parameter.path("schema");
+      if (!schema.has("type") && !schema.has("$ref")) {
+        untyped.add(location + " " + parameter.path("name").asString());
+      }
+    }
+  }
+
+  private static void collectTicketNumbers(JsonNode node, List<String> withTicketNumbers) {
+    if (node.isObject()) {
+      for (String field : List.of("description", "summary")) {
+        JsonNode text = node.get(field);
+        if (text != null && text.isString() && TICKET_NUMBER.matcher(text.asString()).find()) {
+          withTicketNumbers.add(text.asString());
+        }
+      }
+    }
+    node.values().forEach(child -> collectTicketNumbers(child, withTicketNumbers));
   }
 
   /** Without this test, a JSON Schema validator would recurse without end on such a schema. */

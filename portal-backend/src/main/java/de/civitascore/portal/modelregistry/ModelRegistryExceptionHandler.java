@@ -8,15 +8,13 @@ import de.civitascore.modelforge.contract.Diagnostic;
 import de.civitascore.modelforge.contract.RegistryConflictException;
 import de.civitascore.modelforge.contract.RegistryUnavailableException;
 import de.civitascore.modelforge.contract.ValidationFailedException;
-import jakarta.servlet.http.HttpServletRequest;
-import java.net.URI;
+import de.civitascore.portal.problem.ProblemDetails;
+import de.civitascore.portal.problem.ProblemType;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.owasp.encoder.Encode;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -37,42 +35,43 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class ModelRegistryExceptionHandler {
 
-  private static final String ERROR_URN_PREFIX = "urn:civitas:error:";
+  private final ProblemDetails problemDetails;
+
+  public ModelRegistryExceptionHandler(ProblemDetails problemDetails) {
+    this.problemDetails = problemDetails;
+  }
 
   /** A document the registry refuses to store, reported with the paths it objected to. */
   @ExceptionHandler(ValidationFailedException.class)
-  public ProblemDetail handleValidationFailed(
-      ValidationFailedException ex, HttpServletRequest request) {
+  public ProblemDetail handleValidationFailed(ValidationFailedException ex) {
     String detail = withDiagnostics(ex);
     log.warn("Registry rejected a document: {}", Encode.forJava(detail));
-    return problem(HttpStatus.BAD_REQUEST, "INVALID_INPUT", detail, request);
+    return problemDetails.of(ProblemType.INVALID_INPUT, detail);
   }
 
-  /** A delete the registry refuses because other artifacts still reference the target. */
+  /**
+   * A delete the registry refuses because other artifacts still reference the target. What holds it
+   * goes to the log only.
+   */
   @ExceptionHandler(ArtifactInUseException.class)
-  public ProblemDetail handleArtifactInUse(ArtifactInUseException ex, HttpServletRequest request) {
+  public ProblemDetail handleArtifactInUse(ArtifactInUseException ex) {
     log.warn("Registry refused a delete: {}", Encode.forJava(ex.getMessage()));
-    return problem(HttpStatus.CONFLICT, "RESOURCE_IN_USE", ex.getMessage(), request);
+    return problemDetails.of(
+        ProblemType.RESOURCE_IN_USE, "The artifact is still referenced by another artifact");
   }
 
   /** A write that collides with data the registry already holds, such as a taken version. */
   @ExceptionHandler(RegistryConflictException.class)
-  public ProblemDetail handleRegistryConflict(
-      RegistryConflictException ex, HttpServletRequest request) {
+  public ProblemDetail handleRegistryConflict(RegistryConflictException ex) {
     log.warn("Registry refused a conflicting write", ex);
-    return problem(HttpStatus.CONFLICT, "UNIQUE_CONSTRAINT_VIOLATION", ex.getMessage(), request);
+    return problemDetails.of(ProblemType.UNIQUE_CONSTRAINT_VIOLATION, ex.getMessage());
   }
 
   /** The registry cannot be reached; the caller may retry. */
   @ExceptionHandler(RegistryUnavailableException.class)
-  public ProblemDetail handleRegistryUnavailable(
-      RegistryUnavailableException ex, HttpServletRequest request) {
+  public ProblemDetail handleRegistryUnavailable(RegistryUnavailableException ex) {
     log.error("Model registry unavailable", ex);
-    return problem(
-        HttpStatus.SERVICE_UNAVAILABLE,
-        "REGISTRY_UNAVAILABLE",
-        "The model registry is currently unavailable",
-        request);
+    return problemDetails.of(ProblemType.REGISTRY_UNAVAILABLE);
   }
 
   /**
@@ -99,14 +98,5 @@ public class ModelRegistryExceptionHandler {
       return message;
     }
     return message.startsWith(path) ? message : path + ": " + message;
-  }
-
-  private static ProblemDetail problem(
-      HttpStatusCode status, String errorCode, String detail, HttpServletRequest request) {
-    ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(status, detail);
-    problemDetail.setType(URI.create(ERROR_URN_PREFIX + errorCode));
-    problemDetail.setTitle(HttpStatus.valueOf(status.value()).getReasonPhrase());
-    problemDetail.setInstance(URI.create(request.getRequestURI()));
-    return problemDetail;
   }
 }

@@ -1,22 +1,33 @@
 package de.civitascore.portal.util;
 
 import de.civitascore.portal.model.embedded.PendingSagaType;
+import de.civitascore.portal.problem.ProblemException;
+import de.civitascore.portal.problem.ProblemType;
+import java.util.Map;
 import java.util.UUID;
 import lombok.Getter;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
 
 /** Thrown when a DataSet write must wait for its pending saga to finish. */
 @Getter
-@ResponseStatus(HttpStatus.CONFLICT)
-public class SagaInFlightException extends RuntimeException {
+public class SagaInFlightException extends ProblemException {
 
   private final UUID dataSetId;
   private final PendingSagaType pendingSagaType;
 
   public SagaInFlightException(UUID dataSetId, PendingSagaType pendingSagaType, String message) {
-    super(message);
+    super(ProblemType.SAGA_IN_FLIGHT, message);
     this.dataSetId = dataSetId;
     this.pendingSagaType = pendingSagaType;
+  }
+
+  /** The saga type is already part of the detail, so this member discloses nothing further. */
+  @Override
+  public Map<String, Object> properties() {
+    return Map.of("pendingSagaType", pendingSagaType);
+  }
+
+  @Override
+  public String toString() {
+    return super.toString() + " dataSetId=" + dataSetId;
   }
 }

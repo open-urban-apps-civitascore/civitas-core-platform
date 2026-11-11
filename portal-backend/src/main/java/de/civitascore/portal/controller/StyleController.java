@@ -4,13 +4,14 @@ import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.model.input.StyleInputDTO;
 import de.civitascore.portal.model.output.StyleOutputDTO;
 import de.civitascore.portal.model.output.assembler.StyleAssembler;
+import de.civitascore.portal.problem.ProblemType;
+import de.civitascore.portal.problem.Problems;
 import de.civitascore.portal.repository.specification.StyleSpec;
 import de.civitascore.portal.service.StyleService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.io.IOException;
-import java.util.Collections;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -18,80 +19,103 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.MethodNotAllowedException;
-import tools.jackson.databind.JsonNode;
 
 /** REST controller for managing Style resources nested under a parent dataset. */
 @RestController
 @RequestMapping("/datasets/{dataSetId}/styles")
 @RequiredArgsConstructor
 @Tag(name = "Styles", description = "Style management endpoints")
-public class StyleController
-    extends DataSetSubEntityController<StyleInputDTO, StyleOutputDTO, Style, StyleSpec> {
+public class StyleController {
 
   private final StyleService styleService;
   private final StyleAssembler styleAssembler;
 
-  @Override
-  protected StyleService getService() {
-    return styleService;
-  }
-
-  @Override
-  protected StyleAssembler getAssembler() {
-    return styleAssembler;
-  }
-
-  @Override
-  protected Class<Style> getEntityClass() {
-    return Style.class;
-  }
-
-  @Override
-  @Operation(operationId = "listStyles", summary = "List all Styles for a dataset")
-  public ResponseEntity<Page<StyleOutputDTO>> getAll(
+  @GetMapping
+  @Operation(summary = "List all Styles for a dataset")
+  @ApiResponse(responseCode = "200", description = "Page of styles returned successfully")
+  public Page<StyleOutputDTO> listStyles(
+      // Typed so that a malformed id answers 400 before StyleSpec reads the path variable.
+      @PathVariable UUID dataSetId,
       @ParameterObject StyleSpec spec,
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
-    return super.getAll(spec, pageable);
+    return styleAssembler.toOutput(styleService.findAll(spec, pageable));
   }
 
-  @Override
-  @Operation(operationId = "getStyle", summary = "Get Style by ID")
-  public ResponseEntity<StyleOutputDTO> getById(@PathVariable UUID id) {
-    return super.getById(id);
+  @GetMapping("/{styleId}")
+  @Operation(summary = "Get Style by ID")
+  @ApiResponse(responseCode = "200", description = "Style returned successfully")
+  @Problems(ProblemType.NOT_FOUND)
+  public StyleOutputDTO getStyle(@PathVariable UUID dataSetId, @PathVariable UUID styleId) {
+    return styleAssembler.toOutput(requireOwned(dataSetId, styleId));
   }
 
-  @Override
-  @Operation(operationId = "createStyle", summary = "Create a new Style")
-  public ResponseEntity<StyleOutputDTO> create(@Valid @RequestBody StyleInputDTO input) {
-    return super.create(input);
+  @PostMapping
+  @ResponseStatus(HttpStatus.CREATED)
+  @Operation(summary = "Create a new Style")
+  @ApiResponse(responseCode = "201", description = "Style created successfully")
+  @Problems({
+    ProblemType.NOT_FOUND,
+    ProblemType.DATASET_NOT_EDITABLE,
+    ProblemType.SAGA_IN_FLIGHT,
+    ProblemType.UNIQUE_CONSTRAINT_VIOLATION
+  })
+  public ResponseEntity<StyleOutputDTO> createStyle(
+      @PathVariable UUID dataSetId, @Valid @RequestBody StyleInputDTO input) {
+    input.setDataSetId(dataSetId);
+    Style created = styleService.create(input);
+    return ResponseEntity.created(Locations.ofCreated(created.getId()))
+        .body(styleAssembler.toOutput(created));
   }
 
-  @Override
-  @Operation(operationId = "updateStyle", summary = "Replace a Style")
-  public ResponseEntity<StyleOutputDTO> update(
-      @PathVariable UUID id, @Valid @RequestBody StyleInputDTO input) {
-    return super.update(id, input);
+  @PutMapping("/{styleId}")
+  @Operation(summary = "Replace a Style")
+  @ApiResponse(responseCode = "200", description = "Style updated successfully")
+  @Problems({
+    ProblemType.NOT_FOUND,
+    ProblemType.DATASET_NOT_EDITABLE,
+    ProblemType.SAGA_IN_FLIGHT,
+    ProblemType.UNIQUE_CONSTRAINT_VIOLATION
+  })
+  public StyleOutputDTO updateStyle(
+      @PathVariable UUID dataSetId,
+      @PathVariable UUID styleId,
+      @Valid @RequestBody StyleInputDTO input) {
+    requireOwned(dataSetId, styleId);
+    input.setDataSetId(dataSetId);
+    return styleAssembler.toOutput(styleService.update(styleId, input));
   }
 
-  @Override
-  @Operation(operationId = "deleteStyle", summary = "Delete a Style")
-  public void delete(@PathVariable UUID id) {
-    super.delete(id);
+  @DeleteMapping("/{styleId}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  @Operation(summary = "Delete a Style")
+  @ApiResponse(responseCode = "204", description = "Style deleted successfully")
+  @Problems({
+    ProblemType.NOT_FOUND,
+    ProblemType.DATASET_NOT_EDITABLE,
+    ProblemType.SAGA_IN_FLIGHT,
+    ProblemType.RESOURCE_IN_USE
+  })
+  public void deleteStyle(@PathVariable UUID dataSetId, @PathVariable UUID styleId) {
+    requireOwned(dataSetId, styleId);
+    styleService.deleteById(styleId);
   }
 
-  /** PATCH is not supported for Styles. */
-  @Override
-  public ResponseEntity<StyleOutputDTO> patch(@PathVariable UUID id, @RequestBody JsonNode updates)
-      throws IOException {
-    throw new MethodNotAllowedException(HttpMethod.PATCH, Collections.emptySet());
+  private Style requireOwned(UUID dataSetId, UUID styleId) {
+    Style style = styleService.findByIdOrThrow(styleId);
+    ParentOwnership.requireSameParent(dataSetId, style.getDataSet().getId(), Style.class, styleId);
+    return style;
   }
 }

@@ -14,9 +14,6 @@ import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.service.DataSetService;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.Parameters;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -57,38 +54,6 @@ public class DataSetController
   private final DataSetService dataSetService;
   private final DataSetAssembler dataSetAssembler;
 
-  @Parameters({
-    @Parameter(
-        name = "name",
-        description = "Filter by name (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "sensor-data")),
-    @Parameter(
-        name = "description",
-        description = "Filter by description (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "Temperature sensor readings")),
-    @Parameter(
-        name = "q",
-        description = "Search in name or description (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "sensor")),
-    @Parameter(
-        name = "datapoolIds",
-        description =
-            "Filter by datapool IDs (comma-separated UUIDs, IN-clause). Returns datasets assigned to any of the listed datapools.",
-        in = ParameterIn.QUERY,
-        schema =
-            @Schema(
-                type = "string",
-                example =
-                    "550e8400-e29b-41d4-a716-446655440000,3fa85f64-5717-4562-b3fc-2c963f66afa6")),
-    @Parameter(
-        name = "includePendingDelete",
-        description = "Include datasets with pendingSagaType DELETE. Defaults to false.",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "boolean", defaultValue = "false", example = "true"))
-  })
   /**
    * Retrieves a paginated list of datasets with optional filtering by name, description, or
    * free-text search.
@@ -99,7 +64,7 @@ public class DataSetController
    */
   @Override
   public ResponseEntity<Page<DataSetOutputDTO>> getAll(
-      @ParameterObject @Parameter(description = "Search/filter spec") DataSetSpec spec,
+      @ParameterObject DataSetSpec spec,
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
@@ -132,17 +97,16 @@ public class DataSetController
   }
 
   /**
-   * Lists the named APIs of a dataset (issue #1596, concept #1379). Returns the same {@link
-   * NamedApiOutputDTO} list embedded in {@code GET /datasets/{id}} — including the server-built
-   * {@code previewUrl} — via a dedicated discovery surface. Respects the caller's {@code
-   * X-Allowed-Scope-Ids}: an unknown or out-of-scope dataset yields 404, so route existence is not
-   * leaked.
+   * Lists the named APIs of a dataset. Returns the same {@link NamedApiOutputDTO} list embedded in
+   * {@code GET /datasets/{id}} — including the server-built {@code previewUrl} — via a dedicated
+   * discovery surface. Respects the caller's {@code X-Allowed-Scope-Ids}: an unknown or
+   * out-of-scope dataset yields 404, so route existence is not leaked.
    *
-   * <p>Per concept #1379 this is a consumer-facing discovery surface for <b>active, published</b>
-   * APIs: it returns the named APIs only when the dataset is published (lifecycle status {@code
-   * AVAILABLE}). For a {@code DRAFT}/{@code READY} dataset it returns an empty list — draft edits
-   * must not change the public API surface. (Scope is still enforced first: an unknown/out-of-scope
-   * dataset yields 404 regardless of status, so route existence is not leaked.)
+   * <p>This is a consumer-facing discovery surface for <b>active, published</b> APIs: it returns
+   * the named APIs only when the dataset is published (lifecycle status {@code AVAILABLE}). For a
+   * {@code DRAFT}/{@code READY} dataset it returns an empty list — draft edits must not change the
+   * public API surface. (Scope is still enforced first: an unknown/out-of-scope dataset yields 404
+   * regardless of status, so route existence is not leaked.)
    *
    * @param id the dataset UUID
    * @return HTTP 200 with the published dataset's named APIs (empty unless the dataset is
@@ -154,8 +118,8 @@ public class DataSetController
       summary = "List a dataset's published named APIs",
       description =
           "Returns the named APIs of a PUBLISHED dataset (lifecycle status AVAILABLE), including the"
-              + " server-built previewUrl. Per concept #1379 only active published APIs are"
-              + " discoverable: a DRAFT/READY dataset returns an empty list. Respects the caller's"
+              + " server-built previewUrl. Only active published APIs are discoverable: a"
+              + " DRAFT/READY dataset returns an empty list. Respects the caller's"
               + " X-Allowed-Scope-Ids; unknown or out-of-scope datasets return 404.")
   @ApiResponse(responseCode = "200", description = "Named APIs returned successfully")
   @ApiResponse(
@@ -169,10 +133,9 @@ public class DataSetController
         dataSetService
             .findOne(scopedById)
             .orElseThrow(() -> new ResourceNotFoundException("DataSet", id));
-    // Only a published (AVAILABLE) dataset exposes active named APIs for consumer discovery
-    // (concept
-    // #1379). A DRAFT/READY dataset has no public API surface yet, so return an empty list rather
-    // than leaking not-yet-active (or about-to-change) draft routes.
+    // Only a published (AVAILABLE) dataset exposes active named APIs for consumer discovery. A
+    // DRAFT/READY dataset has no public API surface yet, so return an empty list rather than
+    // leaking not-yet-active (or about-to-change) draft routes.
     List<NamedApiOutputDTO> namedApis =
         dataSet.getDataSetStatus() == DataSetStatus.AVAILABLE
             ? dataSetAssembler.toOutput(dataSet).getNamedApis()
@@ -238,6 +201,10 @@ public class DataSetController
       summary = "Unstage a dataset",
       description = "Reverts the dataset from READY to DRAFT.")
   @ApiResponse(
+      responseCode = "200",
+      description = "The dataset is unstaged",
+      content = @Content(schema = @Schema(implementation = DataSetOutputDTO.class)))
+  @ApiResponse(
       responseCode = "409",
       description = "Conflict (saga is in-flight for this dataset)",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
@@ -271,6 +238,10 @@ public class DataSetController
 
   @Override
   @ApiResponse(
+      responseCode = "202",
+      description = "The unrelease was accepted; routes and pipelines are torn down asynchronously",
+      content = @Content(schema = @Schema(implementation = DataSetOutputDTO.class)))
+  @ApiResponse(
       responseCode = "409",
       description = "Conflict (saga is in-flight for this dataset)",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
@@ -281,6 +252,10 @@ public class DataSetController
   }
 
   @Override
+  @ApiResponse(
+      responseCode = "200",
+      description = "Dataset metadata updated successfully",
+      content = @Content(schema = @Schema(implementation = DataSetOutputDTO.class)))
   @ApiResponse(
       responseCode = "409",
       description = "Conflict (saga is in-flight for this dataset)",

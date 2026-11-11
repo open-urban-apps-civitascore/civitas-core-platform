@@ -1,9 +1,10 @@
 package de.civitascore.portal.util;
 
+import de.civitascore.portal.problem.ProblemException;
+import de.civitascore.portal.problem.ProblemType;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
 
 /**
  * Thrown when the artifacts a Data Set's flows reach cannot carry a release.
@@ -13,20 +14,29 @@ import org.springframework.web.bind.annotation.ResponseStatus;
  * one would disclose it just as well. The message states every condition instead, and the log
  * records which one applied.
  */
-@ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
-public class PipelineClosureValidationException extends RuntimeException {
+public class PipelineClosureValidationException extends ProblemException {
 
   private final List<UUID> offendingPipelineIds;
 
   public PipelineClosureValidationException(List<UUID> offendingPipelineIds) {
-    super(
+    this(
         "One or more Pipelines reach an artifact that cannot carry a release. Each artifact a"
             + " Pipeline reaches must exist, be readable, and be released: "
-            + offendingPipelineIds);
+            + offendingPipelineIds,
+        offendingPipelineIds);
+  }
+
+  private PipelineClosureValidationException(String message, List<UUID> offendingPipelineIds) {
+    super(ProblemType.PIPELINE_CLOSURE_INVALID, message);
     this.offendingPipelineIds = List.copyOf(offendingPipelineIds);
   }
 
   public List<UUID> getOffendingPipelineIds() {
     return offendingPipelineIds;
+  }
+
+  @Override
+  public Map<String, Object> properties() {
+    return Map.of("offendingPipelineIds", offendingPipelineIds);
   }
 }

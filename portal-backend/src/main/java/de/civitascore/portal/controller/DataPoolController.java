@@ -8,9 +8,6 @@ import de.civitascore.portal.model.output.assembler.DataPoolAssembler;
 import de.civitascore.portal.repository.specification.DataPoolSpec;
 import de.civitascore.portal.service.DataPoolService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.Parameters;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -40,27 +37,10 @@ public class DataPoolController
   private final DataPoolService dataPoolService;
   private final DataPoolAssembler dataPoolAssembler;
 
-  @Parameters({
-    @Parameter(
-        name = "name",
-        description = "Filter by name (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "mobility")),
-    @Parameter(
-        name = "description",
-        description = "Filter by description (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "governance")),
-    @Parameter(
-        name = "q",
-        description = "Search in name or description (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "city"))
-  })
   /** Overridden to apply {@code @ParameterObject} and pagination defaults for SpringDoc. */
   @Override
   public ResponseEntity<Page<DataPoolOutputDTO>> getAll(
-      @ParameterObject @Parameter(description = "Search/filter spec") DataPoolSpec spec,
+      @ParameterObject DataPoolSpec spec,
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {

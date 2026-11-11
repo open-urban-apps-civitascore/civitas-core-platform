@@ -14,7 +14,6 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.io.IOException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -88,9 +87,12 @@ public class DataSinkController
   }
 
   @Override
-  @Operation(operationId = "patchDataSink", summary = "Partially update a DataSink")
+  @Operation(
+      operationId = "patchDataSink",
+      summary = "Partially update a DataSink",
+      description = JsonMergePatch.OPERATION_DESCRIPTION)
   public ResponseEntity<DataSinkOutputDTO> patch(
-      @PathVariable UUID id, @RequestBody JsonNode updates) throws IOException {
+      @PathVariable UUID id, @RequestBody JsonNode updates) {
     return super.patch(id, updates);
   }
 

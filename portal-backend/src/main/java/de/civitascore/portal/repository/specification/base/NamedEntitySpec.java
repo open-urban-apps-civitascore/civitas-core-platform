@@ -16,12 +16,19 @@ import net.kaczmarzyk.spring.data.jpa.web.annotation.Spec;
  *   <li>q: search in name or description
  * </ul>
  */
+@FilterParam(name = "name", description = "Filter by name (partial match, case-insensitive).")
 @Spec(path = "name", params = "name", spec = LikeIgnoreCase.class)
 interface NamedEntityNameSpec<T> extends BaseSpec<T> {}
 
+@FilterParam(
+    name = "description",
+    description = "Filter by description (partial match, case-insensitive).")
 @Spec(path = "description", params = "description", spec = LikeIgnoreCase.class)
 interface NamedEntityDescriptionSpec<T> extends BaseSpec<T> {}
 
+@FilterParam(
+    name = "q",
+    description = "Search in name or description (partial match, case-insensitive).")
 @Or({
   @Spec(path = "name", params = "q", spec = LikeIgnoreCase.class),
   @Spec(path = "description", params = "q", spec = LikeIgnoreCase.class)

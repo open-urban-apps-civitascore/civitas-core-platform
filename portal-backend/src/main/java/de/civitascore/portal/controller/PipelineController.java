@@ -15,7 +15,6 @@ import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.io.IOException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -45,7 +44,7 @@ public class PipelineController
   @Operation(operationId = "listPipelines", summary = "List all pipelines")
   @Override
   public ResponseEntity<Page<PipelineOutputDTO>> getAll(
-      @ParameterObject @Parameter(description = "Search/filter spec") PipelineSpec spec,
+      @ParameterObject PipelineSpec spec,
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
@@ -105,8 +104,9 @@ public class PipelineController
       operationId = "patchPipeline",
       summary = "Partially update a pipeline",
       description =
-          "A DataSink that loses its last Pipeline through this update is removed with its Layers,"
-              + " and with the APIs it is the last backing DataSink of.")
+          JsonMergePatch.OPERATION_DESCRIPTION
+              + " A DataSink that loses its last Pipeline through this update is removed with its"
+              + " Layers, and with the APIs it is the last backing DataSink of.")
   @Parameter(
       name = CONFIRM_DATA_LOSS,
       in = ParameterIn.QUERY,
@@ -117,7 +117,7 @@ public class PipelineController
       description = REMOVAL_CONFLICT_DESCRIPTION,
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
   public ResponseEntity<PipelineOutputDTO> patch(
-      @PathVariable UUID id, @RequestBody JsonNode updates) throws IOException {
+      @PathVariable UUID id, @RequestBody JsonNode updates) {
     return super.patch(id, updates);
   }
 

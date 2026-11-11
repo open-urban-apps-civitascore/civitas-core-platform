@@ -2,12 +2,18 @@ package de.civitascore.portal.controller.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
+import de.civitascore.portal.model.connector.MalformedDataSourceRequestException;
 import de.civitascore.portal.model.embedded.PendingSagaType;
+import de.civitascore.portal.problem.FieldError;
+import de.civitascore.portal.problem.ProblemException;
+import de.civitascore.portal.problem.TestProblemDetails;
+import de.civitascore.portal.service.connector.ConnectorValidationException;
+import de.civitascore.portal.service.connector.ConnectorViolation;
 import de.civitascore.portal.service.connector.StoredConnectorUnreadableException;
 import de.civitascore.portal.util.ConnectionTestBusyException;
 import de.civitascore.portal.util.DataSetNotEditableException;
+import de.civitascore.portal.util.DataSourceScopeViolationException;
 import de.civitascore.portal.util.ForbiddenException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ModelMemberUnreachableException;
@@ -20,41 +26,67 @@ import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.SagaInFlightException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import jakarta.persistence.PersistenceException;
-import jakarta.servlet.http.HttpServletRequest;
-import java.net.URI;
 import java.sql.SQLException;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mock.http.MockHttpInputMessage;
-import org.springframework.validation.BeanPropertyBindingResult;
-import org.springframework.validation.FieldError;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.validation.MapBindingResult;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @DisplayName("GlobalExceptionHandler Unit Tests")
 class GlobalExceptionHandlerTest {
 
   private static final String TEST_URI = "/v1/datasets";
 
-  private final GlobalExceptionHandler handler = new GlobalExceptionHandler();
+  private final GlobalExceptionHandler handler = handler();
 
-  private static HttpServletRequest mockRequest() {
-    HttpServletRequest request = mock(HttpServletRequest.class);
-    when(request.getRequestURI()).thenReturn(TEST_URI);
-    return request;
+  private static GlobalExceptionHandler handler() {
+    GlobalExceptionHandler handler = new GlobalExceptionHandler(TestProblemDetails.create());
+    handler.setMessageSource(TestProblemDetails.MESSAGES);
+    return handler;
+  }
+
+  static Stream<ProblemException> freeFormProblems() {
+    UUID id = UUID.fromString("3fa85f64-5717-4562-b3fc-2c963f66afa6");
+    return Stream.of(
+        new ResourceNotFoundException("DataSet", id),
+        new InvalidInputException("Layer", "layerName", "layerName must not be blank"),
+        new MalformedDataSourceRequestException("Unknown key: connector.foo"),
+        new DataSetNotEditableException("Dataset must be DRAFT"),
+        new ModelMemberUnreachableException(List.of("Orphan")),
+        new UniqueConstraintViolationException("Layer", "layerName", "it's taken"),
+        new ResourceInUseException("Style", id, "Style is still referenced by a Layer"),
+        new SagaInFlightException(
+            id, PendingSagaType.CREATE, "Cannot write while a saga is in-flight: CREATE"),
+        new DataSourceScopeViolationException(List.of(id)),
+        new PipelineClosureValidationException(List.of(id)),
+        new ForbiddenException("Role", id, "Cannot delete system role"),
+        new ConnectionTestBusyException("A connection test of this user is still running"));
   }
 
   private static ConstraintViolationException constraintViolation(
@@ -67,18 +99,44 @@ class GlobalExceptionHandlerTest {
   @DisplayName("Domain exception handling")
   class DomainExceptionTests {
 
+    /** portal-frontend matches substrings of the detail, so a changed text breaks its messages. */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource(
+        "de.civitascore.portal.controller.exception.GlobalExceptionHandlerTest#freeFormProblems")
+    void freeFormProblem_answersTheThrowSiteTextUnchanged(ProblemException ex) {
+      ProblemDetail problemDetail = handler.handleProblem(ex);
+
+      assertThat(problemDetail.getDetail()).isEqualTo(ex.getMessage());
+    }
+
+    @Test
+    void problemException_isAnsweredWithItsCatalogTypeTitleAndProperties() {
+      ConnectorValidationException ex =
+          new ConnectorValidationException(
+              List.of(new ConnectorViolation("connector.qos", "must be 0, 1 or 2")));
+
+      ProblemDetail problemDetail = handler.handleProblem(ex);
+
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:VALIDATION_FAILED");
+      assertThat(problemDetail.getTitle()).isEqualTo("Validation failed");
+      assertThat(problemDetail.getDetail()).isEqualTo("Input validation failed");
+      assertThat(problemDetail.getProperties())
+          .containsEntry(
+              "fieldErrors", List.of(new FieldError("connector.qos", "must be 0, 1 or 2")));
+    }
+
     @Test
     @DisplayName("Should return 404 for ResourceNotFoundException")
     void shouldReturn404ForNotFound() {
       UUID id = UUID.randomUUID();
       ResourceNotFoundException ex = new ResourceNotFoundException("DataSet", id);
 
-      ProblemDetail problemDetail = handler.handleNotFound(ex, mockRequest());
+      ProblemDetail problemDetail = handler.handleProblem(ex);
 
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.NOT_FOUND.value());
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:NOT_FOUND");
       assertThat(problemDetail.getDetail()).contains(id.toString());
-      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
     }
 
     @Test
@@ -87,12 +145,11 @@ class GlobalExceptionHandlerTest {
       InvalidInputException ex =
           new InvalidInputException("Pipeline", UUID.randomUUID(), "Name is required");
 
-      ProblemDetail problemDetail = handler.handleInvalidInput(ex, mockRequest());
+      ProblemDetail problemDetail = handler.handleProblem(ex);
 
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:INVALID_INPUT");
       assertThat(problemDetail.getDetail()).isEqualTo("Name is required");
-      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
     }
 
     @Test
@@ -100,12 +157,11 @@ class GlobalExceptionHandlerTest {
     void shouldReturn400ForDataSetNotEditable() {
       DataSetNotEditableException ex = new DataSetNotEditableException("Dataset must be DRAFT");
 
-      ProblemDetail problemDetail = handler.handleDataSetNotEditable(ex, mockRequest());
+      ProblemDetail problemDetail = handler.handleProblem(ex);
 
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:DATASET_NOT_EDITABLE");
       assertThat(problemDetail.getDetail()).isEqualTo("Dataset must be DRAFT");
-      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
     }
 
     @Test
@@ -113,12 +169,14 @@ class GlobalExceptionHandlerTest {
     void shouldReturn400ForModelRootMissing() {
       ModelRootMissingException ex = new ModelRootMissingException();
 
-      ProblemDetail problemDetail = handler.handleModelRootMissing(ex, mockRequest());
+      ProblemDetail problemDetail = handler.handleProblem(ex);
 
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:MODEL_ROOT_MISSING");
-      assertThat(problemDetail.getDetail()).isEqualTo(ex.getMessage());
-      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
+      assertThat(problemDetail.getDetail())
+          .isEqualTo(
+              "DataStructureVersion model must designate exactly one root Element before"
+                  + " releasing");
     }
 
     @Test
@@ -126,12 +184,15 @@ class GlobalExceptionHandlerTest {
     void shouldReturn400ForModelReferenceNotAvailable() {
       ModelReferenceNotAvailableException ex = new ModelReferenceNotAvailableException();
 
-      ProblemDetail problemDetail = handler.handleModelReferenceNotAvailable(ex, mockRequest());
+      ProblemDetail problemDetail = handler.handleProblem(ex);
 
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
       assertThat(problemDetail.getType())
           .hasToString("urn:civitas:error:MODEL_REFERENCE_NOT_AVAILABLE");
-      assertThat(problemDetail.getDetail()).isEqualTo(ex.getMessage());
+      assertThat(problemDetail.getDetail())
+          .isEqualTo(
+              "A referenced model is not available: it must exist, be readable, and be referenced"
+                  + " with a version");
     }
 
     @Test
@@ -140,7 +201,7 @@ class GlobalExceptionHandlerTest {
     void shouldReturn400ForModelMemberUnreachable() {
       ModelMemberUnreachableException ex = new ModelMemberUnreachableException(List.of("Orphan"));
 
-      ProblemDetail problemDetail = handler.handleModelMemberUnreachable(ex, mockRequest());
+      ProblemDetail problemDetail = handler.handleProblem(ex);
 
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:MODEL_MEMBER_UNREACHABLE");
@@ -152,12 +213,12 @@ class GlobalExceptionHandlerTest {
     void shouldReturn409ForModelMissing() {
       ModelMissingException ex = new ModelMissingException();
 
-      ProblemDetail problemDetail = handler.handleModelMissing(ex, mockRequest());
+      ProblemDetail problemDetail = handler.handleProblem(ex);
 
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:MODEL_MISSING");
-      assertThat(problemDetail.getDetail()).isEqualTo(ex.getMessage());
-      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
+      assertThat(problemDetail.getDetail())
+          .isEqualTo("DataStructureVersion model is missing from the model registry");
     }
 
     @Test
@@ -166,12 +227,11 @@ class GlobalExceptionHandlerTest {
       UniqueConstraintViolationException ex =
           new UniqueConstraintViolationException("Pipeline", "name", "test-pipeline");
 
-      ProblemDetail problemDetail = handler.handleUniqueConstraint(ex, mockRequest());
+      ProblemDetail problemDetail = handler.handleProblem(ex);
 
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
       assertThat(problemDetail.getType())
           .hasToString("urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION");
-      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
     }
 
     @Test
@@ -181,13 +241,12 @@ class GlobalExceptionHandlerTest {
       ResourceInUseException ex =
           new ResourceInUseException("DataStructureVersion", id, "Referenced by DataSource");
 
-      ProblemDetail problemDetail = handler.handleResourceInUse(ex, mockRequest());
+      ProblemDetail problemDetail = handler.handleProblem(ex);
 
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:RESOURCE_IN_USE");
       assertThat(problemDetail.getDetail()).isEqualTo("Referenced by DataSource");
       assertThat(problemDetail.getProperties()).isNullOrEmpty();
-      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
     }
 
     @Test
@@ -201,7 +260,7 @@ class GlobalExceptionHandlerTest {
           new ResourceInUseException(
               "DataStructure", UUID.randomUUID(), "Still referenced", blockers);
 
-      ProblemDetail problemDetail = handler.handleResourceInUse(ex, mockRequest());
+      ProblemDetail problemDetail = handler.handleProblem(ex);
 
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
       assertThat(problemDetail.getDetail()).isEqualTo("Still referenced");
@@ -217,13 +276,12 @@ class GlobalExceptionHandlerTest {
           new SagaInFlightException(
               id, pendingSagaType, "Cannot write while a saga is in-flight: " + pendingSagaType);
 
-      ProblemDetail problemDetail = handler.handleSagaInFlight(ex, mockRequest());
+      ProblemDetail problemDetail = handler.handleProblem(ex);
 
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:SAGA_IN_FLIGHT");
       assertThat(problemDetail.getDetail()).contains(pendingSagaType.name());
       assertThat(problemDetail.getProperties()).containsEntry("pendingSagaType", pendingSagaType);
-      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
     }
 
     @Test
@@ -233,8 +291,7 @@ class GlobalExceptionHandlerTest {
       UUID second = UUID.randomUUID();
 
       ProblemDetail problemDetail =
-          handler.handlePipelineClosureValidation(
-              new PipelineClosureValidationException(List.of(first, second)), mockRequest());
+          handler.handleProblem(new PipelineClosureValidationException(List.of(first, second)));
 
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY.value());
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:PIPELINE_CLOSURE_INVALID");
@@ -255,12 +312,11 @@ class GlobalExceptionHandlerTest {
       ForbiddenException ex =
           new ForbiddenException("Role", UUID.randomUUID(), "Cannot delete system role");
 
-      ProblemDetail problemDetail = handler.handleForbidden(ex, mockRequest());
+      ProblemDetail problemDetail = handler.handleProblem(ex);
 
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.FORBIDDEN.value());
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:FORBIDDEN");
       assertThat(problemDetail.getDetail()).isEqualTo("Cannot delete system role");
-      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
     }
 
     @Test
@@ -269,14 +325,13 @@ class GlobalExceptionHandlerTest {
       ConnectionTestBusyException ex =
           new ConnectionTestBusyException("A connection test of this user is still running");
 
-      ProblemDetail problemDetail = handler.handleConnectionTestBusy(ex, mockRequest());
+      ProblemDetail problemDetail = handler.handleProblem(ex);
 
       assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS.value());
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:TOO_MANY_REQUESTS");
-      assertThat(problemDetail.getTitle()).isEqualTo("Too Many Requests");
+      assertThat(problemDetail.getTitle()).isEqualTo("Too many requests");
       assertThat(problemDetail.getDetail())
           .isEqualTo("A connection test of this user is still running");
-      assertThat(problemDetail.getInstance()).isEqualTo(URI.create(TEST_URI));
     }
   }
 
@@ -296,13 +351,11 @@ class GlobalExceptionHandlerTest {
       DataIntegrityViolationException ex =
           new DataIntegrityViolationException("could not execute statement", cve);
 
-      ResponseEntity<ProblemDetail> response =
-          handler.handleDataIntegrityViolation(ex, mockRequest());
+      ProblemDetail problemDetail = handler.handleDataIntegrityViolation(ex);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-      assertThat(response.getBody().getType())
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+      assertThat(problemDetail.getType())
           .hasToString("urn:civitas:error:UNIQUE_CONSTRAINT_VIOLATION");
-      assertThat(response.getBody().getInstance()).isEqualTo(URI.create(TEST_URI));
     }
 
     @Test
@@ -316,13 +369,10 @@ class GlobalExceptionHandlerTest {
       DataIntegrityViolationException ex =
           new DataIntegrityViolationException("could not execute statement", cve);
 
-      ResponseEntity<ProblemDetail> response =
-          handler.handleDataIntegrityViolation(ex, mockRequest());
+      ProblemDetail problemDetail = handler.handleDataIntegrityViolation(ex);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
-      assertThat(response.getBody().getType())
-          .hasToString("urn:civitas:error:FOREIGN_KEY_VIOLATION");
-      assertThat(response.getBody().getInstance()).isEqualTo(URI.create(TEST_URI));
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:FOREIGN_KEY_VIOLATION");
     }
 
     @Test
@@ -336,12 +386,10 @@ class GlobalExceptionHandlerTest {
       DataIntegrityViolationException ex =
           new DataIntegrityViolationException("could not execute statement", cve);
 
-      ResponseEntity<ProblemDetail> response =
-          handler.handleDataIntegrityViolation(ex, mockRequest());
+      ProblemDetail problemDetail = handler.handleDataIntegrityViolation(ex);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:NOT_NULL_VIOLATION");
-      assertThat(response.getBody().getInstance()).isEqualTo(URI.create(TEST_URI));
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:NOT_NULL_VIOLATION");
     }
 
     @Test
@@ -352,12 +400,10 @@ class GlobalExceptionHandlerTest {
       DataIntegrityViolationException ex =
           new DataIntegrityViolationException("could not execute statement", cve);
 
-      ResponseEntity<ProblemDetail> response =
-          handler.handleDataIntegrityViolation(ex, mockRequest());
+      ProblemDetail problemDetail = handler.handleDataIntegrityViolation(ex);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-      assertThat(response.getBody().getType())
-          .hasToString("urn:civitas:error:DATA_INTEGRITY_ERROR");
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:DATA_INTEGRITY_ERROR");
     }
 
     @Test
@@ -367,12 +413,10 @@ class GlobalExceptionHandlerTest {
           new DataIntegrityViolationException(
               "could not execute statement", new RuntimeException("some unknown database error"));
 
-      ResponseEntity<ProblemDetail> response =
-          handler.handleDataIntegrityViolation(ex, mockRequest());
+      ProblemDetail problemDetail = handler.handleDataIntegrityViolation(ex);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-      assertThat(response.getBody().getType())
-          .hasToString("urn:civitas:error:DATA_INTEGRITY_ERROR");
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:DATA_INTEGRITY_ERROR");
     }
   }
 
@@ -386,14 +430,11 @@ class GlobalExceptionHandlerTest {
       PersistenceException ex =
           new PersistenceException(new IllegalStateException("scopeType requires scopeId"));
 
-      ResponseEntity<ProblemDetail> response =
-          handler.handlePersistenceException(ex, mockRequest());
+      ProblemDetail problemDetail = handler.handlePersistenceException(ex);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody().getType())
-          .hasToString("urn:civitas:error:ENTITY_VALIDATION_FAILED");
-      assertThat(response.getBody().getDetail()).isEqualTo("Entity validation failed");
-      assertThat(response.getBody().getInstance()).isEqualTo(URI.create(TEST_URI));
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:ENTITY_VALIDATION_FAILED");
+      assertThat(problemDetail.getDetail()).isEqualTo("Entity validation failed");
     }
 
     @Test
@@ -401,11 +442,10 @@ class GlobalExceptionHandlerTest {
     void shouldReturn500ForOtherPersistenceCauses() {
       PersistenceException ex = new PersistenceException(new RuntimeException("unexpected error"));
 
-      ResponseEntity<ProblemDetail> response =
-          handler.handlePersistenceException(ex, mockRequest());
+      ProblemDetail problemDetail = handler.handlePersistenceException(ex);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:PERSISTENCE_ERROR");
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:PERSISTENCE_ERROR");
     }
 
     @Test
@@ -413,11 +453,10 @@ class GlobalExceptionHandlerTest {
     void shouldReturn500WhenCauseIsNull() {
       PersistenceException ex = new PersistenceException("persistence error");
 
-      ResponseEntity<ProblemDetail> response =
-          handler.handlePersistenceException(ex, mockRequest());
+      ProblemDetail problemDetail = handler.handlePersistenceException(ex);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:PERSISTENCE_ERROR");
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:PERSISTENCE_ERROR");
     }
 
     @Test
@@ -426,13 +465,11 @@ class GlobalExceptionHandlerTest {
       StoredConnectorUnreadableException ex =
           new StoredConnectorUnreadableException(UUID.randomUUID(), urn);
 
-      ResponseEntity<ProblemDetail> response =
-          handler.handleStoredConnectorUnreadable(ex, mockRequest());
+      ProblemDetail problemDetail = handler.handleProblem(ex);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:PERSISTENCE_ERROR");
-      assertThat(response.getBody().getDetail()).doesNotContain(urn);
-      assertThat(response.getBody().getInstance()).isEqualTo(URI.create(TEST_URI));
+      assertThat(problemDetail.getStatus()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value());
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:PERSISTENCE_ERROR");
+      assertThat(problemDetail.getDetail()).doesNotContain(urn);
     }
   }
 
@@ -444,11 +481,9 @@ class GlobalExceptionHandlerTest {
     @DisplayName("Should return 400 with field errors for MethodArgumentNotValidException")
     @SuppressWarnings("unchecked")
     void shouldReturn400WithFieldErrors() {
-      BeanPropertyBindingResult bindingResult =
-          new BeanPropertyBindingResult(new Object(), "input");
-      bindingResult.addError(new FieldError("input", "name", "Name is required"));
-      bindingResult.addError(
-          new FieldError("input", "description", "Description must not be blank"));
+      MapBindingResult bindingResult = new MapBindingResult(new HashMap<>(), "input");
+      bindingResult.rejectValue("name", "NotBlank", "Name is required");
+      bindingResult.rejectValue("description", "NotBlank", "Description must not be blank");
 
       MethodArgumentNotValidException ex = new MethodArgumentNotValidException(null, bindingResult);
 
@@ -462,12 +497,12 @@ class GlobalExceptionHandlerTest {
       ProblemDetail problemDetail = (ProblemDetail) response.getBody();
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:VALIDATION_FAILED");
 
-      List<Map<String, String>> fieldErrors =
-          (List<Map<String, String>>) problemDetail.getProperties().get("fieldErrors");
-      assertThat(fieldErrors).hasSize(2);
+      List<FieldError> fieldErrors =
+          (List<FieldError>) problemDetail.getProperties().get("fieldErrors");
       assertThat(fieldErrors)
-          .extracting(fe -> fe.get("field"))
-          .containsExactlyInAnyOrder("name", "description");
+          .containsExactlyInAnyOrder(
+              new FieldError("name", "Name is required"),
+              new FieldError("description", "Description must not be blank"));
     }
 
     @Test
@@ -486,6 +521,76 @@ class GlobalExceptionHandlerTest {
 
       ProblemDetail problemDetail = (ProblemDetail) response.getBody();
       assertThat(problemDetail.getType()).hasToString("urn:civitas:error:MALFORMED_REQUEST");
+      assertThat(problemDetail.getTitle()).isEqualTo("Malformed request");
+      assertThat(problemDetail.getDetail()).isEqualTo("Request body is missing or malformed");
+    }
+  }
+
+  @Nested
+  @DisplayName("Framework and unexpected exception handling")
+  class FrameworkExceptionTests {
+
+    private final ServletWebRequest webRequest =
+        new ServletWebRequest(
+            new MockHttpServletRequest("PATCH", TEST_URI), new MockHttpServletResponse());
+
+    private ProblemDetail problemOf(ResponseEntity<Object> response) {
+      assertThat(response.getBody()).isInstanceOf(ProblemDetail.class);
+      return (ProblemDetail) response.getBody();
+    }
+
+    @Test
+    void handleExceptionInternal_methodNotSupported_keepsAllowAndSetsMethodNotAllowedUrn()
+        throws Exception {
+      ResponseEntity<Object> response =
+          handler.handleException(
+              new HttpRequestMethodNotSupportedException("PATCH", List.of("GET", "DELETE")),
+              webRequest);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+      assertThat(response.getHeaders().getAllow())
+          .contains(HttpMethod.GET, HttpMethod.DELETE)
+          .doesNotContain(HttpMethod.PATCH);
+      ProblemDetail problemDetail = problemOf(response);
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:METHOD_NOT_ALLOWED");
+      assertThat(problemDetail.getTitle()).isEqualTo("Method not allowed");
+    }
+
+    @Test
+    void handleExceptionInternal_typeMismatch_namesParameterWithoutEchoingValue() throws Exception {
+      TypeMismatchException ex = new TypeMismatchException("not-a-uuid", UUID.class);
+      ex.initPropertyName("dataSetId");
+
+      ResponseEntity<Object> response = handler.handleException(ex, webRequest);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      ProblemDetail problemDetail = problemOf(response);
+      assertThat(problemDetail.getType()).hasToString("urn:civitas:error:INVALID_INPUT");
+      assertThat(problemDetail.getDetail()).isEqualTo("Invalid value: dataSetId");
+    }
+
+    @Test
+    void handleExceptionInternal_noResource_setsNotFoundUrn() throws Exception {
+      ResponseEntity<Object> response =
+          handler.handleException(
+              new NoResourceFoundException(HttpMethod.GET, TEST_URI, "datasets"), webRequest);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+      assertThat(problemOf(response).getType()).hasToString("urn:civitas:error:NOT_FOUND");
+    }
+
+    @Test
+    void handleExceptionInternal_mediaTypeNotSupported_setsUnsupportedMediaTypeUrn()
+        throws Exception {
+      ResponseEntity<Object> response =
+          handler.handleException(
+              new HttpMediaTypeNotSupportedException(
+                  MediaType.TEXT_PLAIN, List.of(MediaType.APPLICATION_JSON)),
+              webRequest);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+      assertThat(problemOf(response).getType())
+          .hasToString("urn:civitas:error:UNSUPPORTED_MEDIA_TYPE");
     }
   }
 }

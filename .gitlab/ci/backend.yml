@@ -9,6 +9,7 @@
         - portal-backend/**/*
         - portal-model/**/* # Backend depends on portal-model, so run when model changes too
         - model-forge/**/* # Backend depends on model-forge, so run when it changes too
+        - authz/rego/data/backends/portal_backend/data.json # The backend route parity test reads it
         - .gitlab-ci.yml
         - .gitlab/ci/docker.yml
         - .gitlab/ci/maven.yml
@@ -143,6 +144,7 @@ integration-test-backend:
       - portal-backend/target/failsafe-reports/
       - portal-backend/target/site/jacoco-it/
       - portal-backend/target/jacoco-it.exec
+      - portal-backend/target/undocumented-answers.txt
     reports:
       junit: portal-backend/target/failsafe-reports/TEST-*.xml
 

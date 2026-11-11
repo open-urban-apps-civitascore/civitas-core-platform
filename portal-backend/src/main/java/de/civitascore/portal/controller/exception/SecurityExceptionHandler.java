@@ -1,12 +1,15 @@
 package de.civitascore.portal.controller.exception;
 
+import de.civitascore.portal.problem.ProblemDetails;
+import de.civitascore.portal.problem.ProblemType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URI;
 import lombok.extern.slf4j.Slf4j;
 import org.owasp.encoder.Encode;
-import org.springframework.http.HttpStatus;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.access.AccessDeniedException;
@@ -16,7 +19,6 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -25,14 +27,21 @@ import tools.jackson.databind.json.JsonMapper;
  * authorization failures.
  *
  * <p>Implements both {@link AuthenticationEntryPoint} and {@link AccessDeniedHandler} so that
- * Spring Security delegates unauthenticated and forbidden requests here.
+ * Spring Security delegates unauthenticated and forbidden requests here, and answers the same
+ * failures when a handler throws them.
  */
 @ControllerAdvice
+// Ahead of FallbackExceptionHandler, whose catch-all would otherwise take the security exceptions.
+@Order(Ordered.HIGHEST_PRECEDENCE)
 @Slf4j
 public class SecurityExceptionHandler implements AuthenticationEntryPoint, AccessDeniedHandler {
 
-  private static final String ERROR_URN_PREFIX = "urn:civitas:error:";
   private final ObjectMapper mapper = new JsonMapper();
+  private final ProblemDetails problemDetails;
+
+  public SecurityExceptionHandler(ProblemDetails problemDetails) {
+    this.problemDetails = problemDetails;
+  }
 
   /**
    * Handles unauthenticated requests by writing a 401 Problem Detail response.
@@ -46,9 +55,7 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
   public void commence(
       HttpServletRequest request, HttpServletResponse response, AuthenticationException ex)
       throws IOException {
-    log.warn("Authentication failed: {}", Encode.forJava(ex.getMessage()));
-    writeProblemDetailResponse(
-        request, response, HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", "Authentication required");
+    writeProblemDetailResponse(request, response, handleAuthentication(ex));
   }
 
   /**
@@ -63,44 +70,43 @@ public class SecurityExceptionHandler implements AuthenticationEntryPoint, Acces
   public void handle(
       HttpServletRequest request, HttpServletResponse response, AccessDeniedException ex)
       throws IOException {
-    log.warn("Access denied: {}", Encode.forJava(ex.getMessage()));
-    writeProblemDetailResponse(
-        request, response, HttpStatus.FORBIDDEN, "ACCESS_DENIED", "Insufficient privileges");
+    writeProblemDetailResponse(request, response, handleAccessDenied(ex));
+  }
+
+  /** Answers an authentication failure that a handler throws. */
+  @ExceptionHandler(AuthenticationException.class)
+  public ProblemDetail handleAuthentication(AuthenticationException ex) {
+    return answer(ProblemType.UNAUTHORIZED, "Authentication failed", ex);
+  }
+
+  /** Answers an access denial that a handler throws, for example from method security. */
+  @ExceptionHandler(AccessDeniedException.class)
+  public ProblemDetail handleAccessDenied(AccessDeniedException ex) {
+    return answer(ProblemType.ACCESS_DENIED, "Access denied", ex);
   }
 
   /**
    * Handles JWT validation failures and returns a 401 Problem Detail response.
    *
    * @param ex the JWT exception
-   * @param request the current HTTP request
    * @return a Problem Detail with HTTP 401 status
    */
   @ExceptionHandler(JwtException.class)
-  @ResponseStatus(HttpStatus.UNAUTHORIZED)
-  public ProblemDetail handleJwtException(JwtException ex, HttpServletRequest request) {
-    log.warn("JWT validation failed: {}", Encode.forJava(ex.getMessage()));
-    ProblemDetail problemDetail =
-        ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, "JWT validation failed");
-    problemDetail.setType(URI.create(ERROR_URN_PREFIX + "INVALID_TOKEN"));
-    problemDetail.setTitle(HttpStatus.UNAUTHORIZED.getReasonPhrase());
-    problemDetail.setInstance(URI.create(request.getRequestURI()));
-    return problemDetail;
+  public ProblemDetail handleJwtException(JwtException ex) {
+    return answer(ProblemType.INVALID_TOKEN, "JWT validation failed", ex);
+  }
+
+  private ProblemDetail answer(ProblemType type, String logPrefix, RuntimeException ex) {
+    log.warn("{}: {}", logPrefix, Encode.forJava(ex.getMessage()));
+    return problemDetails.of(type);
   }
 
   private void writeProblemDetailResponse(
-      HttpServletRequest request,
-      HttpServletResponse response,
-      HttpStatus status,
-      String errorCode,
-      String detail)
+      HttpServletRequest request, HttpServletResponse response, ProblemDetail problemDetail)
       throws IOException {
-    ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(status, detail);
-    problemDetail.setType(URI.create(ERROR_URN_PREFIX + errorCode));
-    problemDetail.setTitle(status.getReasonPhrase());
     problemDetail.setInstance(URI.create(request.getRequestURI()));
-
     response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
-    response.setStatus(status.value());
+    response.setStatus(problemDetail.getStatus());
     response.getWriter().write(mapper.writeValueAsString(problemDetail));
   }
 }

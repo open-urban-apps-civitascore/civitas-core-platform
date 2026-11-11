@@ -1,8 +1,6 @@
 package de.civitascore.portal.controller;
 
 import de.civitascore.portal.model.connector.ConnectorJson;
-import de.civitascore.portal.model.connector.MalformedDataSourceRequestException;
-import de.civitascore.portal.model.embedded.ConnectorType;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.input.ConnectionTestInputDTO;
@@ -15,15 +13,11 @@ import de.civitascore.portal.repository.specification.DataSourceSpec;
 import de.civitascore.portal.service.DataSourceService;
 import de.civitascore.portal.service.connector.DataSourceConnectionTestService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.Parameters;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.io.IOException;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -38,7 +32,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -85,54 +78,6 @@ public class DataSourceController
     return super.updateReleasedMeta(id, updates);
   }
 
-  @Parameters({
-    @Parameter(
-        name = "name",
-        description = "Filter by name (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "mqtt-sensor")),
-    @Parameter(
-        name = "description",
-        description = "Filter by description (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "Temperature sensor")),
-    @Parameter(
-        name = "q",
-        description = "Search in name or description (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "sensor")),
-    @Parameter(
-        name = "dataSourceStatus",
-        description = "Filter by status (exact match).",
-        in = ParameterIn.QUERY,
-        schema =
-            @Schema(
-                type = "string",
-                allowableValues = {"DRAFT", "AVAILABLE"})),
-    @Parameter(
-        name = "connectorType",
-        description = "Filter by connector type (exact match).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(implementation = ConnectorType.class)),
-    @Parameter(
-        name = "datapoolId",
-        description =
-            "Filter by DataPool scope. Returns DataSources with scope type ALL, or SPECIFIC DataSources that include this DataPool.",
-        in = ParameterIn.QUERY,
-        schema =
-            @Schema(
-                type = "string",
-                format = "uuid",
-                example = "550e8400-e29b-41d4-a716-446655440000")),
-    @Parameter(
-        name = "datapoolScopeType",
-        description = "Filter by DataPool scope type (exact match).",
-        in = ParameterIn.QUERY,
-        schema =
-            @Schema(
-                type = "string",
-                allowableValues = {"ALL", "NONE", "SPECIFIC"}))
-  })
   /**
    * Retrieves a paginated list of data sources with optional filtering by name, description,
    * status, connector type, or free-text search.
@@ -143,7 +88,7 @@ public class DataSourceController
    */
   @Override
   public ResponseEntity<Page<DataSourceOutputDTO>> getAll(
-      @ParameterObject @Parameter(description = "Search/filter spec") DataSourceSpec spec,
+      @ParameterObject DataSourceSpec spec,
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
@@ -234,6 +179,19 @@ public class DataSourceController
     return ResponseEntity.ok(connectionTestService.test(id, input));
   }
 
+  @Override
+  @Operation(
+      summary = "Partially update a {entity}",
+      description =
+          JsonMergePatch.OPERATION_DESCRIPTION
+              + " The connector is the exception: it merges recursively into the stored"
+              + " connector, so a secret that the patch omits keeps its stored value. A connector"
+              + " with another connectorType replaces the stored one.")
+  public ResponseEntity<DataSourceOutputDTO> patch(
+      @PathVariable UUID id, @RequestBody JsonNode updates) {
+    return super.patch(id, updates);
+  }
+
   /**
    * Applies the {@code connector} member as a JSON merge patch of the stored connector, and the
    * other members as usual. A {@code connector} with another {@code connectorType} replaces the
@@ -243,18 +201,12 @@ public class DataSourceController
    */
   @Override
   protected DataSourceInputDTO patchInput(
-      DataSourceInputDTO currentDto, DataSource entity, JsonNode updates) throws IOException {
+      DataSourceInputDTO currentDto, DataSource entity, JsonNode updates) {
     JsonNode otherMembers =
         updates instanceof ObjectNode object
             ? object.deepCopy().without(ConnectorJson.ROOT)
             : updates;
-    DataSourceInputDTO patchedDto;
-    // Jackson wraps the exception that the any-setter of the input throws for an unknown key.
-    try {
-      patchedDto = super.patchInput(currentDto, entity, otherMembers);
-    } catch (JacksonException e) {
-      throw e.getCause() instanceof MalformedDataSourceRequestException malformed ? malformed : e;
-    }
+    DataSourceInputDTO patchedDto = super.patchInput(currentDto, entity, otherMembers);
     patchedDto.setConnector(getService().patchConnector(entity, updates.path(ConnectorJson.ROOT)));
     return patchedDto;
   }

@@ -91,15 +91,19 @@ export const mapFormLayerToPayload = (layers: LayerFormData[]): LayerApiPayload[
     latLonBoundingBox: toBoundingBoxPayload(computeLatLonBoundingBox(layer.nativeBoundingBox, layer.crs)),
   }))
 
-export const buildStaPayloadData = (data: StaApiFormData): NamedApiPayload => ({
-  ...data.baseInfo,
+export const buildStaPayloadData = ({
+  baseInfo: { persistence: _persistence, ...baseInfo },
+}: StaApiFormData): NamedApiPayload => ({
+  ...baseInfo,
   standard: DEFAULTS_BY_TYPE.sensorthings.standard,
 })
 
-export const buildOwsPayload = (data: OwsApiFormData): NamedApiPayload => ({
-  ...data.baseInfo,
+export const buildOwsPayload = ({
+  baseInfo: { persistence: _persistence, ...baseInfo },
+}: OwsApiFormData): NamedApiPayload => ({
+  ...baseInfo,
   standard: DEFAULTS_BY_TYPE['ows'].standard,
-  description: data.baseInfo.description || undefined,
+  description: baseInfo.description || undefined,
 })
 
 type SchemaProperty = { $ref?: string; crs?: string }

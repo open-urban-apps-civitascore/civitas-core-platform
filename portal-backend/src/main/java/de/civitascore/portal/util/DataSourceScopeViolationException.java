@@ -1,13 +1,13 @@
 package de.civitascore.portal.util;
 
+import de.civitascore.portal.problem.ProblemException;
+import de.civitascore.portal.problem.ProblemType;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
 
 /** Thrown when one or more DataSources violate the DataPool scope of the Pipeline's Dataset. */
-@ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
-public class DataSourceScopeViolationException extends RuntimeException {
+public class DataSourceScopeViolationException extends ProblemException {
 
   private final List<UUID> offendingDataSourceIds;
 
@@ -15,16 +15,16 @@ public class DataSourceScopeViolationException extends RuntimeException {
     // Name the way out: the offending ids alone leave the caller guessing, and widening the
     // datasource's own datapool scope is the only resolution — the dataset cannot be edited out
     // of the violation.
-    super(
+    this(
+        offendingDataSourceIds,
         "One or more DataSources are not permitted for the Dataset's DataPool scope."
             + " Widen the datapool scope of the offending DataSources "
             + offendingDataSourceIds
             + " or move the Dataset to a datapool they are scoped for.");
-    this.offendingDataSourceIds = List.copyOf(offendingDataSourceIds);
   }
 
   private DataSourceScopeViolationException(List<UUID> offendingDataSourceIds, String message) {
-    super(message);
+    super(ProblemType.DATASOURCE_SCOPE_VIOLATION, message);
     this.offendingDataSourceIds = List.copyOf(offendingDataSourceIds);
   }
 
@@ -50,5 +50,10 @@ public class DataSourceScopeViolationException extends RuntimeException {
 
   public List<UUID> getOffendingDataSourceIds() {
     return offendingDataSourceIds;
+  }
+
+  @Override
+  public Map<String, Object> properties() {
+    return Map.of("offendingDataSourceIds", offendingDataSourceIds);
   }
 }

@@ -4,7 +4,6 @@ import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.ExternalDocumentation;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.PathItem;
-import io.swagger.v3.oas.models.examples.Example;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.info.License;
@@ -12,16 +11,13 @@ import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.parameters.Parameter;
-import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.security.OAuthFlow;
 import io.swagger.v3.oas.models.security.OAuthFlows;
 import io.swagger.v3.oas.models.security.Scopes;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -29,12 +25,12 @@ import java.util.stream.Collectors;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.annotation.Order;
 
 /**
  * OpenAPI/Swagger configuration that customizes the generated API documentation. Adds OAuth2
- * security schemes, normalizes operation IDs, replaces entity name placeholders, provides RFC 9457
- * ProblemDetail examples, and derives PATCH schemas from PUT input DTOs.
+ * security schemes, normalizes operation IDs, replaces entity name placeholders, and derives PATCH
+ * schemas from PUT input DTOs. The error responses come from {@link
+ * de.civitascore.portal.configuration.openapi.ProblemResponsesCustomizer}.
  */
 @Configuration
 public class OpenApiConfig {
@@ -49,8 +45,6 @@ public class OpenApiConfig {
   }
 
   private static final String APPLICATION_JSON = "application/json";
-  private static final String APPLICATION_PROBLEM_JSON = "application/problem+json";
-  private static final String EXAMPLE_PATH = "/v1/datasets";
 
   /**
    * Creates the base OpenAPI definition with info metadata, license, contact, external docs, and
@@ -165,9 +159,8 @@ public class OpenApiConfig {
                                 operation.setOperationId(
                                     operation.getOperationId().replace("{Entity}", entityPascal));
                               }
-                              operation
-                                  .getResponses()
-                                  .values()
+                              operation.getResponses().values().stream()
+                                  .filter(response -> response.get$ref() == null)
                                   .forEach(
                                       response ->
                                           response.setDescription(
@@ -284,117 +277,14 @@ public class OpenApiConfig {
                                             .name(param)
                                             .in("path")
                                             .required(true)
-                                            .schema(new Schema<>().type("string").format("uuid")));
+                                            .schema(
+                                                new Schema<>()
+                                                    .types(Set.of("string"))
+                                                    .format("uuid")));
                               }
                             }
                           });
                 });
-  }
-
-  /**
-   * Adds global 401/403/500 responses to all operations and normalizes all ProblemDetail error
-   * responses to use {@code application/problem+json} (RFC 9457). Other error codes (400, 404, 409)
-   * come from {@code @ApiResponse} annotations on controllers.
-   */
-  @Bean
-  @Order(1)
-  public OpenApiCustomizer globalResponseCustomizer() {
-    return openApi ->
-        openApi
-            .getPaths()
-            .values()
-            .forEach(
-                pathItem ->
-                    pathItem
-                        .readOperations()
-                        .forEach(
-                            operation -> {
-                              operation
-                                  .getResponses()
-                                  .addApiResponse(
-                                      "401",
-                                      new ApiResponse()
-                                          .description("Authentication required")
-                                          .content(newProblemContent()));
-                              operation
-                                  .getResponses()
-                                  .addApiResponse(
-                                      "403",
-                                      new ApiResponse()
-                                          .description("Insufficient privileges")
-                                          .content(newProblemContent()));
-                              operation
-                                  .getResponses()
-                                  .addApiResponse(
-                                      "500",
-                                      new ApiResponse()
-                                          .description("Internal server error")
-                                          .content(newProblemContent()));
-
-                              operation
-                                  .getResponses()
-                                  .values()
-                                  .forEach(this::normalizeProblemContentType);
-                            }));
-  }
-
-  /**
-   * Extracts common error responses (401, 403, 500) into {@code components/responses} and replaces
-   * inline occurrences with {@code $ref}s.
-   */
-  @Bean
-  @Order(2)
-  public OpenApiCustomizer sharedResponsesCustomizer() {
-    Map<String, String> sharedResponses =
-        orderedMap(
-            "401", "Unauthorized",
-            "403", "Forbidden",
-            "500", "InternalServerError");
-
-    return openApi -> {
-      // Capture the first inline occurrence of each code as the shared definition
-      openApi.getPaths().values().stream()
-          .flatMap(pathItem -> pathItem.readOperations().stream())
-          .findFirst()
-          .ifPresent(
-              operation ->
-                  sharedResponses.forEach(
-                      (code, name) -> {
-                        ApiResponse inline = operation.getResponses().get(code);
-                        if (inline != null && inline.get$ref() == null) {
-                          openApi
-                              .getComponents()
-                              .addResponses(
-                                  name,
-                                  new ApiResponse()
-                                      .description(inline.getDescription())
-                                      .content(newProblemContent()));
-                        }
-                      }));
-
-      // Replace all inline occurrences with $refs
-      openApi
-          .getPaths()
-          .values()
-          .forEach(
-              pathItem ->
-                  pathItem
-                      .readOperations()
-                      .forEach(
-                          operation ->
-                              sharedResponses.forEach(
-                                  (code, name) -> {
-                                    ApiResponse existing = operation.getResponses().get(code);
-                                    if (existing != null && existing.get$ref() == null) {
-                                      operation
-                                          .getResponses()
-                                          .addApiResponse(
-                                              code,
-                                              new ApiResponse()
-                                                  .$ref("#/components/responses/" + name));
-                                    }
-                                  })));
-    };
   }
 
   /**
@@ -453,236 +343,5 @@ public class OpenApiConfig {
     MediaType json = content.get(APPLICATION_JSON);
     if (json == null || json.getSchema() == null) return null;
     return json.getSchema().get$ref();
-  }
-
-  private Content newProblemContent() {
-    Schema<?> schema = new Schema<>().$ref("#/components/schemas/ProblemDetail");
-    return new Content().addMediaType(APPLICATION_PROBLEM_JSON, new MediaType().schema(schema));
-  }
-
-  /**
-   * Adds realistic ProblemDetail examples (RFC 9457) with actual {@code urn:civitas:error:*} type
-   * URNs to all error responses. Shared responses (401, 403, 500) get examples on the component
-   * definition; inline responses (400, 404, 409) get examples per-operation.
-   */
-  @Bean
-  @Order(3)
-  public OpenApiCustomizer problemDetailExamplesCustomizer() {
-    return openApi -> {
-      // Add examples to shared component responses
-      if (openApi.getComponents() != null && openApi.getComponents().getResponses() != null) {
-        addExamplesToResponse(
-            openApi.getComponents().getResponses().get("Unauthorized"),
-            problemExamples(
-                orderedMap(
-                    "expired_token",
-                    problemExample(401, "UNAUTHORIZED", "Authentication required", EXAMPLE_PATH),
-                    "invalid_token",
-                    problemExample(401, "INVALID_TOKEN", "JWT validation failed", EXAMPLE_PATH))));
-        addExamplesToResponse(
-            openApi.getComponents().getResponses().get("Forbidden"),
-            problemExamples(
-                orderedMap(
-                    "access_denied",
-                    problemExample(
-                        403, "ACCESS_DENIED", "Insufficient privileges", EXAMPLE_PATH))));
-        addExamplesToResponse(
-            openApi.getComponents().getResponses().get("InternalServerError"),
-            problemExamples(
-                orderedMap(
-                    "data_integrity_error",
-                    problemExample(
-                        500,
-                        "DATA_INTEGRITY_ERROR",
-                        "A database constraint was violated",
-                        EXAMPLE_PATH),
-                    "persistence_error",
-                    problemExample(
-                        500,
-                        "PERSISTENCE_ERROR",
-                        "An unexpected database error occurred",
-                        EXAMPLE_PATH))));
-      }
-
-      // Add examples to inline error responses
-      openApi
-          .getPaths()
-          .forEach(
-              (path, pathItem) ->
-                  pathItem
-                      .readOperations()
-                      .forEach(
-                          operation ->
-                              operation
-                                  .getResponses()
-                                  .forEach(
-                                      (code, response) -> {
-                                        if (response.get$ref() != null) return;
-                                        Map<String, Example> examples =
-                                            inlineExamplesForCode(code, path);
-                                        if (examples != null) {
-                                          addExamplesToResponse(response, examples);
-                                        }
-                                      })));
-    };
-  }
-
-  private Map<String, Example> inlineExamplesForCode(String code, String path) {
-    return switch (code) {
-      case "400" ->
-          problemExamples(
-              orderedMap(
-                  "invalid_input",
-                  problemExample(
-                      400, "INVALID_INPUT", "Validation failed: name must not be blank", path),
-                  "validation_failed",
-                  problemExample(400, "VALIDATION_FAILED", "Request body validation failed", path),
-                  "malformed_request",
-                  problemExample(400, "MALFORMED_REQUEST", "Failed to read request body", path),
-                  "dataset_not_editable",
-                  problemExample(
-                      400,
-                      "DATASET_NOT_EDITABLE",
-                      "A dataset and its sub-entities can only be changed while the dataset is "
-                          + "DRAFT. Unstage or unrelease the dataset first.",
-                      path),
-                  "model_root_missing",
-                  problemExample(
-                      400,
-                      "MODEL_ROOT_MISSING",
-                      "DataStructureVersion model must designate exactly one root Element before"
-                          + " releasing",
-                      path),
-                  "model_member_unreachable",
-                  problemExample(
-                      400,
-                      "MODEL_MEMBER_UNREACHABLE",
-                      "DataStructureVersion model has members that its root Element does not"
-                          + " reach: Orphan",
-                      path,
-                      "memberNames",
-                      List.of("Orphan")),
-                  "model_reference_not_available",
-                  problemExample(
-                      400,
-                      "MODEL_REFERENCE_NOT_AVAILABLE",
-                      "A referenced model is not available: it must exist, be readable, and be"
-                          + " referenced with a version",
-                      path)));
-      case "404" ->
-          problemExamples(
-              orderedMap(
-                  "not_found",
-                  problemExample(
-                      404,
-                      "NOT_FOUND",
-                      "Resource not found: 550e8400-e29b-41d4-a716-446655440000",
-                      path)));
-      case "409" ->
-          problemExamples(
-              orderedMap(
-                  "unique_constraint",
-                  problemExample(
-                      409,
-                      "UNIQUE_CONSTRAINT_VIOLATION",
-                      "A resource with this name already exists",
-                      path),
-                  "resource_in_use",
-                  problemExample(
-                      409,
-                      "RESOURCE_IN_USE",
-                      "Cannot delete: resource is referenced by other entities",
-                      path),
-                  "saga_in_flight",
-                  problemExample(
-                      409,
-                      "SAGA_IN_FLIGHT",
-                      "Cannot write while a saga is in-flight: CREATE",
-                      path,
-                      "pendingSagaType",
-                      "CREATE"),
-                  "model_missing",
-                  problemExample(
-                      409,
-                      "MODEL_MISSING",
-                      "DataStructureVersion model is missing from the model registry",
-                      path),
-                  "foreign_key_violation",
-                  problemExample(
-                      409, "FOREIGN_KEY_VIOLATION", "Referenced entity does not exist", path)));
-      default -> null;
-    };
-  }
-
-  private void addExamplesToResponse(ApiResponse response, Map<String, Example> examples) {
-    if (response == null || response.getContent() == null) return;
-    MediaType media = response.getContent().get(APPLICATION_PROBLEM_JSON);
-    if (media == null) return;
-    examples.forEach(media::addExamples);
-  }
-
-  private Map<String, Example> problemExamples(Map<String, Map<String, Object>> entries) {
-    Map<String, Example> examples = new LinkedHashMap<>();
-    entries.forEach((name, value) -> examples.put(name, new Example().summary(name).value(value)));
-    return examples;
-  }
-
-  private Map<String, Object> problemExample(
-      int status, String errorCode, String detail, String instance) {
-    String title =
-        switch (status) {
-          case 400 -> "Bad Request";
-          case 401 -> "Unauthorized";
-          case 403 -> "Forbidden";
-          case 404 -> "Not Found";
-          case 409 -> "Conflict";
-          case 500 -> "Internal Server Error";
-          case 502 -> "Bad Gateway";
-          case 504 -> "Gateway Timeout";
-          default -> "Error";
-        };
-    Map<String, Object> map = new LinkedHashMap<>();
-    map.put("type", "urn:civitas:error:" + errorCode);
-    map.put("title", title);
-    map.put("status", status);
-    map.put("detail", detail);
-    map.put("instance", instance);
-    return map;
-  }
-
-  private Map<String, Object> problemExample(
-      int status,
-      String errorCode,
-      String detail,
-      String instance,
-      String propertyName,
-      Object propertyValue) {
-    Map<String, Object> map = problemExample(status, errorCode, detail, instance);
-    map.put(propertyName, propertyValue);
-    return map;
-  }
-
-  @SuppressWarnings("unchecked")
-  private <V> Map<String, V> orderedMap(Object... keyValues) {
-    Map<String, V> map = new LinkedHashMap<>();
-    for (int i = 0; i < keyValues.length; i += 2) {
-      map.put((String) keyValues[i], (V) keyValues[i + 1]);
-    }
-    return map;
-  }
-
-  /**
-   * Replaces {@code application/json} with {@code application/problem+json} on ProblemDetail
-   * responses.
-   */
-  private void normalizeProblemContentType(ApiResponse response) {
-    if (response.getContent() == null) return;
-    MediaType jsonMedia = response.getContent().get(APPLICATION_JSON);
-    if (jsonMedia == null || jsonMedia.getSchema() == null) return;
-    String ref = jsonMedia.getSchema().get$ref();
-    if (ref != null && ref.endsWith("/ProblemDetail")) {
-      response.getContent().remove(APPLICATION_JSON);
-      response.getContent().addMediaType(APPLICATION_PROBLEM_JSON, jsonMedia);
-    }
   }
 }

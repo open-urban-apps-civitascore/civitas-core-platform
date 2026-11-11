@@ -33,7 +33,7 @@ docs {
 
   **Expected Response:** 200 OK, body reflects updated `sldContent`.
 
-  **Note:** PATCH is not supported on Styles — the controller returns 405. Use this PUT for any modification.
+  **Note:** PATCH is not supported on Styles. The gateway route table has no PATCH for this path, so the gateway denies the request; the backend itself answers 405 with an `Allow` header. Use this PUT for any modification.
 
   **System Impact:**
 

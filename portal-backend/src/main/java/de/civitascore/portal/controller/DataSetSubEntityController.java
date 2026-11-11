@@ -9,8 +9,10 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
-import java.io.IOException;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,8 +26,7 @@ import tools.jackson.databind.JsonNode;
  * /datasets/{dataSetId}/...}.
  *
  * <p>Every id-addressed operation answers {@link ResourceNotFoundException} when the addressed
- * entity belongs to a different dataset than the path names, so a foreign id is indistinguishable
- * from an unknown one and cannot reveal the other dataset's state.
+ * entity belongs to a different dataset than the path names.
  *
  * @param <I> the input DTO type
  * @param <O> the output DTO type
@@ -59,6 +60,13 @@ public abstract class DataSetSubEntityController<
    * @return the entity class this controller manages
    */
   protected abstract Class<E> getEntityClass();
+
+  /** DataSetOwnedSpec answers a malformed {@code dataSetId} with an empty page, not a 400. */
+  @Override
+  protected ResponseEntity<Page<O>> getAll(Specification<E> spec, Pageable pageable) {
+    extractDataSetId();
+    return super.getAll(spec, pageable);
+  }
 
   @Override
   public ResponseEntity<O> getById(@PathVariable UUID id) {
@@ -102,8 +110,7 @@ public abstract class DataSetSubEntityController<
       responseCode = "409",
       description = "A saga is in flight on the parent dataset",
       content = @Content(schema = @Schema(implementation = ProblemDetail.class)))
-  public ResponseEntity<O> patch(@PathVariable UUID id, @RequestBody JsonNode updates)
-      throws IOException {
+  public ResponseEntity<O> patch(@PathVariable UUID id, @RequestBody JsonNode updates) {
     requireOwnedByPathDataSet(id);
     return super.patch(id, updates);
   }
@@ -137,9 +144,7 @@ public abstract class DataSetSubEntityController<
   protected E requireOwnedByPathDataSet(UUID id) {
     UUID dataSetId = extractDataSetId();
     E entity = getService().findByIdOrThrow(id);
-    if (!dataSetId.equals(entity.getDataSet().getId())) {
-      throw new ResourceNotFoundException(getEntityClass().getSimpleName(), id);
-    }
+    ParentOwnership.requireSameParent(dataSetId, entity.getDataSet().getId(), getEntityClass(), id);
     return entity;
   }
 

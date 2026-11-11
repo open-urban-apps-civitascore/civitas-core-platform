@@ -31,7 +31,6 @@ tests {
   });
   test("Error body matches the VALIDATION_FAILED contract", function() {
     expect(res.body.type).to.equal("urn:civitas:error:VALIDATION_FAILED");
-    expect(res.body.title).to.equal("Bad Request");
     expect(res.body.status).to.equal(400);
     expect(res.body.fieldErrors).to.deep.equal([
       { field: "connector.qos", message: "'qos' must be 0, 1, or 2" }

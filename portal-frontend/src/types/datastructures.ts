@@ -119,7 +119,7 @@ export type DatastructureVersionSummary = z.infer<typeof DatastructureVersionSum
 export type DatastructureVersionFormData = z.infer<typeof DatastructureVersionFormDraftSchema>
 export type DatastructureVersionCreateData = z.infer<typeof DatastructureVersionCreateSchema>
 export type DatastructureVersionPutData = DatastructureVersionCreateData & WithId
-export type DatastructureVersionPatchData = Partial<DatastructureVersionCreateData> & WithId
+export type DatastructureVersionPatchData = Partial<DatastructureVersionCreateData>
 
 export type DatastructureVersionsListData = {
   id: string

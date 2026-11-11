@@ -4,8 +4,9 @@ import { STATUS_TYPES } from '@/types/common'
 import { DataSink, DATASINK_TYPES } from '@/types/datasinks'
 import { DATASTRUCTURE_VERSION_SOURCE, DatastructureVersion } from '@/types/datastructures'
 import { LayerFormData } from '@/types/layers'
+import { API_STANDARDS, API_TYPE_QUERY } from '@/types/namedApis'
 
-import { getNativeCRSFromDataSink, mapFormLayerToPayload } from './namedApis'
+import { buildOwsPayload, buildStaPayloadData, getNativeCRSFromDataSink, mapFormLayerToPayload } from './namedApis'
 
 const makeLayer = (overrides: Partial<LayerFormData> = {}): LayerFormData => ({
   id: '00000000-0000-0000-0000-000000000001',
@@ -214,5 +215,28 @@ describe('getNativeCRSFromDataSink', () => {
       [makeDatastructureVersion(modelWithoutCRS)],
     )
     expect(result).toBe('')
+  })
+})
+
+// The backend answers a named API field it does not know with 400, so no form-only field may reach the payload.
+describe('named API payloads', () => {
+  const baseInfo = { name: 'Traffic', slug: 'traffic', description: 'Counts', persistence: 'sink-1' }
+
+  it('builds the STA payload from the named API fields only', () => {
+    expect(buildStaPayloadData({ type: API_TYPE_QUERY.SENSORTHINGS, baseInfo })).toEqual({
+      name: 'Traffic',
+      slug: 'traffic',
+      description: 'Counts',
+      standard: API_STANDARDS.STA,
+    })
+  })
+
+  it('builds the OWS payload from the named API fields only', () => {
+    expect(buildOwsPayload({ type: API_TYPE_QUERY.OWS, baseInfo, layers: [], styles: [] })).toEqual({
+      name: 'Traffic',
+      slug: 'traffic',
+      description: 'Counts',
+      standard: API_STANDARDS.OWS,
+    })
   })
 })

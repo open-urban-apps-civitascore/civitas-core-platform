@@ -1,13 +1,12 @@
 package de.civitascore.portal.util;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
+import de.civitascore.portal.problem.ProblemException;
+import de.civitascore.portal.problem.ProblemType;
 
 /** Thrown when a data structure version is released while its model has no single root Element. */
-@ResponseStatus(HttpStatus.BAD_REQUEST)
-public class ModelRootMissingException extends RuntimeException {
+public class ModelRootMissingException extends ProblemException {
 
   public ModelRootMissingException() {
-    super("DataStructureVersion model must designate exactly one root Element before releasing");
+    super(ProblemType.MODEL_ROOT_MISSING, ProblemType.MODEL_ROOT_MISSING.name(), null);
   }
 }

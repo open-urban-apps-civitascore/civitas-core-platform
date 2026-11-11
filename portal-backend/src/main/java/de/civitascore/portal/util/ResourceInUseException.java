@@ -1,15 +1,14 @@
 package de.civitascore.portal.util;
 
+import de.civitascore.portal.problem.ProblemException;
+import de.civitascore.portal.problem.ProblemType;
 import java.util.List;
 import java.util.UUID;
 import lombok.Getter;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
 
 /** Thrown when a resource cannot be deleted or modified because it is still referenced. */
 @Getter
-@ResponseStatus(HttpStatus.CONFLICT)
-public class ResourceInUseException extends RuntimeException {
+public class ResourceInUseException extends ProblemException {
 
   private final String resourceType;
   private final UUID resourceId;
@@ -23,9 +22,14 @@ public class ResourceInUseException extends RuntimeException {
 
   public ResourceInUseException(
       String resourceType, UUID resourceId, String message, List<String> blockedBy) {
-    super(message);
+    super(ProblemType.RESOURCE_IN_USE, message);
     this.resourceType = resourceType;
     this.resourceId = resourceId;
     this.blockedBy = blockedBy == null ? List.of() : List.copyOf(blockedBy);
+  }
+
+  @Override
+  public String toString() {
+    return super.toString() + " blockedBy=" + blockedBy;
   }
 }

@@ -8,10 +8,6 @@ import de.civitascore.portal.model.output.assembler.GroupAssembler;
 import de.civitascore.portal.repository.specification.GroupSpec;
 import de.civitascore.portal.service.GroupService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.Parameters;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
-import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.Set;
@@ -40,33 +36,6 @@ public class GroupController
   private final GroupService groupService;
   private final GroupAssembler groupAssembler;
 
-  @Parameters({
-    @Parameter(
-        name = "name",
-        description = "Filter by name (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "Engineering")),
-    @Parameter(
-        name = "description",
-        description = "Filter by description (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "Development team")),
-    @Parameter(
-        name = "contactUserId",
-        description = "Filter by contact user ID (exact match).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "user-123")),
-    @Parameter(
-        name = "memberIds",
-        description = "Filter by member user ID(s), comma-separated.",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "user-456")),
-    @Parameter(
-        name = "q",
-        description = "Search in name or description (partial match, case-insensitive).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "team"))
-  })
   /**
    * Retrieves a paginated list of groups with optional filtering by name, description, contact
    * user, members, or free-text search.
@@ -77,7 +46,7 @@ public class GroupController
    */
   @Override
   public ResponseEntity<Page<GroupOutputDTO>> getAll(
-      @ParameterObject @Parameter(description = "Search/filter spec") GroupSpec spec,
+      @ParameterObject GroupSpec spec,
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {

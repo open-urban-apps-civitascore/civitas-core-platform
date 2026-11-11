@@ -8,13 +8,9 @@ import de.civitascore.portal.repository.specification.base.BaseSpec;
 import de.civitascore.portal.service.BaseService;
 import de.civitascore.portal.util.InvalidInputException;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.Parameters;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import jakarta.validation.Validator;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.util.Map;
@@ -23,7 +19,6 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.experimental.FieldDefaults;
 import org.springdoc.core.annotations.ParameterObject;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -38,7 +33,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.servlet.HandlerMapping;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * Abstract base controller exposing only GET (read) operations. Subclasses that require write
@@ -59,45 +53,14 @@ public abstract class BaseReadOnlyController<
 
   protected abstract BaseAssembler<E, O, UUID> getAssembler();
 
-  @Autowired protected ObjectMapper objectMapper;
-  @Autowired protected Validator validator;
-
   @Operation(
       summary = "List all {entities}",
       description =
           "Returns a paginated, filterable list of {entities}. Supports sorting and specification-based filtering.")
   @ApiResponse(responseCode = "200", description = "Page of {entities} returned successfully")
-  @Parameters({
-    @Parameter(
-        name = "id",
-        description = "Filter by one or more IDs (comma-separated).",
-        example = "1,2,3",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", example = "1,2,3")),
-    @Parameter(
-        name = "createdAtFrom",
-        description = "Filter by creation date greater than or equal to this value (ISO 8601).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", format = "date-time", example = "2024-01-01T00:00:00Z")),
-    @Parameter(
-        name = "createdAtTo",
-        description = "Filter by creation date less than or equal to this value (ISO 8601).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", format = "date-time", example = "2024-12-31T23:59:59Z")),
-    @Parameter(
-        name = "modifiedAtFrom",
-        description = "Filter by modification date greater than or equal to this value (ISO 8601).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", format = "date-time", example = "2024-01-01T00:00:00Z")),
-    @Parameter(
-        name = "modifiedAtTo",
-        description = "Filter by modification date less than or equal to this value (ISO 8601).",
-        in = ParameterIn.QUERY,
-        schema = @Schema(type = "string", format = "date-time", example = "2024-12-31T23:59:59Z"))
-  })
   @GetMapping
   public ResponseEntity<Page<O>> getAll(
-      @ParameterObject @Parameter(description = "Search/filter spec") S spec,
+      @ParameterObject S spec,
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {

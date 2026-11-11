@@ -34,7 +34,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @WebMvcTest(
     controllers = UserController.class,
     excludeAutoConfiguration = {OAuth2ResourceServerAutoConfiguration.class})
-@ContextConfiguration(classes = {UserController.class})
+@ContextConfiguration(classes = {UserController.class, JsonMergePatch.class})
 class UserControllerTest {
 
   @Autowired private MockMvc mockMvc;
