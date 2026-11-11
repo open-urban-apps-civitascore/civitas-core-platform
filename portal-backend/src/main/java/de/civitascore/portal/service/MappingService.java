@@ -2,7 +2,10 @@ package de.civitascore.portal.service;
 
 import de.civitascore.configadapter.model.dataset.CoreUrn;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.input.MappingInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway.ModelPin;
+import de.civitascore.portal.modelregistry.ModelRegistryGateway.RegistryDocument;
 import de.civitascore.portal.modelregistry.PayloadKind;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -11,8 +14,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Value;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * First-class Mapping artifacts, nested under the DataSet they belong to. A Mapping is a CORE
@@ -22,12 +27,13 @@ import org.springframework.stereotype.Service;
  * validates the document against {@code mapping.schema.json} and stamps its {@code $schema} +
  * {@code id} on store.
  *
- * <p>Every operation is scoped to a DataSet: the mapping is a member of that DataSet's manifest, so
- * the DataSet-typed route grant covers it and a caller cannot reach a mapping of another DataSet.
- * Membership is checked version-agnostically, because a mapping is addressed by either its logical
- * or a versioned URN and every version shares the same membership.
+ * <p>A Mapping is addressed by the UUID of its CORE URN, and every operation resolves that id among
+ * the members of the DataSet's manifest only. The DataSet-typed route grant covers exactly those
+ * members, so a caller cannot reach a mapping of another DataSet, and a foreign mapping answers
+ * like an unknown one.
  */
 @Service
+@RequiredArgsConstructor
 public class MappingService {
 
   private static final String ENTITY_NAME = "Mapping";
@@ -35,100 +41,132 @@ public class MappingService {
   /** CORE artifact-type segment of a Mapping, as it appears in the dependency graph. */
   private static final String MAPPING_ARTIFACT_TYPE = "mapping";
 
+  private static final String POSITIONS = "positions";
+
+  private static final TypeReference<Map<String, Object>> CONTENT = new TypeReference<>() {};
+
   private final ModelRegistryGateway registry;
   private final DataSetService dataSetService;
+  private final DataSetMutationGuard dataSetMutationGuard;
+  private final ObjectMapper objectMapper;
+
+  /** A Mapping as the list names it. */
+  public record MappingSummary(UUID mappingId, String logicalUrn, String title) {}
 
   /**
-   * The namespace the registry mints into, read from the registry's own configuration so the two
-   * cannot drift apart.
-   */
-  private final String urnScope;
-
-  private final String urnOwner;
-  private final String urnDomain;
-
-  public MappingService(
-      ModelRegistryGateway registry,
-      DataSetService dataSetService,
-      @Value("${model-forge.urn.scope:}") String urnScope,
-      @Value("${model-forge.urn.owner:}") String urnOwner,
-      @Value("${model-forge.urn.domain:}") String urnDomain) {
-    this.registry = registry;
-    this.dataSetService = dataSetService;
-    this.urnScope = urnScope;
-    this.urnOwner = urnOwner;
-    this.urnDomain = urnDomain;
-  }
-
-  /**
-   * Stores a mapping document under a DataSet — creates a new artifact when {@code logicalUrn} is
-   * null, otherwise versions the existing one — and returns the assigned URN pins. A new mapping is
-   * linked into the DataSet's manifest as it is stored, which is what makes it reachable through
-   * this DataSet afterwards. The editor's UI-only node layout ({@code positions}) is split off the
-   * content into {@code x-ui-styles}; everything else is passed through opaquely to Model Forge.
+   * A stored version of a Mapping.
    *
-   * @throws ResourceNotFoundException when versioning a mapping that is not a member of this
-   *     DataSet
+   * @param mapping the authored content with the editor's node {@code positions}
    */
-  public ModelRegistryGateway.ModelPin store(
-      UUID dataSetId, String logicalUrn, Map<String, Object> doc) {
-    requireOwnNamespace(logicalUrn);
-    String manifestUrn = manifestUrnOrThrow(dataSetId);
-    if (logicalUrn != null) {
-      requireMemberOfDataSet(manifestUrn, logicalUrn);
-    }
-    Map<String, Object> content = new LinkedHashMap<>(doc == null ? Map.of() : doc);
-    content.remove("logicalUrn");
-    Object positions = content.remove("positions");
-    Map<String, Object> styles =
-        positions instanceof Map<?, ?> ? Map.of("positions", positions) : null;
-    requireResolvableEndpoint(content, "source");
-    requireResolvableEndpoint(content, "target");
-    return registry.storePayload(
-        PayloadKind.MAPPING,
-        Optional.ofNullable(logicalUrn),
-        // A Mapping has no portal row, so Model Forge mints its UUID.
-        null,
-        deriveName(content),
-        content,
-        styles,
-        manifestUrn);
-  }
+  public record StoredMapping(ModelPin pin, MappingInputDTO mapping) {}
+
+  private record Document(Map<String, Object> content, Map<String, Object> styles) {}
 
   /**
-   * The mapping read back from Model Forge — its rules plus the editor's node layout, which is
-   * stored alongside the content and has to be served with it for the editor to restore a saved
-   * diagram. Empty when the mapping does not exist or is not a member of this DataSet; the two are
-   * deliberately indistinguishable, otherwise the difference is an existence oracle over mapping
-   * URNs.
-   */
-  public Optional<Map<String, Object>> get(UUID dataSetId, String urn) {
-    if (!isMemberOfDataSet(manifestUrnOrThrow(dataSetId), urn)) {
-      return Optional.empty();
-    }
-    return registry
-        .fetchPayload(urn)
-        .map(
-            document -> {
-              Map<String, Object> result = new LinkedHashMap<>(document.content());
-              if (document.styles() != null && document.styles().get("positions") != null) {
-                result.put("positions", document.styles().get("positions"));
-              }
-              return result;
-            });
-  }
-
-  /**
-   * Deletes a Mapping artifact of this DataSet by its (logical or versioned) CORE URN. Model Forge
-   * rejects the delete while another artifact still references the mapping — a pipeline's {@code
-   * mappingRef}, for instance — and the caller removes that reference at its own artifact first. A
-   * pipeline deleted on its own takes with it the mappings no other pipeline uses.
+   * The Mappings of this DataSet, in manifest order.
    *
-   * @throws ResourceNotFoundException when the mapping is not a member of this DataSet
+   * @throws InvalidInputException when the DataSet has no manifest
    */
-  public void delete(UUID dataSetId, String urn) {
-    requireMemberOfDataSet(manifestUrnOrThrow(dataSetId), urn);
-    registry.deletePayload(urn);
+  public List<MappingSummary> list(UUID dataSetId) {
+    return members(dataSetWithManifestOrThrow(dataSetId).getManifestLogicalUrn()).stream()
+        .map(member -> new MappingSummary(member.id(), member.logicalUrn(), titleOf(member)))
+        .toList();
+  }
+
+  /**
+   * The current version of a Mapping of this DataSet, with the editor's node layout, which the
+   * editor needs to restore a saved diagram.
+   *
+   * @throws ResourceNotFoundException when the Mapping is no member of this DataSet
+   */
+  public StoredMapping get(UUID dataSetId, UUID mappingId) {
+    ModelPin member =
+        currentMemberOrThrow(
+            dataSetWithManifestOrThrow(dataSetId).getManifestLogicalUrn(), mappingId);
+    MappingInputDTO mapping =
+        registry
+            .fetchPayload(member.versionedUrn())
+            .map(this::toMapping)
+            .orElseThrow(() -> new ResourceNotFoundException(ENTITY_NAME, mappingId));
+    return new StoredMapping(member, mapping);
+  }
+
+  /**
+   * Stores a new Mapping and links it into the DataSet's manifest, which is what makes it reachable
+   * through this DataSet afterwards.
+   */
+  public StoredMapping create(UUID dataSetId, MappingInputDTO mapping) {
+    DataSet dataSet = dataSetWithManifestOrThrow(dataSetId);
+    dataSetMutationGuard.requireMutable(dataSet, "create " + ENTITY_NAME);
+    return store(dataSet.getManifestLogicalUrn(), Optional.empty(), mapping, toDocument(mapping));
+  }
+
+  /**
+   * Stores a new version of a Mapping of this DataSet. A Mapping whose content and node layout
+   * equal its current version keeps that version.
+   *
+   * @throws ResourceNotFoundException when the Mapping is no member of this DataSet
+   */
+  public StoredMapping update(UUID dataSetId, UUID mappingId, MappingInputDTO mapping) {
+    DataSet dataSet = dataSetWithManifestOrThrow(dataSetId);
+    String manifestUrn = dataSet.getManifestLogicalUrn();
+    ModelPin member = currentMemberOrThrow(manifestUrn, mappingId);
+    dataSetMutationGuard.requireMutable(dataSet, "update " + ENTITY_NAME);
+    Document document = toDocument(mapping);
+    if (registry.isUnchanged(member.versionedUrn(), document.content(), document.styles())) {
+      return new StoredMapping(member, mapping);
+    }
+    return store(manifestUrn, Optional.of(member.logicalUrn()), mapping, document);
+  }
+
+  /**
+   * Deletes a Mapping of this DataSet with all its versions. Model Forge rejects the delete while
+   * another artifact still references the mapping — a pipeline's {@code mappingRef}, for instance —
+   * and the caller removes that reference at its own artifact first. A pipeline deleted on its own
+   * takes with it the mappings no other pipeline uses.
+   *
+   * @throws ResourceNotFoundException when the Mapping is no member of this DataSet
+   */
+  public void delete(UUID dataSetId, UUID mappingId) {
+    DataSet dataSet = dataSetWithManifestOrThrow(dataSetId);
+    ModelPin member = currentMemberOrThrow(dataSet.getManifestLogicalUrn(), mappingId);
+    dataSetMutationGuard.requireMutable(dataSet, "delete " + ENTITY_NAME);
+    registry.deletePayload(member.logicalUrn());
+  }
+
+  /**
+   * The editor's UI-only node layout ({@code positions}) goes into {@code x-ui-styles}; the rules
+   * in {@code fields} reach Model Forge unchanged.
+   */
+  private Document toDocument(MappingInputDTO mapping) {
+    requireResolvableEndpoint(mapping.getSource(), "source");
+    requireResolvableEndpoint(mapping.getTarget(), "target");
+    Map<String, Object> content = objectMapper.convertValue(mapping, CONTENT);
+    Object positions = content.remove(POSITIONS);
+    return new Document(content, positions == null ? null : Map.of(POSITIONS, positions));
+  }
+
+  private StoredMapping store(
+      String manifestUrn, Optional<String> logicalUrn, MappingInputDTO mapping, Document document) {
+    ModelPin pin =
+        registry.storePayload(
+            PayloadKind.MAPPING,
+            logicalUrn,
+            // A Mapping has no portal row, so Model Forge mints its UUID.
+            null,
+            deriveName(mapping),
+            document.content(),
+            document.styles(),
+            manifestUrn);
+    return new StoredMapping(pin, mapping);
+  }
+
+  private MappingInputDTO toMapping(RegistryDocument stored) {
+    Map<String, Object> document = new LinkedHashMap<>(stored.content());
+    if (stored.styles() != null && stored.styles().get(POSITIONS) != null) {
+      document.put(POSITIONS, stored.styles().get(POSITIONS));
+    }
+    return objectMapper.convertValue(document, MappingInputDTO.class);
   }
 
   /**
@@ -140,12 +178,11 @@ public class MappingService {
    * read the schema. A URN that does not resolve and one the caller may not see are reported
    * identically, so the difference is not an existence oracle over structure URNs.
    */
-  private void requireResolvableEndpoint(Map<String, Object> content, String field) {
-    Object raw = content.get(field);
-    if (raw == null) {
+  private void requireResolvableEndpoint(String urn, String field) {
+    if (urn == null) {
       return;
     }
-    if (!(raw instanceof String urn) || !CoreUrn.isValid(urn)) {
+    if (!CoreUrn.isValid(urn)) {
       throw new InvalidInputException(
           ENTITY_NAME, field, field + " must be a CORE URN pinned to a version");
     }
@@ -154,82 +191,36 @@ public class MappingService {
     }
   }
 
-  private static String deriveName(Map<String, Object> doc) {
-    Object title = doc.get("title");
-    return title instanceof String s && !s.isBlank() ? s : "mapping";
+  private static String deriveName(MappingInputDTO mapping) {
+    String title = mapping.getTitle();
+    return title != null && !title.isBlank() ? title : "mapping";
   }
 
-  /** The DataSet's manifest URN, which every mapping of that DataSet is a member of. */
-  private String manifestUrnOrThrow(UUID dataSetId) {
+  private String titleOf(ModelPin member) {
+    return registry
+        .fetchPayload(member.versionedUrn())
+        .map(stored -> toMapping(stored).getTitle())
+        .orElse(null);
+  }
+
+  private DataSet dataSetWithManifestOrThrow(UUID dataSetId) {
     DataSet dataSet = dataSetService.findByIdOrThrow(dataSetId);
-    String manifestUrn = dataSet.getManifestLogicalUrn();
-    if (manifestUrn == null) {
+    if (dataSet.getManifestLogicalUrn() == null) {
       throw new InvalidInputException(
           "DataSet", dataSetId, "DataSet has no manifest to hold mappings");
     }
-    return manifestUrn;
+    return dataSet;
   }
 
-  private void requireMemberOfDataSet(String manifestUrn, String urn) {
-    if (!isMemberOfDataSet(manifestUrn, urn)) {
-      throw new ResourceNotFoundException(ENTITY_NAME, urn);
-    }
+  private List<ModelPin> members(String manifestUrn) {
+    return registry.dependencyPinsOfType(manifestUrn, MAPPING_ARTIFACT_TYPE);
   }
 
-  /**
-   * The logical URNs of this DataSet's mappings.
-   *
-   * <p>A mapping has no host row and is addressed by its URN alone, so without this a mapping that
-   * no pipeline names cannot be found, and the delete that would clear it has no address to aim at.
-   *
-   * @throws ResourceNotFoundException when the DataSet has no manifest
-   */
-  public List<String> list(UUID dataSetId) {
-    return registry
-        .dependencyUrnsOfType(manifestUrnOrThrow(dataSetId), MAPPING_ARTIFACT_TYPE)
-        .stream()
-        .map(registry::logicalUrn)
-        .distinct()
-        .toList();
-  }
-
-  /**
-   * Whether {@code urn} names a mapping of this DataSet. Compared on logical URNs so a versioned
-   * and a logical URN of the same mapping both resolve to the same membership.
-   */
-  private boolean isMemberOfDataSet(String manifestUrn, String urn) {
-    if (urn == null || urn.isBlank()) {
-      return false;
-    }
-    String logical = registry.logicalUrn(urn);
-    return registry.dependencyUrnsOfType(manifestUrn, MAPPING_ARTIFACT_TYPE).stream()
-        .anyMatch(member -> registry.logicalUrn(member).equals(logical));
-  }
-
-  /**
-   * A mapping has no host row to pin it to, so the URN of the artifact to version arrives in the
-   * request body. It is therefore caller input and has to name this registry's own namespace —
-   * otherwise a request could create an artifact anywhere in the registry, or silently create a
-   * second mapping from a mistyped URN. Rejected when the namespace is unknown, since an unchecked
-   * body-supplied URN is what this guards against.
-   */
-  private void requireOwnNamespace(String logicalUrn) {
-    if (logicalUrn == null) {
-      return;
-    }
-    if (urnScope.isBlank() || urnOwner.isBlank() || urnDomain.isBlank()) {
-      throw new InvalidInputException(
-          ENTITY_NAME,
-          "logicalUrn",
-          "Cannot accept a mapping URN: the registry namespace is unset");
-    }
-    String ownPrefix = "urn:core:%s:%s:mapping:%s:".formatted(urnScope, urnOwner, urnDomain);
-    if (!logicalUrn.startsWith(ownPrefix)) {
-      throw new InvalidInputException(
-          ENTITY_NAME,
-          "logicalUrn",
-          "Mapping URN must name this registry's own namespace (%s...): %s"
-              .formatted(ownPrefix, logicalUrn));
-    }
+  /** The manifest's pin of the Mapping, which is its current version. */
+  private ModelPin currentMemberOrThrow(String manifestUrn, UUID mappingId) {
+    return members(manifestUrn).stream()
+        .filter(member -> mappingId.equals(member.id()))
+        .findFirst()
+        .orElseThrow(() -> new ResourceNotFoundException(ENTITY_NAME, mappingId));
   }
 }

@@ -4,22 +4,28 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.civitascore.portal.model.embedded.DataSetStatus;
+import de.civitascore.portal.model.embedded.PendingSagaType;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.input.MappingInputDTO;
+import de.civitascore.portal.model.input.MappingNodePosition;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway.ModelPin;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway.RegistryDocument;
 import de.civitascore.portal.modelregistry.PayloadKind;
+import de.civitascore.portal.repository.DataSetRepository;
+import de.civitascore.portal.service.MappingService.MappingSummary;
+import de.civitascore.portal.service.MappingService.StoredMapping;
+import de.civitascore.portal.util.DataSetNotEditableException;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
-import java.util.LinkedHashMap;
+import de.civitascore.portal.util.SagaInFlightException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -29,11 +35,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Unit tests for {@link MappingService}: a thin pass-through that stores/versions a CORE Mapping
@@ -48,38 +56,41 @@ class MappingServiceTest {
   private static final String MANIFEST_URN =
       "urn:core:platform:civitas:dataset:common:dae07e27-2d14-8b0c-a5c3-d3f788db5acd";
 
+  private static final UUID MAPPING_ID = UUID.fromString("0bdbebd9-e766-86ff-bec5-f04da0a8abdd");
   private static final String LOGICAL_URN =
-      "urn:core:platform:civitas:mapping:common:0bdbebd9-e766-86ff-bec5-f04da0a8abdd";
+      "urn:core:platform:civitas:mapping:common:" + MAPPING_ID;
   private static final String VERSIONED_URN = LOGICAL_URN + ":1.0.0";
 
   /** A mapping of a different DataSet — never a member of the manifest under test. */
-  private static final String FOREIGN_URN =
-      "urn:core:platform:civitas:mapping:common:835fdb09-4274-85a1-b063-a3e3127d3dc6";
+  private static final UUID FOREIGN_ID = UUID.fromString("835fdb09-4274-85a1-b063-a3e3127d3dc6");
+
+  /** A second mapping of the DataSet under test. */
+  private static final UUID OTHER_ID = UUID.fromString("5e1f0c2a-9d3b-8a47-b6e2-7c4d1f9a0b38");
+
+  private static final String OTHER_LOGICAL_URN =
+      "urn:core:platform:civitas:mapping:common:" + OTHER_ID;
+  private static final String OTHER_URN = OTHER_LOGICAL_URN + ":2.0.0";
 
   @Mock private ModelRegistryGateway registry;
   @Mock private DataSetService dataSetService;
+  @Mock private DataSetRepository dataSetRepository;
 
   private MappingService mappingService;
+  private DataSet dataSet;
 
   @BeforeEach
   void createService() {
-    // The namespace the registry mints into; a body-supplied URN is checked against it.
-    mappingService = new MappingService(registry, dataSetService, "platform", "civitas", "common");
+    mappingService =
+        new MappingService(
+            registry,
+            dataSetService,
+            new DataSetMutationGuard(dataSetRepository),
+            new JsonMapper());
 
-    DataSet dataSet = new DataSet();
+    dataSet = new DataSet();
     dataSet.setManifestLogicalUrn(MANIFEST_URN);
+    dataSet.setDataSetStatus(DataSetStatus.DRAFT);
     lenient().when(dataSetService.findByIdOrThrow(DATA_SET_ID)).thenReturn(dataSet);
-
-    // Mirrors UrnParser: a logical URN is the versioned one without its trailing version segment.
-    lenient()
-        .when(registry.logicalUrn(anyString()))
-        .thenAnswer(
-            invocation -> {
-              String urn = invocation.getArgument(0);
-              return urn.matches(".*:\\d+\\.\\d+\\.\\d+$")
-                  ? urn.substring(0, urn.lastIndexOf(':'))
-                  : urn;
-            });
   }
 
   @Captor private ArgumentCaptor<Optional<String>> logicalUrnCaptor;
@@ -89,7 +100,15 @@ class MappingServiceTest {
   @Captor private ArgumentCaptor<String> dataSetCaptor;
 
   private static ModelPin pin() {
-    return new ModelPin(LOGICAL_URN, VERSIONED_URN, "1.0.0");
+    return pin(LOGICAL_URN, "1.0.0");
+  }
+
+  private static ModelPin otherPin() {
+    return pin(OTHER_LOGICAL_URN, "2.0.0");
+  }
+
+  private static ModelPin pin(String logicalUrn, String version) {
+    return new ModelPin(logicalUrn, logicalUrn + ":" + version, version);
   }
 
   private void stubStore() {
@@ -97,23 +116,43 @@ class MappingServiceTest {
         .thenReturn(pin());
   }
 
-  /** The manifest holds {@code memberUrns} as its mapping members. */
-  private void stubMembers(String... memberUrns) {
-    when(registry.dependencyUrnsOfType(MANIFEST_URN, "mapping")).thenReturn(List.of(memberUrns));
+  private static MappingInputDTO mapping(Map<String, Object> fields) {
+    MappingInputDTO mapping = new MappingInputDTO();
+    mapping.setFields(fields);
+    return mapping;
+  }
+
+  private static MappingInputDTO mapping() {
+    return mapping(Map.of());
+  }
+
+  private static MappingInputDTO titled(String title) {
+    MappingInputDTO mapping = mapping();
+    mapping.setTitle(title);
+    return mapping;
+  }
+
+  private static MappingInputDTO between(String source, String target) {
+    MappingInputDTO mapping = mapping();
+    mapping.setSource(source);
+    mapping.setTarget(target);
+    return mapping;
+  }
+
+  /** The manifest holds {@code members} as its mapping members. */
+  private void stubMembers(ModelPin... members) {
+    when(registry.dependencyPinsOfType(MANIFEST_URN, "mapping")).thenReturn(List.of(members));
   }
 
   @Test
-  void store_whenLogicalUrnNull_createsNewArtifactAndReturnsPins() {
+  void create_storesANewArtifactAndReturnsItsPin() {
     stubStore();
 
-    ModelPin result =
-        mappingService.store(
-            DATA_SET_ID,
-            null,
-            Map.of("fields", Map.of("$.id", Map.of("op", "copy", "sourcePath", "$.id"))));
+    StoredMapping result =
+        mappingService.create(
+            DATA_SET_ID, mapping(Map.of("$.id", Map.of("op", "copy", "sourcePath", "$.id"))));
 
-    assertThat(result.versionedUrn()).isEqualTo(VERSIONED_URN);
-    assertThat(result.logicalUrn()).isEqualTo(LOGICAL_URN);
+    assertThat(result.pin()).isEqualTo(pin());
     verify(registry)
         .storePayload(
             eq(PayloadKind.MAPPING), logicalUrnCaptor.capture(), any(), any(), any(), any(), any());
@@ -121,11 +160,20 @@ class MappingServiceTest {
   }
 
   @Test
-  @DisplayName("a created mapping is linked into the DataSet's manifest as it is stored")
-  void store_whenCreating_linksIntoTheDataSetManifest() {
+  void create_returnsTheIdOfTheMintedUrn() {
     stubStore();
 
-    mappingService.store(DATA_SET_ID, null, Map.of("fields", Map.of()));
+    StoredMapping result = mappingService.create(DATA_SET_ID, mapping());
+
+    assertThat(result.pin().id()).isEqualTo(MAPPING_ID);
+  }
+
+  @Test
+  @DisplayName("a created mapping is linked into the DataSet's manifest as it is stored")
+  void create_linksIntoTheDataSetManifest() {
+    stubStore();
+
+    mappingService.create(DATA_SET_ID, mapping());
 
     verify(registry)
         .storePayload(
@@ -134,11 +182,11 @@ class MappingServiceTest {
   }
 
   @Test
-  void store_whenLogicalUrnGiven_versionsExistingArtifact() {
-    stubMembers(VERSIONED_URN);
+  void update_versionsTheLogicalUrnOfTheMember() {
+    stubMembers(pin());
     stubStore();
 
-    mappingService.store(DATA_SET_ID, LOGICAL_URN, Map.of("fields", Map.of()));
+    mappingService.update(DATA_SET_ID, MAPPING_ID, mapping());
 
     verify(registry)
         .storePayload(
@@ -147,15 +195,16 @@ class MappingServiceTest {
   }
 
   @Test
-  void store_stripsLogicalUrnAndSplitsPositionsIntoStyles() {
-    stubMembers(VERSIONED_URN);
+  void update_splitsPositionsIntoStylesAndReturnsThemWithTheContent() {
+    stubMembers(pin());
     stubStore();
-    Map<String, Object> doc = new LinkedHashMap<>();
-    doc.put("logicalUrn", LOGICAL_URN);
-    doc.put("fields", Map.of("$.geom", Map.of("op", "geoPoint", "lat", "$.lat", "lon", "$.lon")));
-    doc.put("positions", Map.of("$.geom", Map.of("x", 1, "y", 2)));
+    Map<String, MappingNodePosition> positions =
+        Map.of("$.geom", new MappingNodePosition(1.5, 2.0));
+    MappingInputDTO mapping =
+        mapping(Map.of("$.geom", Map.of("op", "geoPoint", "lat", "$.lat", "lon", "$.lon")));
+    mapping.setPositions(positions);
 
-    mappingService.store(DATA_SET_ID, LOGICAL_URN, doc);
+    StoredMapping result = mappingService.update(DATA_SET_ID, MAPPING_ID, mapping);
 
     verify(registry)
         .storePayload(
@@ -166,16 +215,18 @@ class MappingServiceTest {
             contentCaptor.capture(),
             stylesCaptor.capture(),
             any());
-    assertThat(contentCaptor.getValue()).doesNotContainKeys("logicalUrn", "positions");
-    assertThat(contentCaptor.getValue()).containsKey("fields");
-    assertThat(stylesCaptor.getValue()).containsKey("positions");
+    assertThat(contentCaptor.getValue()).doesNotContainKey("positions").containsKey("fields");
+    assertThat(stylesCaptor.getValue())
+        .containsEntry("positions", Map.of("$.geom", Map.of("x", 1.5, "y", 2.0)));
+    assertThat(result.mapping().getPositions()).isEqualTo(positions);
+    assertThat(result.mapping().getFields()).containsKey("$.geom");
   }
 
   @Test
-  void store_whenTitlePresent_usesItAsArtifactName() {
+  void create_whenTitlePresent_usesItAsArtifactName() {
     stubStore();
 
-    mappingService.store(DATA_SET_ID, null, Map.of("title", "My Mapping", "fields", Map.of()));
+    mappingService.create(DATA_SET_ID, titled("My Mapping"));
 
     verify(registry)
         .storePayload(
@@ -184,10 +235,10 @@ class MappingServiceTest {
   }
 
   @Test
-  void store_whenTitleMissing_defaultsNameToMapping() {
+  void create_whenTitleMissing_defaultsNameToMapping() {
     stubStore();
 
-    mappingService.store(DATA_SET_ID, null, Map.of("fields", Map.of()));
+    mappingService.create(DATA_SET_ID, mapping());
 
     verify(registry)
         .storePayload(
@@ -196,72 +247,60 @@ class MappingServiceTest {
   }
 
   @Test
-  void store_whenDocNull_doesNotThrowAndStoresEmptyContent() {
-    stubStore();
+  void get_whenMappingIdNamesAMember_returnsItsCurrentPinAndDocument() {
+    ModelPin currentVersion = pin(LOGICAL_URN, "1.2.0");
+    stubMembers(otherPin(), currentVersion);
+    Map<String, Object> fields = Map.of("$.id", Map.of("op", "copy"));
+    Map<String, Object> positions = Map.of("$.id", Map.of("x", 1, "y", 2));
+    when(registry.fetchPayload(currentVersion.versionedUrn()))
+        .thenReturn(
+            Optional.of(
+                new RegistryDocument(Map.of("fields", fields), Map.of("positions", positions))));
 
-    mappingService.store(DATA_SET_ID, null, null);
+    StoredMapping result = mappingService.get(DATA_SET_ID, MAPPING_ID);
 
-    verify(registry)
-        .storePayload(
-            eq(PayloadKind.MAPPING), any(), any(), any(), contentCaptor.capture(), any(), any());
-    assertThat(contentCaptor.getValue()).isEmpty();
+    assertThat(result.pin()).isEqualTo(currentVersion);
+    assertThat(result.mapping().getFields()).isEqualTo(fields);
+    assertThat(result.mapping().getPositions())
+        .isEqualTo(Map.of("$.id", new MappingNodePosition(1.0, 2.0)));
   }
 
   @Test
-  void get_whenPresent_returnsContentFromRegistry() {
-    stubMembers(VERSIONED_URN);
-    Map<String, Object> content = Map.of("fields", Map.of("$.id", Map.of("op", "copy")));
-    when(registry.fetchPayload(VERSIONED_URN))
-        .thenReturn(Optional.of(new RegistryDocument(content, null)));
+  void get_whenThePayloadIsGone_throwsNotFound() {
+    stubMembers(pin());
+    when(registry.fetchPayload(VERSIONED_URN)).thenReturn(Optional.empty());
 
-    assertThat(mappingService.get(DATA_SET_ID, VERSIONED_URN)).contains(content);
+    assertThatThrownBy(() -> mappingService.get(DATA_SET_ID, MAPPING_ID))
+        .isInstanceOf(ResourceNotFoundException.class);
   }
 
+  // Without it, a caller authorized on one Dataset could read the Mappings of another.
   @Test
-  void get_whenMissing_returnsEmpty() {
-    stubMembers(FOREIGN_URN);
-    when(registry.fetchPayload(FOREIGN_URN)).thenReturn(Optional.empty());
+  void get_whenMappingIdIsNoMemberOfThisDataSet_throwsNotFoundWithoutReadingIt() {
+    stubMembers(pin());
 
-    assertThat(mappingService.get(DATA_SET_ID, FOREIGN_URN)).isEmpty();
+    assertThatThrownBy(() -> mappingService.get(DATA_SET_ID, FOREIGN_ID))
+        .isInstanceOf(ResourceNotFoundException.class);
+
+    verify(registry, never()).fetchPayload(any());
   }
 
   @Test
   @DisplayName("a delete goes to the registry, which refuses it while anything still references it")
-  void delete_delegatesToThePlainDeletePayload() {
-    stubMembers(VERSIONED_URN);
+  void delete_deletesTheLogicalUrnOfTheMember() {
+    stubMembers(pin());
 
-    mappingService.delete(DATA_SET_ID, VERSIONED_URN);
+    mappingService.delete(DATA_SET_ID, MAPPING_ID);
 
-    verify(registry).deletePayload(VERSIONED_URN);
+    verify(registry).deletePayload(LOGICAL_URN);
     verify(registry, never()).deleteArtifact(any(), anyBoolean());
   }
 
   @Test
-  @DisplayName("membership holds for a logical URN addressing a versioned member")
-  void membershipIsVersionAgnostic() {
-    stubMembers(VERSIONED_URN);
-    when(registry.fetchPayload(LOGICAL_URN))
-        .thenReturn(Optional.of(new RegistryDocument(Map.of("fields", Map.of()), null)));
+  void delete_whenMappingIdIsNoMemberOfThisDataSet_throwsNotFound() {
+    stubMembers(pin());
 
-    assertThat(mappingService.get(DATA_SET_ID, LOGICAL_URN)).isPresent();
-  }
-
-  @Test
-  @DisplayName("reading a mapping of another DataSet is indistinguishable from a missing one")
-  void get_whenNotAMemberOfThisDataSet_returnsEmptyWithoutReadingIt() {
-    stubMembers(VERSIONED_URN);
-
-    assertThat(mappingService.get(DATA_SET_ID, FOREIGN_URN)).isEmpty();
-
-    verify(registry, never()).fetchPayload(FOREIGN_URN);
-  }
-
-  @Test
-  @DisplayName("deleting a mapping of another DataSet is refused and deletes nothing")
-  void delete_whenNotAMemberOfThisDataSet_isRefused() {
-    stubMembers(VERSIONED_URN);
-
-    assertThatThrownBy(() -> mappingService.delete(DATA_SET_ID, FOREIGN_URN))
+    assertThatThrownBy(() -> mappingService.delete(DATA_SET_ID, FOREIGN_ID))
         .isInstanceOf(ResourceNotFoundException.class);
 
     verify(registry, never()).deleteArtifact(any(), anyBoolean());
@@ -269,11 +308,10 @@ class MappingServiceTest {
   }
 
   @Test
-  @DisplayName("versioning a mapping of another DataSet is refused before anything is stored")
-  void store_whenVersioningANonMember_isRefused() {
-    stubMembers(VERSIONED_URN);
+  void update_whenMappingIdIsNoMemberOfThisDataSet_throwsNotFoundAndStoresNothing() {
+    stubMembers(pin());
 
-    assertThatThrownBy(() -> mappingService.store(DATA_SET_ID, FOREIGN_URN, Map.of()))
+    assertThatThrownBy(() -> mappingService.update(DATA_SET_ID, FOREIGN_ID, mapping()))
         .isInstanceOf(ResourceNotFoundException.class);
 
     verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any(), any());
@@ -281,14 +319,67 @@ class MappingServiceTest {
 
   @Test
   @DisplayName("a DataSet without a manifest cannot hold mappings")
-  void store_whenDataSetHasNoManifest_isRejected() {
+  void create_whenDataSetHasNoManifest_isRejected() {
     when(dataSetService.findByIdOrThrow(DATA_SET_ID)).thenReturn(new DataSet());
 
-    assertThatThrownBy(() -> mappingService.store(DATA_SET_ID, null, Map.of()))
+    assertThatThrownBy(() -> mappingService.create(DATA_SET_ID, new MappingInputDTO()))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("no manifest");
 
     verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any(), any());
+  }
+
+  @ParameterizedTest
+  @EnumSource(value = DataSetStatus.class, names = "DRAFT", mode = EnumSource.Mode.EXCLUDE)
+  void create_whenTheDataSetIsNotDraft_throwsDataSetNotEditable(DataSetStatus status) {
+    dataSet.setDataSetStatus(status);
+
+    assertThatThrownBy(() -> mappingService.create(DATA_SET_ID, mapping()))
+        .isInstanceOf(DataSetNotEditableException.class);
+
+    verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void update_whenTheDataSetIsNotDraft_throwsDataSetNotEditable() {
+    stubMembers(pin());
+    dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+
+    assertThatThrownBy(() -> mappingService.update(DATA_SET_ID, MAPPING_ID, mapping()))
+        .isInstanceOf(DataSetNotEditableException.class);
+
+    verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void delete_whenTheDataSetIsNotDraft_throwsDataSetNotEditable() {
+    stubMembers(pin());
+    dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+
+    assertThatThrownBy(() -> mappingService.delete(DATA_SET_ID, MAPPING_ID))
+        .isInstanceOf(DataSetNotEditableException.class);
+
+    verify(registry, never()).deletePayload(any());
+  }
+
+  @Test
+  void update_whileASagaIsInFlight_throwsSagaInFlight() {
+    stubMembers(pin());
+    dataSet.setPendingSagaType(PendingSagaType.UPDATE);
+
+    assertThatThrownBy(() -> mappingService.update(DATA_SET_ID, MAPPING_ID, mapping()))
+        .isInstanceOf(SagaInFlightException.class);
+
+    verify(registry, never()).storePayload(any(), any(), any(), any(), any(), any(), any());
+  }
+
+  @Test
+  void update_whenTheMappingIsForeignAndTheDataSetIsNotDraft_throwsNotFound() {
+    stubMembers(pin());
+    dataSet.setDataSetStatus(DataSetStatus.AVAILABLE);
+
+    assertThatThrownBy(() -> mappingService.update(DATA_SET_ID, FOREIGN_ID, mapping()))
+        .isInstanceOf(ResourceNotFoundException.class);
   }
 
   private static final String SOURCE_URN =
@@ -306,12 +397,11 @@ class MappingServiceTest {
 
   @Test
   @DisplayName("a mapping whose endpoints resolve is stored")
-  void store_whenEndpointsResolve_isAccepted() {
+  void create_whenEndpointsResolve_isAccepted() {
     stubResolvable(SOURCE_URN, TARGET_URN);
     stubStore();
 
-    mappingService.store(
-        DATA_SET_ID, null, Map.of("source", SOURCE_URN, "target", TARGET_URN, "fields", Map.of()));
+    mappingService.create(DATA_SET_ID, between(SOURCE_URN, TARGET_URN));
 
     verify(registry)
         .storePayload(eq(PayloadKind.MAPPING), any(), any(), any(), any(), any(), any());
@@ -319,21 +409,12 @@ class MappingServiceTest {
 
   @Test
   @DisplayName("a source that does not resolve is refused before anything is stored")
-  void store_whenSourceDoesNotResolve_isRefused() {
-    when(registry.fetchModel(
-            "urn:core:platform:civitas:element:common:99d9ab54-d6f3-8c7e-a746-f62a4a18fae6:1.0.0"))
-        .thenReturn(Optional.empty());
+  void create_whenSourceDoesNotResolve_isRefused() {
+    String missing =
+        "urn:core:platform:civitas:element:common:99d9ab54-d6f3-8c7e-a746-f62a4a18fae6:1.0.0";
+    when(registry.fetchModel(missing)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(
-            () ->
-                mappingService.store(
-                    DATA_SET_ID,
-                    null,
-                    Map.of(
-                        "source",
-                        "urn:core:platform:civitas:element:common:99d9ab54-d6f3-8c7e-a746-f62a4a18fae6:1.0.0",
-                        "fields",
-                        Map.of())))
+    assertThatThrownBy(() -> mappingService.create(DATA_SET_ID, between(missing, null)))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("not available");
 
@@ -342,18 +423,14 @@ class MappingServiceTest {
 
   @Test
   @DisplayName("a target pinning a version that does not exist is refused")
-  void store_whenTargetVersionDoesNotResolve_isRefused() {
+  void create_whenTargetVersionDoesNotResolve_isRefused() {
     stubResolvable(SOURCE_URN);
     String missingVersion =
         "urn:core:platform:civitas:element:common:4431ae01-c275-8ce0-9250-14c0de69c06a:9.9.9";
     when(registry.fetchModel(missingVersion)).thenReturn(Optional.empty());
 
     assertThatThrownBy(
-            () ->
-                mappingService.store(
-                    DATA_SET_ID,
-                    null,
-                    Map.of("source", SOURCE_URN, "target", missingVersion, "fields", Map.of())))
+            () -> mappingService.create(DATA_SET_ID, between(SOURCE_URN, missingVersion)))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("not available");
 
@@ -369,11 +446,8 @@ class MappingServiceTest {
         "urn:core:platform:civitas:element:common:07ee560b-697b-87ca-a0ac-aa2a0e481164:1.0"
       })
   @DisplayName("an endpoint not pinned to a SemVer version is refused before anything is stored")
-  void store_whenEndpointNotPinned_isRefused(String unpinned) {
-    assertThatThrownBy(
-            () ->
-                mappingService.store(
-                    DATA_SET_ID, null, Map.of("source", unpinned, "fields", Map.of())))
+  void create_whenEndpointNotPinned_isRefused(String unpinned) {
+    assertThatThrownBy(() -> mappingService.create(DATA_SET_ID, between(unpinned, null)))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("pinned to a version");
 
@@ -383,10 +457,10 @@ class MappingServiceTest {
 
   @Test
   @DisplayName("a draft that has not picked its structures yet is still storable")
-  void store_whenEndpointsAbsent_isAccepted() {
+  void create_whenEndpointsAbsent_isAccepted() {
     stubStore();
 
-    mappingService.store(DATA_SET_ID, null, Map.of("fields", Map.of()));
+    mappingService.create(DATA_SET_ID, mapping());
 
     verify(registry)
         .storePayload(eq(PayloadKind.MAPPING), any(), any(), any(), any(), any(), any());
@@ -394,61 +468,19 @@ class MappingServiceTest {
   }
 
   @Test
-  @DisplayName("a URN naming another namespace is refused before anything is stored")
-  void foreignNamespaceUrnIsRefused() {
-    assertThatThrownBy(
-            () ->
-                mappingService.store(
-                    DATA_SET_ID,
-                    "urn:core:evil:attacker:mapping:hijack:19f13b09-afa8-8095-9669-dc33c10412e9",
-                    Map.of()))
-        .isInstanceOf(InvalidInputException.class)
-        .hasMessageContaining("own namespace");
+  void list_returnsIdLogicalUrnAndTitleOfEachMember() {
+    stubMembers(pin(), otherPin());
+    when(registry.fetchPayload(VERSIONED_URN))
+        .thenReturn(
+            Optional.of(
+                new RegistryDocument(Map.of("title", "Sensors", "fields", Map.of()), null)));
+    when(registry.fetchPayload(OTHER_URN))
+        .thenReturn(Optional.of(new RegistryDocument(Map.of("fields", Map.of()), null)));
 
-    verifyNoInteractions(registry);
-  }
-
-  @Test
-  @DisplayName("a URN of this registry's own namespace is accepted")
-  void ownNamespaceUrnIsAccepted() {
-    stubMembers(VERSIONED_URN);
-    stubStore();
-
-    assertThat(mappingService.store(DATA_SET_ID, LOGICAL_URN, Map.of("fields", Map.of())).version())
-        .isEqualTo("1.0.0");
-  }
-
-  @Test
-  @DisplayName("versioning without a URN is refused rather than forking a second mapping")
-  void store_whenVersioningWithoutAUrn_isNotSilentlyACreate() {
-    // The controller rejects a PUT without logicalUrn; the service itself still treats a null URN
-    // as
-    // a create, which is what POST relies on. This pins that the two paths stay distinguishable.
-    stubStore();
-
-    ModelPin created = mappingService.store(DATA_SET_ID, null, Map.of("fields", Map.of()));
-
-    assertThat(created.logicalUrn()).isEqualTo(LOGICAL_URN);
-    verify(registry)
-        .storePayload(
-            eq(PayloadKind.MAPPING), logicalUrnCaptor.capture(), any(), any(), any(), any(), any());
-    assertThat(logicalUrnCaptor.getValue()).isEmpty();
-  }
-
-  @Test
-  @DisplayName("a create carries no URN, so the namespace rule does not apply")
-  void createNeedsNoUrn() {
-    stubStore();
-
-    assertThat(mappingService.store(DATA_SET_ID, null, Map.of("fields", Map.of()))).isNotNull();
-  }
-
-  @Test
-  @DisplayName("the list names every mapping of the DataSet once, by logical URN")
-  void list_returnsTheManifestsMappingsAsLogicalUrns() {
-    stubMembers(VERSIONED_URN, LOGICAL_URN, FOREIGN_URN + ":2.0.0");
-
-    assertThat(mappingService.list(DATA_SET_ID)).containsExactly(LOGICAL_URN, FOREIGN_URN);
+    assertThat(mappingService.list(DATA_SET_ID))
+        .containsExactly(
+            new MappingSummary(MAPPING_ID, LOGICAL_URN, "Sensors"),
+            new MappingSummary(OTHER_ID, OTHER_LOGICAL_URN, null));
   }
 
   @Test

@@ -68,6 +68,7 @@ Test case documentation is embedded in each `.bru` file's `docs` block (visible 
 | Assignments | `assignments/` | Create / Create Scoped / Read / Delete |
 | DataSources | `datasources/` | CRUD + Release / Unrelease + Released Meta + Assignments + Connection Test (unsaved / saved) |
 | DataSets | `datasets/` | CRUD + Stage / Unstage + Release / Unrelease + Released Meta + Assignments |
+| Mappings | `mappings/` | CRUD (nested under DataSet, each Mapping addressed by its `mappingId`) |
 | Pipelines | `pipelines/` | CRUD (nested under DataSet) |
 | DataStructures | `datastructures/` | CRUD + Assignments + Versions (Release / Unrelease + Released Meta) |
 | DataStructure Versions | `datastructures/versions/` | CRUD + Release / Unrelease + Released Meta + Duplicate |

@@ -2,23 +2,26 @@ import { useMutation } from '@tanstack/react-query'
 
 import { apiRequest, type ApiServiceResponse } from '@/app/services/api/request/apiRequest'
 import type { MappingField } from '@/generated/core'
+import { idOfUrn } from '@/utils/coreUrn'
 
 /**
  * API client for CORE Mapping artifacts.
  *
  * Mappings are nested under the dataset that holds them. The `/api` proxy prepends the backend's
- * `/v1` base, so the endpoint here is `/datasets/{datasetId}/mappings` (the backend route is
- * `POST|PUT /v1/datasets/{dataSetId}/mappings`).
+ * `/v1` base, so the collection here is `/datasets/{datasetId}/mappings` and each mapping is the
+ * item `/datasets/{datasetId}/mappings/{mappingId}`, where `mappingId` is the UUID of its CORE URN.
  *
- * - POST creates a brand-new logical Mapping (first version).
- * - PUT versions an existing logical Mapping (identified by its `logicalUrn`).
- * - DELETE removes a logical Mapping, addressed by URN in the query string.
+ * - POST on the collection creates a brand-new logical Mapping (first version).
+ * - PUT on the item stores a new version of the Mapping.
+ * - DELETE on the item removes the logical Mapping with all its versions.
  *
  * POST and PUT return the logical URN and the freshly minted versioned URN; the pipeline node
  * references the mapping by its `versionedUrn`.
  */
 
 const mappingsEndpoint = (datasetId: string) => `/datasets/${datasetId}/mappings`
+const mappingEndpoint = (datasetId: string, logicalUrn: string) =>
+  `${mappingsEndpoint(datasetId)}/${idOfUrn(logicalUrn)}`
 const API_REQUEST_HEADER = 'x-api-request'
 
 /** The CORE Mapping document body sent to the backend (no `$schema`/`id` — Model Forge stamps those). */
@@ -42,8 +45,9 @@ export interface UpdateMappingInput extends MappingArtifactBody {
   logicalUrn: string
 }
 
-/** Response of `POST|PUT /v1/datasets/{dataSetId}/mappings`. */
+/** Response of a mapping create or update. */
 export interface MappingArtifactResponse {
+  mappingId: string
   logicalUrn: string
   versionedUrn: string
 }
@@ -65,32 +69,31 @@ export const useCreateMapping = (datasetId: string) =>
   })
 
 /**
- * Versions an existing Mapping artifact of a dataset.
- * PUT /v1/datasets/{datasetId}/mappings
+ * Stores a new version of a Mapping artifact of a dataset.
+ * PUT /v1/datasets/{datasetId}/mappings/{mappingId}
  */
 export const useUpdateMapping = (datasetId: string) =>
   useMutation<ApiServiceResponse<MappingArtifactResponse>, unknown, UpdateMappingInput>({
-    mutationFn: (data: UpdateMappingInput) =>
+    mutationFn: ({ logicalUrn, ...body }: UpdateMappingInput) =>
       apiRequest<MappingArtifactResponse>({
         method: 'PUT',
-        endpoint: mappingsEndpoint(datasetId),
+        endpoint: mappingEndpoint(datasetId, logicalUrn),
         headers: { [API_REQUEST_HEADER]: 'true' },
-        data,
+        data: body,
         errorMessage: 'An error occurred while updating the mapping.',
       }),
   })
 
 /**
- * Deletes a Mapping artifact of a dataset by its logical CORE URN.
- * DELETE /v1/datasets/{datasetId}/mappings?urn={logicalUrn}
+ * Deletes a Mapping artifact of a dataset, given its logical CORE URN.
+ * DELETE /v1/datasets/{datasetId}/mappings/{mappingId}
  */
 export const useDeleteMapping = (datasetId: string) =>
   useMutation<ApiServiceResponse<void>, unknown, string>({
     mutationFn: (logicalUrn: string) =>
       apiRequest<void>({
         method: 'DELETE',
-        endpoint: mappingsEndpoint(datasetId),
-        params: new URLSearchParams({ urn: logicalUrn }),
+        endpoint: mappingEndpoint(datasetId, logicalUrn),
         headers: { [API_REQUEST_HEADER]: 'true' },
         errorMessage: 'An error occurred while deleting the mapping.',
       }),

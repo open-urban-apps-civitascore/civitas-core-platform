@@ -1,0 +1,47 @@
+meta {
+  name: Update Mapping
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/datasets/:dataSetId/mappings/:mappingId
+  body: json
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+  mappingId: {{mappingId}}
+}
+
+body:json {
+  {
+    "title": "ApiTestObservation-copy",
+    "source": "{{setupModelUrn}}",
+    "target": "{{setupModelUrn}}",
+    "fields": {
+      "$.station_id": "$.station_id",
+      "$.value": "$.value"
+    }
+  }
+}
+
+tests {
+  test("Mapping versioned", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Stores a new version of the same mapping", function() {
+    expect(res.body.logicalUrn).to.equal(bru.getVar('mappingLogicalUrn'));
+    expect(res.body.version).to.not.equal(bru.getVar('mappingVersion'));
+  });
+}
+
+docs {
+  **Precondition:** `dataSetId`, `mappingId`, `mappingLogicalUrn` and `mappingVersion` are set.
+
+  **Expected Response:** 200 OK with the same `logicalUrn` and a new `version`. A request whose
+  content and node positions equal the current version stores no new version and answers that
+  version.
+}

@@ -643,7 +643,7 @@ Before phase 1, `planPipelineSaves()` (`utils/dataSinkRemoval.ts`) calculates wh
 Phase 1, per session:
 
 1. **Save the data sinks** – create a sink for a node that has no `entityId`, update a changed one. The returned `configurationUrn` is stashed on the node and becomes the model's `sinkRef`.
-2. **Save the mappings** – create or version the mapping artifacts. An unchanged mapping is skipped, because the mapping API creates a new version per request.
+2. **Save the mappings** – create or version the mapping artifacts. An unchanged mapping is skipped, so a save sends a request only for the mappings that changed.
 
 Phase 2, per session:
 
@@ -657,7 +657,7 @@ After phase 2, when the backend refused one or more updates, `mergeRemovals()` c
 
 If a step throws, the partial progress is written back to the session — still dirty — so a retry updates the artifacts that were already created instead of creating duplicates. An error is classified and reported in a toast.
 
-If the removal is cancelled, every refused session is written back the same way, except for the data sinks and mappings that phase 1 created: no pipeline references them, so they are deleted again (`DELETE /datasets/{datasetId}/datasinks/{id}`, where a sink without storage or Layers needs no confirmation, and `DELETE /datasets/{datasetId}/mappings?urn={logicalUrn}`). Their nodes lose `entityId` and `configurationUrn`, or `mappingRef` and `mappingLogicalUrn`. An artifact whose delete fails keeps its ref, so the next save links or versions it. A mapping that existed before the save keeps the version phase 1 added. A pipeline save that fails in phase 2 for another reason keeps the data sinks that phase 1 created, with their refs: pipelines saved earlier in the same run counted them as staying, and deleting them could remove an API without a confirmation.
+If the removal is cancelled, every refused session is written back the same way, except for the data sinks and mappings that phase 1 created: no pipeline references them, so they are deleted again (`DELETE /datasets/{datasetId}/datasinks/{id}`, where a sink without storage or Layers needs no confirmation, and `DELETE /datasets/{datasetId}/mappings/{mappingId}`). Their nodes lose `entityId` and `configurationUrn`, or `mappingRef` and `mappingLogicalUrn`. An artifact whose delete fails keeps its ref, so the next save links or versions it. A mapping that existed before the save keeps the version phase 1 added. A pipeline save that fails in phase 2 for another reason keeps the data sinks that phase 1 created, with their refs: pipelines saved earlier in the same run counted them as staying, and deleting them could remove an API without a confirmation.
 
 ### Pipeline Delete
 

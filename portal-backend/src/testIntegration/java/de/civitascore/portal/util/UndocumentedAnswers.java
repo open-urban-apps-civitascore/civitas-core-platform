@@ -22,8 +22,11 @@ public final class UndocumentedAnswers {
   private static final String CONTEXT_PATH = "/v1";
   private static final String PROBLEM_JSON = "application/problem+json";
 
-  /** Spring MVC answers an unknown route or method itself, before any operation is chosen. */
-  private static final Set<Integer> ROUTE_LEVEL_STATUSES = Set.of(404, 405);
+  /**
+   * The security filter chain answers an unauthenticated request, and Spring MVC an unknown route
+   * or method, before any operation is chosen.
+   */
+  private static final Set<Integer> ROUTE_LEVEL_STATUSES = Set.of(401, 404, 405);
 
   private UndocumentedAnswers() {}
 

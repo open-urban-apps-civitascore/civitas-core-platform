@@ -1,0 +1,29 @@
+meta {
+  name: Get Deleted Mapping
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/datasets/:dataSetId/mappings/:mappingId
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+  mappingId: {{mappingId}}
+}
+
+tests {
+  test("Deleted mapping is not found", function() {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.body.type).to.equal("urn:civitas:error:NOT_FOUND");
+  });
+}
+
+docs {
+  **Precondition:** `delete-mapping` ran for `mappingId`.
+
+  **Expected Response:** 404 Not Found with type `urn:civitas:error:NOT_FOUND`.
+}

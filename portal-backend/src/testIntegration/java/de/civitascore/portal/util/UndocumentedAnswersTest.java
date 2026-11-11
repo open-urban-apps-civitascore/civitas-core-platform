@@ -105,6 +105,17 @@ class UndocumentedAnswersTest {
   }
 
   @Test
+  void unknownRoute401_isNotReported() {
+    assertThat(
+            UndocumentedAnswers.report(
+                SPEC,
+                List.of(
+                    new RecordedAnswer(
+                        "GET", "/v1/unknown", 401, "urn:civitas:error:UNAUTHORIZED"))))
+        .isEmpty();
+  }
+
+  @Test
   void answerWithoutOperation_isReported() {
     assertThat(
             UndocumentedAnswers.report(

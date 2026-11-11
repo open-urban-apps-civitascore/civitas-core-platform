@@ -328,6 +328,15 @@ public class PortalTestDataFactory {
     return dataSetRepository.save(builder.build());
   }
 
+  /** A dataset whose manifest the registry holds, so Mappings can be stored under it. */
+  public DataSet dataSetWithManifest() {
+    DataSet dataSet = dataSet();
+    ModelRegistryGateway.ModelPin pin =
+        modelRegistryGateway.createDataSetManifest(dataSet.getId(), dataSet.getName());
+    dataSet.setManifestLogicalUrn(pin.logicalUrn());
+    return dataSetRepository.save(dataSet);
+  }
+
   /** Re-saves an existing dataset (e.g. after wiring child collections post-build). */
   public DataSet saveDataSet(DataSet dataSet) {
     return dataSetRepository.save(dataSet);

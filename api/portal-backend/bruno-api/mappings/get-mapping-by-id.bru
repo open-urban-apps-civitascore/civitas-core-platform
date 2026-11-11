@@ -1,0 +1,36 @@
+meta {
+  name: Get Mapping by ID
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/datasets/:dataSetId/mappings/:mappingId
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+  mappingId: {{mappingId}}
+}
+
+tests {
+  test("Mapping read", function() {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("Returns the latest version with its content", function() {
+    expect(res.body.logicalUrn).to.equal(bru.getVar('mappingLogicalUrn'));
+    expect(res.body.versionedUrn).to.be.a('string');
+    expect(res.body.version).to.equal(bru.getVar('mappingVersion'));
+    expect(res.body.fields).to.have.property('$.station_id');
+  });
+}
+
+docs {
+  **Precondition:** `dataSetId` and `mappingId` are set.
+
+  **Expected Response:** 200 OK with `logicalUrn`, `versionedUrn`, `version` and `fields` of the
+  latest version.
+}

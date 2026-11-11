@@ -96,13 +96,18 @@ test_required_permissions_create_dataset_mapping if {
 	result == {"DATASET_UPDATE"}
 }
 
+test_required_permissions_read_dataset_mapping_item if {
+	result := permission_eval.required_permissions with input as portal_request_no_auth("GET", "/v1/datasets/dataset-1/mappings/mapping-1")
+	result == {"DATASET_READ"}
+}
+
 test_required_permissions_version_dataset_mapping if {
-	result := permission_eval.required_permissions with input as portal_request_no_auth("PUT", "/v1/datasets/dataset-1/mappings")
+	result := permission_eval.required_permissions with input as portal_request_no_auth("PUT", "/v1/datasets/dataset-1/mappings/mapping-1")
 	result == {"DATASET_UPDATE"}
 }
 
 test_required_permissions_delete_dataset_mapping if {
-	result := permission_eval.required_permissions with input as portal_request_no_auth("DELETE", "/v1/datasets/dataset-1/mappings")
+	result := permission_eval.required_permissions with input as portal_request_no_auth("DELETE", "/v1/datasets/dataset-1/mappings/mapping-1")
 	result == {"DATASET_UPDATE"}
 }
 

@@ -1,0 +1,34 @@
+meta {
+  name: Delete Mapping
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/datasets/:dataSetId/mappings/:mappingId
+  body: none
+  auth: inherit
+}
+
+params:path {
+  dataSetId: {{dataSetId}}
+  mappingId: {{mappingId}}
+}
+
+tests {
+  test("Mapping deleted", function() {
+    expect(res.getStatus()).to.equal(204);
+  });
+}
+
+docs {
+  **Precondition:** `dataSetId` and `mappingId` are set, and no pipeline references the mapping.
+
+  **Expected Response:** 204 No Content. The mapping and all its versions are gone.
+
+  **System Impact**
+
+  | System | Expected Change |
+  |---|---|
+  | Backend | Mapping artifact removed from the registry and from the dataset's manifest |
+}

@@ -389,9 +389,10 @@ class DataSourceControllerIntegrationTest
 
       assertThat(storedDocument(id)).containsEntry("element", dsv.getModelUrn());
       assertThat(
-              modelRegistryGateway.dependencyUrnsOfType(
+              modelRegistryGateway.dependencyPinsOfType(
                   dataSourceRepository.findById(id).orElseThrow().getConfigurationUrn(),
                   modelRegistryGateway.artifactType(dsv.getModelUrn())))
+          .extracting(ModelRegistryGateway.ModelPin::versionedUrn)
           .contains(dsv.getModelUrn());
     }
 
