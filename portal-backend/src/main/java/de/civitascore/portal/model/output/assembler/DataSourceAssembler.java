@@ -21,7 +21,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class DataSourceAssembler implements BaseAssembler<DataSource, DataSourceOutputDTO, UUID> {
+public class DataSourceAssembler implements BaseAssembler<DataSource, DataSourceOutputDTO> {
 
   private final DataSourceMapper dataSourceMapper;
   private final ArtifactUsageLookup artifactUsageLookup;
@@ -50,15 +50,13 @@ public class DataSourceAssembler implements BaseAssembler<DataSource, DataSource
   }
 
   /**
-   * {@inheritDoc} Converts a data source entity back to its input DTO for PATCH operations. The
-   * connector is left out: the controller derives it from the patch and the stored connector.
+   * Converts a data source entity back to its input DTO for PATCH operations. The connector is left
+   * out: the controller derives it from the patch and the stored connector.
    */
-  @Override
-  @SuppressWarnings("unchecked")
-  public <I> I toInput(DataSource entity) {
+  public DataSourceInputDTO toInput(DataSource entity) {
     DataSourceInputDTO dto = dataSourceMapper.toInput(entity);
     dto.setDatapoolScope(buildDatapoolScopeInput(entity));
-    return (I) dto;
+    return dto;
   }
 
   private DatapoolScopeOutputDTO buildDatapoolScopeOutput(DataSource entity) {

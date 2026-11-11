@@ -20,7 +20,9 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 
 @DisplayName("Role Controller Integration Tests")
@@ -220,6 +222,17 @@ class RoleControllerIntegrationTest
       RoleOutputDTO output = response.getBody();
       assertThat(output.getId()).as("ID should match").isEqualTo(roleId);
       assertThat(output.getName()).as("Name should be present").isNotNull();
+    }
+
+    @Test
+    void getPermission_unknownId_answers404NotFound() {
+      ResponseEntity<ProblemDetail> response =
+          exchangeForProblem(
+              "/permissions/" + UUID.randomUUID(), HttpMethod.GET, createAuthHeaders(), null);
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+      assertThat(response.getBody()).isNotNull();
+      assertThat(response.getBody().getType()).hasToString("urn:civitas:error:NOT_FOUND");
     }
 
     @Test

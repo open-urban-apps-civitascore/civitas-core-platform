@@ -9,7 +9,6 @@ import de.civitascore.portal.problem.Problems;
 import de.civitascore.portal.repository.specification.AssignmentSpec;
 import de.civitascore.portal.service.AssignmentService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -46,7 +45,6 @@ public class AssignmentController {
       description =
           "Returns a paginated, filterable list of assignments. Supports sorting and"
               + " specification-based filtering.")
-  @ApiResponse(responseCode = "200", description = "Page of assignments returned successfully")
   public Page<AssignmentOutputDTO> listAssignments(
       @ParameterObject AssignmentSpec spec,
       @ParameterObject
@@ -59,7 +57,6 @@ public class AssignmentController {
   @Operation(
       summary = "Get assignment by ID",
       description = "Returns a single assignment identified by its UUID.")
-  @ApiResponse(responseCode = "200", description = "Assignment returned successfully")
   @Problems(ProblemType.NOT_FOUND)
   public AssignmentOutputDTO getAssignment(@PathVariable UUID assignmentId) {
     return assignmentAssembler.toOutput(assignmentService.findByIdOrThrow(assignmentId));
@@ -72,7 +69,6 @@ public class AssignmentController {
       description =
           "Creates a new assignment and returns it with a Location header pointing to the new"
               + " assignment URI.")
-  @ApiResponse(responseCode = "201", description = "Assignment created successfully")
   @Problems({
     ProblemType.INVALID_INPUT,
     ProblemType.NOT_FOUND,
@@ -90,7 +86,6 @@ public class AssignmentController {
   @Operation(
       summary = "Delete an assignment",
       description = "Permanently deletes an assignment by its UUID.")
-  @ApiResponse(responseCode = "204", description = "Assignment deleted successfully")
   @Problems(ProblemType.NOT_FOUND)
   public void deleteAssignment(@PathVariable UUID assignmentId) {
     assignmentService.deleteById(assignmentId);

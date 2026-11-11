@@ -4,9 +4,9 @@ import de.civitascore.portal.configuration.CivitasProperties;
 import de.civitascore.portal.mapper.DataSetMapper;
 import de.civitascore.portal.mapper.UserMapper;
 import de.civitascore.portal.model.entity.DataSet;
+import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.output.DataSetOutputDTO;
 import de.civitascore.portal.repository.UserRepository;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -16,7 +16,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class DataSetAssembler implements BaseAssembler<DataSet, DataSetOutputDTO, UUID> {
+public class DataSetAssembler implements BaseAssembler<DataSet, DataSetOutputDTO> {
 
   private final DataSetMapper dataSetMapper;
   private final UserRepository userRepository;
@@ -49,9 +49,7 @@ public class DataSetAssembler implements BaseAssembler<DataSet, DataSetOutputDTO
     return dto;
   }
 
-  @Override
-  @SuppressWarnings("unchecked")
-  public <I> I toInput(DataSet entity) {
-    return (I) dataSetMapper.toInput(entity);
+  public DataSetInputDTO toInput(DataSet entity) {
+    return dataSetMapper.toInput(entity);
   }
 }

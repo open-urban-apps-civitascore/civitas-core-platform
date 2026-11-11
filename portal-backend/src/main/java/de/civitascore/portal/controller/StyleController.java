@@ -9,7 +9,6 @@ import de.civitascore.portal.problem.Problems;
 import de.civitascore.portal.repository.specification.StyleSpec;
 import de.civitascore.portal.service.StyleService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -43,29 +42,25 @@ public class StyleController {
 
   @GetMapping
   @Operation(summary = "List all Styles for a dataset")
-  @ApiResponse(responseCode = "200", description = "Page of styles returned successfully")
   public Page<StyleOutputDTO> listStyles(
-      // Typed so that a malformed id answers 400 before StyleSpec reads the path variable.
       @PathVariable UUID dataSetId,
       @ParameterObject StyleSpec spec,
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
-    return styleAssembler.toOutput(styleService.findAll(spec, pageable));
+    return styleAssembler.toOutput(styleService.findAll(dataSetId, spec, pageable));
   }
 
   @GetMapping("/{styleId}")
   @Operation(summary = "Get Style by ID")
-  @ApiResponse(responseCode = "200", description = "Style returned successfully")
   @Problems(ProblemType.NOT_FOUND)
   public StyleOutputDTO getStyle(@PathVariable UUID dataSetId, @PathVariable UUID styleId) {
-    return styleAssembler.toOutput(requireOwned(dataSetId, styleId));
+    return styleAssembler.toOutput(styleService.findOwned(dataSetId, styleId));
   }
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   @Operation(summary = "Create a new Style")
-  @ApiResponse(responseCode = "201", description = "Style created successfully")
   @Problems({
     ProblemType.NOT_FOUND,
     ProblemType.DATASET_NOT_EDITABLE,
@@ -74,15 +69,13 @@ public class StyleController {
   })
   public ResponseEntity<StyleOutputDTO> createStyle(
       @PathVariable UUID dataSetId, @Valid @RequestBody StyleInputDTO input) {
-    input.setDataSetId(dataSetId);
-    Style created = styleService.create(input);
+    Style created = styleService.create(dataSetId, input);
     return ResponseEntity.created(Locations.ofCreated(created.getId()))
         .body(styleAssembler.toOutput(created));
   }
 
   @PutMapping("/{styleId}")
   @Operation(summary = "Replace a Style")
-  @ApiResponse(responseCode = "200", description = "Style updated successfully")
   @Problems({
     ProblemType.NOT_FOUND,
     ProblemType.DATASET_NOT_EDITABLE,
@@ -93,15 +86,12 @@ public class StyleController {
       @PathVariable UUID dataSetId,
       @PathVariable UUID styleId,
       @Valid @RequestBody StyleInputDTO input) {
-    requireOwned(dataSetId, styleId);
-    input.setDataSetId(dataSetId);
-    return styleAssembler.toOutput(styleService.update(styleId, input));
+    return styleAssembler.toOutput(styleService.update(dataSetId, styleId, input));
   }
 
   @DeleteMapping("/{styleId}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   @Operation(summary = "Delete a Style")
-  @ApiResponse(responseCode = "204", description = "Style deleted successfully")
   @Problems({
     ProblemType.NOT_FOUND,
     ProblemType.DATASET_NOT_EDITABLE,
@@ -109,13 +99,6 @@ public class StyleController {
     ProblemType.RESOURCE_IN_USE
   })
   public void deleteStyle(@PathVariable UUID dataSetId, @PathVariable UUID styleId) {
-    requireOwned(dataSetId, styleId);
-    styleService.deleteById(styleId);
-  }
-
-  private Style requireOwned(UUID dataSetId, UUID styleId) {
-    Style style = styleService.findByIdOrThrow(styleId);
-    ParentOwnership.requireSameParent(dataSetId, style.getDataSet().getId(), Style.class, styleId);
-    return style;
+    styleService.delete(dataSetId, styleId);
   }
 }

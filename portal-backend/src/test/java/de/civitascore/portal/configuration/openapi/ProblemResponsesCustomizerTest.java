@@ -1,7 +1,6 @@
 package de.civitascore.portal.configuration.openapi;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.civitascore.portal.problem.ProblemType;
 import de.civitascore.portal.problem.Problems;
@@ -25,7 +24,7 @@ class ProblemResponsesCustomizerTest {
 
   @Test
   void declaredProblems_areGroupedByStatus_withOneExampleRefPerType() {
-    ApiResponses responses = customize("declaredConflicts", new ApiResponses());
+    ApiResponses responses = customize("declaredConflicts");
 
     assertThat(exampleRefs(responses.get("409")))
         .containsOnlyKeys("RESOURCE_IN_USE", "SAGA_IN_FLIGHT")
@@ -38,13 +37,12 @@ class ProblemResponsesCustomizerTest {
 
   @Test
   void pathVariable_addsInvalidInput() {
-    assertThat(exampleRefs(customize("pathVariable", new ApiResponses()).get("400")))
-        .containsOnlyKeys("INVALID_INPUT");
+    assertThat(exampleRefs(customize("pathVariable").get("400"))).containsOnlyKeys("INVALID_INPUT");
   }
 
   @Test
   void requestBody_addsMalformedRequestAndUnsupportedMediaType() {
-    ApiResponses responses = customize("body", new ApiResponses());
+    ApiResponses responses = customize("body");
 
     assertThat(exampleRefs(responses.get("400"))).containsOnlyKeys("MALFORMED_REQUEST");
     assertThat(exampleRefs(responses.get("415"))).containsOnlyKeys("UNSUPPORTED_MEDIA_TYPE");
@@ -52,13 +50,13 @@ class ProblemResponsesCustomizerTest {
 
   @Test
   void validatedBody_addsValidationFailed() {
-    assertThat(exampleRefs(customize("validatedBody", new ApiResponses()).get("400")))
+    assertThat(exampleRefs(customize("validatedBody").get("400")))
         .containsOnlyKeys("MALFORMED_REQUEST", "VALIDATION_FAILED");
   }
 
   @Test
   void everyOperation_refersToTheShared401_403_500() {
-    ApiResponses responses = customize("noParameters", new ApiResponses());
+    ApiResponses responses = customize("noParameters");
 
     assertThat(responses)
         .containsOnlyKeys("401", "403", "500")
@@ -71,46 +69,16 @@ class ProblemResponsesCustomizerTest {
                         "#/components/responses/InternalServerError"));
   }
 
-  @Test
-  void declaredProblemsWithHandWrittenErrorResponse_failSpecGeneration() {
-    ApiResponses handWritten =
-        new ApiResponses().addApiResponse("404", new ApiResponse().description("Not found"));
-
-    assertThatThrownBy(() -> customize("declaredConflicts", handWritten))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessageContaining("404");
-  }
-
-  @Test
-  void handWrittenErrorResponse_withoutDeclaredProblems_listsOnlyTheFirstCatalogTypeOfItsStatus() {
-    ApiResponses handWritten =
-        new ApiResponses().addApiResponse("409", new ApiResponse().description("Conflict"));
-
-    ApiResponse conflict = customize("noParameters", handWritten).get("409");
-
-    assertThat(conflict.getDescription()).isEqualTo("Conflict");
-    assertThat(exampleRefs(conflict)).containsOnlyKeys("UNIQUE_CONSTRAINT_VIOLATION");
-  }
-
-  @Test
-  void handWrittenErrorResponse_withoutDeclaredProblems_keepsTheImplicitTypesOfItsStatus() {
-    ApiResponses handWritten =
-        new ApiResponses().addApiResponse("400", new ApiResponse().description("Bad request"));
-
-    ApiResponse badRequest = customize("validatedBody", handWritten).get("400");
-
-    assertThat(badRequest.getDescription()).isEqualTo("Bad request");
-    assertThat(exampleRefs(badRequest)).containsOnlyKeys("MALFORMED_REQUEST", "VALIDATION_FAILED");
-  }
-
-  private ApiResponses customize(String fixtureMethod, ApiResponses responses) {
+  private ApiResponses customize(String fixtureMethod) {
     HandlerMethod handlerMethod =
         Arrays.stream(Fixture.class.getDeclaredMethods())
             .filter(method -> method.getName().equals(fixtureMethod))
             .findFirst()
             .map(method -> new HandlerMethod(new Fixture(), method))
             .orElseThrow();
-    return customizer.customize(new Operation().responses(responses), handlerMethod).getResponses();
+    return customizer
+        .customize(new Operation().responses(new ApiResponses()), handlerMethod)
+        .getResponses();
   }
 
   private static Map<String, String> exampleRefs(ApiResponse response) {

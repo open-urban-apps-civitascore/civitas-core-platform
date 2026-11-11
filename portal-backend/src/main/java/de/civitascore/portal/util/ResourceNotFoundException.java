@@ -31,6 +31,11 @@ public class ResourceNotFoundException extends ProblemException {
     this("%s '%s' not found".formatted(resourceType, resourceUrn), resourceType, null, null);
   }
 
+  /** For a resource addressed by a free-text key, which the detail does not echo. */
+  public ResourceNotFoundException(String resourceType) {
+    this("%s not found".formatted(resourceType), resourceType, null, null);
+  }
+
   public ResourceNotFoundException(String resourceType, Collection<UUID> resourceIds) {
     this(
         "%s with ids %s not found".formatted(resourceType, resourceIds),

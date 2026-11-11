@@ -46,6 +46,11 @@ class DataSinkControllerIntegrationTest
     return "datasinks";
   }
 
+  @Override
+  protected UUID createEntityIn(DataSet dataSet) {
+    return portalData.dataSink(dataSet).getId();
+  }
+
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private DataSinkRepository dataSinkRepository;
   @Autowired private ModelRegistryGateway modelRegistryGateway;
@@ -180,10 +185,7 @@ class DataSinkControllerIntegrationTest
               createAuthHeaders(),
               null);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getDetail())
-          .isEqualTo("Missing or invalid dataSetId in path variables");
+      assertRejected(response, HttpStatus.BAD_REQUEST, "urn:civitas:error:INVALID_INPUT");
     }
 
     @Test
@@ -859,10 +861,7 @@ class DataSinkControllerIntegrationTest
               createAuthHeaders(),
               patchMap);
 
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getDetail())
-          .isEqualTo("Missing or invalid dataSetId in path variables");
+      assertRejected(response, HttpStatus.BAD_REQUEST, "urn:civitas:error:INVALID_INPUT");
     }
 
     @Test

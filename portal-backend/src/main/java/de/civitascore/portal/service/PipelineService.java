@@ -341,6 +341,17 @@ public class PipelineService extends DataSetOwnedService<Pipeline, PipelineInput
   }
 
   /**
+   * {@link #deleteById(UUID, boolean)} for an entity of the dataset in the path.
+   *
+   * @throws ResourceNotFoundException if the entity does not exist or belongs to another dataset
+   */
+  @Transactional
+  public void delete(UUID dataSetId, UUID id, boolean confirmDataLoss) {
+    findOwned(dataSetId, id);
+    deleteById(id, confirmDataLoss);
+  }
+
+  /**
    * Deletes the pipeline. Its DataSinks stay with the dataset unless this pipeline was their last
    * one; those are removed (see {@link DataSinkRemovalService}). The Pipeline's Model Forge
    * artifact goes first: Model Forge refuses to delete a Data sink configuration that it still

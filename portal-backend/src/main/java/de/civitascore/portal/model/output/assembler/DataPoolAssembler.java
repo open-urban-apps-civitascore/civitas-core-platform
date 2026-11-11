@@ -2,10 +2,10 @@ package de.civitascore.portal.model.output.assembler;
 
 import de.civitascore.portal.mapper.DataPoolMapper;
 import de.civitascore.portal.model.entity.DataPool;
+import de.civitascore.portal.model.input.DataPoolInputDTO;
 import de.civitascore.portal.model.output.DataPoolOutputDTO;
 import de.civitascore.portal.repository.DataSetRepository;
 import java.util.List;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class DataPoolAssembler implements BaseAssembler<DataPool, DataPoolOutputDTO, UUID> {
+public class DataPoolAssembler implements BaseAssembler<DataPool, DataPoolOutputDTO> {
 
   private final DataPoolMapper dataPoolMapper;
   private final DataSetRepository dataSetRepository;
@@ -35,9 +35,7 @@ public class DataPoolAssembler implements BaseAssembler<DataPool, DataPoolOutput
     return dto;
   }
 
-  @Override
-  @SuppressWarnings("unchecked")
-  public <I> I toInput(DataPool entity) {
-    return (I) dataPoolMapper.toInput(entity);
+  public DataPoolInputDTO toInput(DataPool entity) {
+    return dataPoolMapper.toInput(entity);
   }
 }

@@ -3,13 +3,16 @@ package de.civitascore.portal.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.civitascore.portal.config.PortalTestDataFactory;
+import de.civitascore.portal.model.entity.Assignment;
 import de.civitascore.portal.model.entity.DataPool;
 import de.civitascore.portal.model.entity.User;
 import de.civitascore.portal.model.input.DataPoolInputDTO;
+import de.civitascore.portal.model.output.AssignmentOutputDTO;
 import de.civitascore.portal.model.output.DataPoolOutputDTO;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSetRepository;
 import de.civitascore.portal.util.RestPage;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -98,6 +101,32 @@ class DataPoolControllerIntegrationTest
               null);
 
       assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
+  }
+
+  @Nested
+  @DisplayName("Assignments")
+  class AssignmentsTests {
+
+    @Test
+    @DisplayName("Should return the assignments scoped to the datapool")
+    void shouldReturnAssignmentsOfTheDataPool() {
+      DataPool dataPool = portalData.dataPool();
+      Assignment assignment =
+          portalData.assignment(portalData.group(), portalData.role(), dataPool);
+
+      ResponseEntity<List<AssignmentOutputDTO>> response =
+          exchange(
+              DATAPOOLS_ENDPOINT + "/" + dataPool.getId() + "/assignments",
+              org.springframework.http.HttpMethod.GET,
+              createAuthHeaders(),
+              null,
+              new ParameterizedTypeReference<>() {});
+
+      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+      assertThat(response.getBody())
+          .extracting(AssignmentOutputDTO::getId)
+          .containsExactly(assignment.getId());
     }
   }
 

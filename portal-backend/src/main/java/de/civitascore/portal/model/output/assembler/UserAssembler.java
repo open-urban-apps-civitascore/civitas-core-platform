@@ -5,9 +5,9 @@ import de.civitascore.portal.mapper.GroupMapper;
 import de.civitascore.portal.mapper.UserMapper;
 import de.civitascore.portal.model.embedded.ScopeType;
 import de.civitascore.portal.model.entity.User;
+import de.civitascore.portal.model.input.UserInputDTO;
 import de.civitascore.portal.model.output.UserOutputDTO;
 import de.civitascore.portal.service.AssignmentService;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -18,7 +18,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class UserAssembler implements BaseAssembler<User, UserOutputDTO, UUID> {
+public class UserAssembler implements BaseAssembler<User, UserOutputDTO> {
 
   private final UserMapper userMapper;
   private final GroupMapper groupMapper;
@@ -43,10 +43,8 @@ public class UserAssembler implements BaseAssembler<User, UserOutputDTO, UUID> {
     return output;
   }
 
-  /** {@inheritDoc} Converts a user entity back to its input DTO for PATCH operations. */
-  @Override
-  @SuppressWarnings("unchecked")
-  public <I> I toInput(User entity) {
-    return (I) userMapper.toInput(entity);
+  /** Converts a user entity back to its input DTO for PATCH operations. */
+  public UserInputDTO toInput(User entity) {
+    return userMapper.toInput(entity);
   }
 }

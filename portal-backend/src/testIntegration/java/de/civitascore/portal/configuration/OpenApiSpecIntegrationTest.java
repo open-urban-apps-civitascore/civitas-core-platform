@@ -62,9 +62,9 @@ class OpenApiSpecIntegrationTest extends BaseKeycloakIntegrationTest {
 
   @ParameterizedTest
   @CsvSource({
-    "/datasets/{id}/released/meta, name",
-    "/datasets/{id}/ready/meta, openDataAccess",
-    "/datasources/{id}/released/meta, datapoolScope",
+    "/datasets/{dataSetId}/released/meta, name",
+    "/datasets/{dataSetId}/ready/meta, openDataAccess",
+    "/datasources/{dataSourceId}/released/meta, datapoolScope",
     "/datastructures/{dataStructureId}/versions/{versionId}/released/meta, description"
   })
   @DisplayName("Should describe the metadata patch body with only optional metadata fields")

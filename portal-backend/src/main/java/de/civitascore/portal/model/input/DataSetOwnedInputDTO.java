@@ -6,8 +6,8 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 /**
- * Abstract base input DTO for entities nested under a parent dataset. The controller injects {@code
- * dataSetId} from the path variable, so a request body cannot set it.
+ * Abstract base input DTO for entities nested under a parent dataset. {@code DataSetOwnedService}
+ * sets {@code dataSetId} from the parent it is given, so a request body cannot set it.
  */
 @Data
 @EqualsAndHashCode(callSuper = true)

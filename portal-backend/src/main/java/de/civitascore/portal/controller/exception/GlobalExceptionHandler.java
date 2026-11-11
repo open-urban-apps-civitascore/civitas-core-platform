@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.exception.ConstraintViolationException;
 import org.jspecify.annotations.Nullable;
@@ -24,10 +25,13 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.method.ParameterErrors;
+import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
 /**
@@ -145,18 +149,45 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
       HttpHeaders headers,
       HttpStatusCode status,
       WebRequest request) {
-    List<FieldError> fieldErrors =
+    return validationFailed(
         ex.getBindingResult().getFieldErrors().stream()
-            .map(
-                fe ->
-                    new FieldError(
-                        fe.getField(),
-                        fe.getDefaultMessage() != null ? fe.getDefaultMessage() : ""))
-            .toList();
+            .map(fe -> fieldError(fe.getField(), fe.getDefaultMessage()))
+            .toList());
+  }
 
+  /**
+   * Answers a failed validation of a handler method parameter, such as an element of a {@code
+   * Set<@Valid ...>} body, with the same field errors as a failed {@code @Valid} body.
+   */
+  @Override
+  protected ResponseEntity<Object> handleHandlerMethodValidationException(
+      HandlerMethodValidationException ex,
+      HttpHeaders headers,
+      HttpStatusCode status,
+      WebRequest request) {
+    return validationFailed(
+        ex.getParameterValidationResults().stream()
+            .flatMap(GlobalExceptionHandler::fieldErrors)
+            .toList());
+  }
+
+  private static Stream<FieldError> fieldErrors(ParameterValidationResult result) {
+    if (result instanceof ParameterErrors errors) {
+      return errors.getFieldErrors().stream()
+          .map(fe -> fieldError(fe.getField(), fe.getDefaultMessage()));
+    }
+    String parameterName = result.getMethodParameter().getParameterName();
+    return result.getResolvableErrors().stream()
+        .map(error -> fieldError(parameterName, error.getDefaultMessage()));
+  }
+
+  private static FieldError fieldError(@Nullable String field, @Nullable String message) {
+    return new FieldError(field != null ? field : "", message != null ? message : "");
+  }
+
+  private ResponseEntity<Object> validationFailed(List<FieldError> fieldErrors) {
     ProblemDetail problemDetail = problemDetails.of(ProblemType.VALIDATION_FAILED);
     problemDetail.setProperty("fieldErrors", fieldErrors);
-
     log.warn("Validation failed: {} field error(s)", fieldErrors.size());
     return ResponseEntity.badRequest().body(problemDetail);
   }

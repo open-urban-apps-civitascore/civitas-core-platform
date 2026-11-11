@@ -24,7 +24,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class AssignmentAssembler implements BaseAssembler<Assignment, AssignmentOutputDTO, UUID> {
+public class AssignmentAssembler implements BaseAssembler<Assignment, AssignmentOutputDTO> {
 
   private final AssignmentMapper assignmentMapper;
   private final GroupMapper groupMapper;
@@ -112,12 +112,5 @@ public class AssignmentAssembler implements BaseAssembler<Assignment, Assignment
     summary.setId(scopeEntity.getId());
     summary.setName(scopeEntity.getName());
     return summary;
-  }
-
-  /** {@inheritDoc} Converts an assignment entity back to its input DTO for PATCH operations. */
-  @Override
-  @SuppressWarnings("unchecked")
-  public <I> I toInput(Assignment entity) {
-    return (I) assignmentMapper.toInput(entity);
   }
 }

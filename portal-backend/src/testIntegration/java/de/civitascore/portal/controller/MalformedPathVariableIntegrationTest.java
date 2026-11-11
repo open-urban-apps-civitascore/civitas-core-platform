@@ -74,7 +74,7 @@ class MalformedPathVariableIntegrationTest extends BaseKeycloakIntegrationTest {
 
   @ParameterizedTest(name = "{0} {1} with malformed {2}")
   @MethodSource("uuidPathVariables")
-  void everyUuidPathVariable_whenMalformed_answers400WithCatalogUrn(
+  void everyUuidPathVariable_whenMalformed_answers400InvalidInput(
       HttpMethod method, String pattern, String variable) {
     String path = withMalformed(pattern, variable);
     ResponseEntity<ProblemDetail> response =
@@ -88,7 +88,7 @@ class MalformedPathVariableIntegrationTest extends BaseKeycloakIntegrationTest {
         .as("%s %s", method, path)
         .isEqualTo(HttpStatus.BAD_REQUEST);
     assertThat(response.getBody()).isNotNull();
-    assertThat(response.getBody().getType()).asString().startsWith("urn:civitas:error:");
+    assertThat(response.getBody().getType()).hasToString("urn:civitas:error:INVALID_INPUT");
   }
 
   private static String withMalformed(String pattern, String malformedVariable) {

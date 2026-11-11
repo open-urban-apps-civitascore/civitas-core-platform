@@ -1,4 +1,4 @@
-package de.civitascore.portal.controller;
+package de.civitascore.portal.service;
 
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.util.UUID;
@@ -16,9 +16,9 @@ final class ParentOwnership {
    * @throws ResourceNotFoundException if {@code actualParentId} is not {@code pathParentId}
    */
   static void requireSameParent(
-      UUID pathParentId, UUID actualParentId, Class<?> entityType, UUID id) {
+      UUID pathParentId, UUID actualParentId, String resourceType, UUID id) {
     if (!pathParentId.equals(actualParentId)) {
-      throw new ResourceNotFoundException(entityType.getSimpleName(), id);
+      throw new ResourceNotFoundException(resourceType, id);
     }
   }
 }

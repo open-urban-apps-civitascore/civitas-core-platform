@@ -17,7 +17,7 @@ import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.Style;
 import de.civitascore.portal.model.entity.base.DataSetOwnedEntity;
-import de.civitascore.portal.model.input.BaseInputDTO;
+import de.civitascore.portal.model.input.DataSetOwnedInputDTO;
 import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.model.input.LayerInputDTO;
 import de.civitascore.portal.model.input.PipelineInputDTO;
@@ -62,7 +62,7 @@ class SubEntityGuardWiringIntegrationTest extends BaseKeycloakIntegrationTest {
   @Autowired private PortalTestDataFactory portalData;
   @Autowired private DataSetRepository dataSetRepository;
 
-  private record Fixture(UUID id, BaseInputDTO input) {}
+  private record Fixture(UUID id, DataSetOwnedInputDTO input) {}
 
   private final Map<Class<?>, BiFunction<PortalTestDataFactory, DataSet, Fixture>> fixtures =
       registerFixtures();
@@ -78,7 +78,6 @@ class SubEntityGuardWiringIntegrationTest extends BaseKeycloakIntegrationTest {
           Pipeline pipeline = data.pipeline(dataSet);
           PipelineInputDTO input = new PipelineInputDTO();
           input.setName(pipeline.getName());
-          input.setDataSetId(dataSet.getId());
           return new Fixture(pipeline.getId(), input);
         });
 
@@ -89,7 +88,6 @@ class SubEntityGuardWiringIntegrationTest extends BaseKeycloakIntegrationTest {
           DataSinkInputDTO input = new DataSinkInputDTO();
           input.setDataSinkType(DataSinkType.FROST);
           input.setConfiguration(Map.of());
-          input.setDataSetId(dataSet.getId());
           return new Fixture(sink.getId(), input);
         });
 
@@ -100,7 +98,6 @@ class SubEntityGuardWiringIntegrationTest extends BaseKeycloakIntegrationTest {
           StyleInputDTO input = new StyleInputDTO();
           input.setName(style.getName());
           input.setSldContent("<StyledLayerDescriptor version=\"1.1.0\"/>");
-          input.setDataSetId(dataSet.getId());
           return new Fixture(style.getId(), input);
         });
 
@@ -112,7 +109,6 @@ class SubEntityGuardWiringIntegrationTest extends BaseKeycloakIntegrationTest {
           LayerInputDTO input = new LayerInputDTO();
           input.setLayerName(layer.getLayerName());
           input.setDataSinkId(layer.getDataSink().getId());
-          input.setDataSetId(dataSet.getId());
           return new Fixture(layer.getId(), input);
         });
 
@@ -143,19 +139,22 @@ class SubEntityGuardWiringIntegrationTest extends BaseKeycloakIntegrationTest {
   }
 
   @SuppressWarnings("unchecked")
-  private BaseService<DataSetOwnedEntity, BaseInputDTO> serviceFor(Class<?> entityType) {
-    return (BaseService<DataSetOwnedEntity, BaseInputDTO>)
-        Stream.of(applicationContext.getBeanNamesForType(BaseService.class))
-            .map(name -> applicationContext.getBean(name, BaseService.class))
+  private DataSetOwnedService<DataSetOwnedEntity, DataSetOwnedInputDTO> serviceFor(
+      Class<?> entityType) {
+    return (DataSetOwnedService<DataSetOwnedEntity, DataSetOwnedInputDTO>)
+        Stream.of(applicationContext.getBeanNamesForType(DataSetOwnedService.class))
+            .map(name -> applicationContext.getBean(name, DataSetOwnedService.class))
             .filter(
                 service -> {
                   ResolvableType resolved =
-                      ResolvableType.forClass(BaseService.class, service.getClass());
+                      ResolvableType.forClass(DataSetOwnedService.class, service.getClass());
                   return entityType.equals(resolved.getGeneric(0).resolve());
                 })
             .findFirst()
             .orElseThrow(
-                () -> new AssertionError("No BaseService found for " + entityType.getSimpleName()));
+                () ->
+                    new AssertionError(
+                        "No DataSetOwnedService found for " + entityType.getSimpleName()));
   }
 
   private DataSet dataSetWith(DataSetStatus status, PendingSagaType pendingSagaType) {
@@ -189,7 +188,8 @@ class SubEntityGuardWiringIntegrationTest extends BaseKeycloakIntegrationTest {
     draft.setDataSetStatus(DataSetStatus.READY);
     dataSetRepository.save(draft);
 
-    assertThatThrownBy(() -> serviceFor(entityType).update(fixture.id(), fixture.input()))
+    assertThatThrownBy(
+            () -> serviceFor(entityType).update(draft.getId(), fixture.id(), fixture.input()))
         .as("%s must consult the guard on update", entityType.getSimpleName())
         .isInstanceOf(DataSetNotEditableException.class);
   }
@@ -203,7 +203,8 @@ class SubEntityGuardWiringIntegrationTest extends BaseKeycloakIntegrationTest {
     draft.setDataSetStatus(DataSetStatus.AVAILABLE);
     dataSetRepository.save(draft);
 
-    assertThatThrownBy(() -> serviceFor(entityType).update(fixture.id(), fixture.input()))
+    assertThatThrownBy(
+            () -> serviceFor(entityType).update(draft.getId(), fixture.id(), fixture.input()))
         .isInstanceOf(DataSetNotEditableException.class);
   }
 
@@ -216,7 +217,8 @@ class SubEntityGuardWiringIntegrationTest extends BaseKeycloakIntegrationTest {
     draft.setPendingSagaType(PendingSagaType.UNRELEASE);
     dataSetRepository.save(draft);
 
-    assertThatThrownBy(() -> serviceFor(entityType).update(fixture.id(), fixture.input()))
+    assertThatThrownBy(
+            () -> serviceFor(entityType).update(draft.getId(), fixture.id(), fixture.input()))
         .isInstanceOf(SagaInFlightException.class);
   }
 
@@ -229,7 +231,7 @@ class SubEntityGuardWiringIntegrationTest extends BaseKeycloakIntegrationTest {
     draft.setDataSetStatus(DataSetStatus.READY);
     dataSetRepository.save(draft);
 
-    assertThatThrownBy(() -> serviceFor(entityType).create(fixture.input()))
+    assertThatThrownBy(() -> serviceFor(entityType).create(draft.getId(), fixture.input()))
         .as("%s must consult the guard on create", entityType.getSimpleName())
         .isInstanceOf(DataSetNotEditableException.class);
   }
@@ -243,13 +245,13 @@ class SubEntityGuardWiringIntegrationTest extends BaseKeycloakIntegrationTest {
     draft.setPendingSagaType(PendingSagaType.UNRELEASE);
     dataSetRepository.save(draft);
 
-    assertThatThrownBy(() -> serviceFor(entityType).create(fixture.input()))
+    assertThatThrownBy(() -> serviceFor(entityType).create(draft.getId(), fixture.input()))
         .isInstanceOf(SagaInFlightException.class);
   }
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("subEntityTypes")
-  @DisplayName("deleteById() is rejected when the parent DataSet is READY")
+  @DisplayName("delete() is rejected when the parent DataSet is READY")
   void deleteRejectedWhenParentIsReady(Class<?> entityType) {
     DataSet draft = dataSetWith(DataSetStatus.DRAFT, null);
     Fixture fixture = fixtureFor(entityType, draft);
@@ -257,14 +259,14 @@ class SubEntityGuardWiringIntegrationTest extends BaseKeycloakIntegrationTest {
     draft.setDataSetStatus(DataSetStatus.READY);
     dataSetRepository.save(draft);
 
-    assertThatThrownBy(() -> serviceFor(entityType).deleteById(id))
+    assertThatThrownBy(() -> serviceFor(entityType).delete(draft.getId(), id))
         .as("%s must consult the guard on delete", entityType.getSimpleName())
         .isInstanceOf(DataSetNotEditableException.class);
   }
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("subEntityTypes")
-  @DisplayName("deleteById() is rejected while a saga is in flight on a DRAFT parent")
+  @DisplayName("delete() is rejected while a saga is in flight on a DRAFT parent")
   void deleteRejectedWhileSagaInFlight(Class<?> entityType) {
     DataSet draft = dataSetWith(DataSetStatus.DRAFT, null);
     Fixture fixture = fixtureFor(entityType, draft);
@@ -272,7 +274,7 @@ class SubEntityGuardWiringIntegrationTest extends BaseKeycloakIntegrationTest {
     draft.setPendingSagaType(PendingSagaType.UNRELEASE);
     dataSetRepository.save(draft);
 
-    assertThatThrownBy(() -> serviceFor(entityType).deleteById(id))
+    assertThatThrownBy(() -> serviceFor(entityType).delete(draft.getId(), id))
         .isInstanceOf(SagaInFlightException.class);
   }
 
@@ -283,7 +285,8 @@ class SubEntityGuardWiringIntegrationTest extends BaseKeycloakIntegrationTest {
     DataSet draft = dataSetWith(DataSetStatus.DRAFT, null);
     Fixture fixture = fixtureFor(entityType, draft);
 
-    assertThatCode(() -> serviceFor(entityType).update(fixture.id(), fixture.input()))
+    assertThatCode(
+            () -> serviceFor(entityType).update(draft.getId(), fixture.id(), fixture.input()))
         .as("The guard must not reject a DRAFT parent")
         .doesNotThrowAnyException();
   }

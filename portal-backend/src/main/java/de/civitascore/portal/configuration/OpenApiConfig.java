@@ -10,26 +10,20 @@ import io.swagger.v3.oas.models.info.License;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.media.Schema;
-import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.oas.models.security.OAuthFlow;
 import io.swagger.v3.oas.models.security.OAuthFlows;
 import io.swagger.v3.oas.models.security.Scopes;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * OpenAPI/Swagger configuration that customizes the generated API documentation. Adds OAuth2
- * security schemes, normalizes operation IDs, replaces entity name placeholders, and derives PATCH
- * schemas from PUT input DTOs. The error responses come from {@link
+ * Completes the OpenAPI description that springdoc builds from the controllers: the OAuth2 security
+ * scheme, the relative server URL and the request body schema of each PATCH operation. The error
+ * responses come from {@link
  * de.civitascore.portal.configuration.openapi.ProblemResponsesCustomizer}.
  */
 @Configuration
@@ -107,184 +101,11 @@ public class OpenApiConfig {
     return openAPI;
   }
 
-  /**
-   * Replaces {@code {entity}}, {@code {entities}}, and {@code {Entity}} placeholders in operation
-   * summaries, response descriptions, and operationIds using the tag name.
-   */
-  @Bean
-  public OpenApiCustomizer placeholderReplacementCustomizer() {
-    return openApi ->
-        openApi
-            .getPaths()
-            .values()
-            .forEach(
-                pathItem ->
-                    pathItem
-                        .readOperations()
-                        .forEach(
-                            operation -> {
-                              if (operation.getTags() == null || operation.getTags().isEmpty()) {
-                                return;
-                              }
-                              String tag = operation.getTags().get(0);
-                              String plural = tag.toLowerCase();
-                              String singular =
-                                  plural.endsWith("s")
-                                      ? plural.substring(0, plural.length() - 1)
-                                      : plural;
-                              String capitalized =
-                                  singular.substring(0, 1).toUpperCase() + singular.substring(1);
-                              // Derive PascalCase from original tag: "DataSources" → "DataSource",
-                              // "Data Structures" → "DataStructure"
-                              String strippedTag =
-                                  tag.endsWith("s") ? tag.substring(0, tag.length() - 1) : tag;
-                              String entityPascal = strippedTag.replace(" ", "");
-                              if (operation.getSummary() != null) {
-                                operation.setSummary(
-                                    operation
-                                        .getSummary()
-                                        .replace("{entities}", plural)
-                                        .replace("{entity}", singular)
-                                        .replace("{Entity}", capitalized));
-                              }
-                              if (operation.getDescription() != null) {
-                                operation.setDescription(
-                                    operation
-                                        .getDescription()
-                                        .replace("{entities}", plural)
-                                        .replace("{entity}", singular)
-                                        .replace("{Entity}", capitalized));
-                              }
-                              if (operation.getOperationId() != null) {
-                                operation.setOperationId(
-                                    operation.getOperationId().replace("{Entity}", entityPascal));
-                              }
-                              operation.getResponses().values().stream()
-                                  .filter(response -> response.get$ref() == null)
-                                  .forEach(
-                                      response ->
-                                          response.setDescription(
-                                              response
-                                                  .getDescription()
-                                                  .replace("{entities}", plural)
-                                                  .replace("{entity}", singular)
-                                                  .replace("{Entity}", capitalized)));
-                            }));
-  }
-
-  /**
-   * Sets operationIds for base CRUD endpoints (1- or 2-segment paths). Non-CRUD endpoints must set
-   * operationId manually via {@code @Operation(operationId = "...")} — the customizer skips them.
-   */
-  @Bean
-  public OpenApiCustomizer operationIdCustomizer() {
-    return openApi ->
-        openApi
-            .getPaths()
-            .forEach(
-                (path, pathItem) ->
-                    pathItem
-                        .readOperationsMap()
-                        .forEach(
-                            (method, operation) -> {
-                              if (operation.getTags() == null || operation.getTags().isEmpty()) {
-                                return;
-                              }
-                              // Skip if operationId was explicitly set via @Operation.
-                              // SpringDoc auto-generates IDs like "getById", "getAll_1",
-                              // "create_2" — overwrite those but preserve manual ones.
-                              String existingId = operation.getOperationId();
-                              if (existingId != null
-                                  && !existingId.matches(
-                                      "(getById|getAll|create|update|delete|patch)(_\\d+)?")) {
-                                return;
-                              }
-
-                              String[] segments = path.substring(1).split("/");
-                              // Only handle /{resource} and /{resource}/{param}
-                              if (segments.length > 2) return;
-                              if (segments.length == 2 && !segments[1].startsWith("{")) return;
-
-                              String tag = operation.getTags().get(0);
-                              String stripped =
-                                  tag.endsWith("s") ? tag.substring(0, tag.length() - 1) : tag;
-                              String singular = stripped.replace(" ", "");
-                              String plural = tag.replace(" ", "");
-
-                              String operationId =
-                                  switch (method) {
-                                    case GET ->
-                                        segments.length == 1 ? "list" + plural : "get" + singular;
-                                    case POST -> "create" + singular;
-                                    case PUT -> "update" + singular;
-                                    case PATCH -> "patch" + singular;
-                                    case DELETE -> "delete" + singular;
-                                    default -> null;
-                                  };
-                              if (operationId != null) {
-                                operation.setOperationId(operationId);
-                              }
-                            }));
-  }
-
   /** Replace auto-generated localhost URL with a relative base path. */
   @Bean
   public OpenApiCustomizer relativeServerUrlCustomizer() {
     return openApi ->
         openApi.setServers(List.of(new io.swagger.v3.oas.models.servers.Server().url("/v1")));
-  }
-
-  /**
-   * Ensures all path parameters referenced in URL templates are declared as {@code @Parameter} on
-   * the operation. Adds missing path parameters with UUID schema so the generated spec is valid.
-   */
-  @Bean
-  public OpenApiCustomizer missingPathParameterCustomizer() {
-    Pattern pathParamPattern = Pattern.compile("\\{([^}]+)}");
-    return openApi ->
-        openApi
-            .getPaths()
-            .forEach(
-                (path, pathItem) -> {
-                  Matcher matcher = pathParamPattern.matcher(path);
-                  List<String> pathParams = new ArrayList<>();
-                  while (matcher.find()) {
-                    pathParams.add(matcher.group(1));
-                  }
-                  if (pathParams.isEmpty()) {
-                    return;
-                  }
-                  pathItem
-                      .readOperations()
-                      .forEach(
-                          operation -> {
-                            Set<String> declared =
-                                operation.getParameters() == null
-                                    ? Set.of()
-                                    : operation.getParameters().stream()
-                                        .filter(p -> "path".equals(p.getIn()))
-                                        .map(Parameter::getName)
-                                        .collect(Collectors.toSet());
-                            for (String param : pathParams) {
-                              if (!declared.contains(param)) {
-                                if (operation.getParameters() == null) {
-                                  operation.setParameters(new ArrayList<>());
-                                }
-                                operation
-                                    .getParameters()
-                                    .add(
-                                        new Parameter()
-                                            .name(param)
-                                            .in("path")
-                                            .required(true)
-                                            .schema(
-                                                new Schema<>()
-                                                    .types(Set.of("string"))
-                                                    .format("uuid")));
-                              }
-                            }
-                          });
-                });
   }
 
   /**

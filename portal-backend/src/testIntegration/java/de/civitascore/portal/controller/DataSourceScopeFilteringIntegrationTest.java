@@ -28,8 +28,8 @@ import org.springframework.http.ResponseEntity;
  * Integration tests for scope-based collection filtering on DataSource endpoints.
  *
  * <p>Verifies that the X-Allowed-Scope-Ids header correctly filters data source collection results.
- * Tests the full path: AllowedScopesFilter → AllowedScopes bean → BaseController.applyScopeFilter()
- * → JPA Specification.
+ * Tests the full path: AllowedScopesFilter → AllowedScopes bean → BaseDataEntityService → JPA
+ * Specification.
  */
 @DisplayName("DataSource Scope Filtering Integration Tests")
 class DataSourceScopeFilteringIntegrationTest

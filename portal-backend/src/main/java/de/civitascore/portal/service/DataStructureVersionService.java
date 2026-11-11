@@ -70,6 +70,90 @@ public class DataStructureVersionService
   }
 
   /**
+   * @throws de.civitascore.portal.util.ResourceNotFoundException if the version does not exist or
+   *     belongs to another data structure
+   */
+  public DataStructureVersion findOwned(UUID dataStructureId, UUID versionId) {
+    DataStructureVersion version = findByIdOrThrow(versionId);
+    ParentOwnership.requireSameParent(
+        dataStructureId, version.getDataStructure().getId(), getEntityName(), versionId);
+    return version;
+  }
+
+  /**
+   * @throws de.civitascore.portal.util.ResourceNotFoundException if the data structure does not
+   *     exist
+   */
+  @Transactional
+  public DataStructureVersion create(UUID dataStructureId, DataStructureVersionInputDTO input) {
+    input.setDataStructureId(dataStructureId);
+    return create(input);
+  }
+
+  /**
+   * @throws de.civitascore.portal.util.ResourceNotFoundException if the version does not exist or
+   *     belongs to another data structure
+   */
+  @Transactional
+  public DataStructureVersion update(
+      UUID dataStructureId, UUID versionId, DataStructureVersionInputDTO input) {
+    findOwned(dataStructureId, versionId);
+    input.setDataStructureId(dataStructureId);
+    return update(versionId, input);
+  }
+
+  /**
+   * @throws de.civitascore.portal.util.ResourceNotFoundException if the version does not exist or
+   *     belongs to another data structure
+   */
+  @Transactional
+  public DataStructureVersion updateReleasedMeta(
+      UUID dataStructureId, UUID versionId, DataStructureVersionMetaInputDTO meta) {
+    findOwned(dataStructureId, versionId);
+    return updateReleasedMeta(versionId, meta);
+  }
+
+  /**
+   * @throws de.civitascore.portal.util.ResourceNotFoundException if the version does not exist or
+   *     belongs to another data structure
+   */
+  @Transactional
+  public DataStructureVersion release(UUID dataStructureId, UUID versionId) {
+    findOwned(dataStructureId, versionId);
+    return release(versionId);
+  }
+
+  /**
+   * @throws de.civitascore.portal.util.ResourceNotFoundException if the version does not exist or
+   *     belongs to another data structure
+   */
+  @Transactional
+  public DataStructureVersion unrelease(UUID dataStructureId, UUID versionId) {
+    findOwned(dataStructureId, versionId);
+    return unrelease(versionId);
+  }
+
+  /**
+   * @throws de.civitascore.portal.util.ResourceNotFoundException if the version does not exist or
+   *     belongs to another data structure
+   */
+  @Transactional
+  public DataStructureVersion duplicate(UUID dataStructureId, UUID versionId) {
+    findOwned(dataStructureId, versionId);
+    return duplicate(versionId);
+  }
+
+  /**
+   * @throws de.civitascore.portal.util.ResourceNotFoundException if the version does not exist or
+   *     belongs to another data structure
+   */
+  @Transactional
+  public void delete(UUID dataStructureId, UUID versionId) {
+    findOwned(dataStructureId, versionId);
+    deleteById(versionId);
+  }
+
+  /**
    * Resolves and sets the parent data structure relationship after DTO-to-entity conversion.
    *
    * @param entity the data structure version entity
@@ -218,7 +302,7 @@ public class DataStructureVersionService
    * @throws InvalidInputException if the version is DRAFT
    */
   @Transactional
-  public DataStructureVersion updateReleasedMeta(UUID id, DataStructureVersionMetaInputDTO meta) {
+  DataStructureVersion updateReleasedMeta(UUID id, DataStructureVersionMetaInputDTO meta) {
     DataStructureVersion existingEntity = findByIdOrThrow(id);
     if (existingEntity.getDataStructureVersionStatus() == DataStructureVersionStatus.DRAFT) {
       throw new InvalidInputException(
@@ -255,7 +339,7 @@ public class DataStructureVersionService
    *     caller may not use
    */
   @Transactional
-  public DataStructureVersion release(UUID id) {
+  DataStructureVersion release(UUID id) {
     DataStructureVersion version = findByIdOrThrow(id);
 
     // Validate that version is currently in DRAFT status
@@ -292,7 +376,7 @@ public class DataStructureVersionService
    *     may not use
    */
   @Transactional
-  public DataStructureVersion duplicate(UUID sourceVersionId) {
+  DataStructureVersion duplicate(UUID sourceVersionId) {
     DataStructureVersion source = findByIdOrThrow(sourceVersionId);
     UUID dataStructureId = source.getDataStructure().getId();
     ModelRegistryGateway.ModelPin pin = null;
@@ -327,7 +411,7 @@ public class DataStructureVersionService
    * @throws ResourceInUseException if a released entity references the version
    */
   @Transactional
-  public DataStructureVersion unrelease(UUID id) {
+  DataStructureVersion unrelease(UUID id) {
     DataStructureVersion version = findByIdOrThrow(id);
 
     // Validate that version is currently released

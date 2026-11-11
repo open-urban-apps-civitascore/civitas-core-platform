@@ -30,10 +30,10 @@ import tools.jackson.databind.exc.MismatchedInputException;
 class JsonMergePatch {
 
   static final String OPERATION_DESCRIPTION =
-      "Applies a merge patch to an existing {entity}. A top-level field that the patch omits keeps"
+      "Applies a merge patch to an existing resource. A top-level field that the patch omits keeps"
           + " its value. A field that the patch contains replaces the stored value; a nested object"
           + " replaces the stored object as a whole and does not merge. null clears a field, or"
-          + " answers 400 for a field that must have a value. A field that the {entity} does not"
+          + " answers 400 for a field that must have a value. A field that the resource does not"
           + " have answers 400.";
 
   private final ObjectMapper objectMapper;

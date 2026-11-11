@@ -47,6 +47,11 @@ class PipelineControllerIntegrationTest
     return "pipelines";
   }
 
+  @Override
+  protected UUID createEntityIn(DataSet dataSet) {
+    return portalData.pipeline(dataSet).getId();
+  }
+
   @Autowired private PipelineRepository pipelineRepository;
   @Autowired private DataSetRepository dataSetRepository;
   @Autowired private DataSourceRepository dataSourceRepository;
@@ -550,7 +555,6 @@ class PipelineControllerIntegrationTest
       assertThat(initialPipeline).isNotNull();
       String originalName = initialPipeline.getName();
 
-      // Use PATCH instead of PUT to avoid BaseController bug
       Map<String, Object> patchMap = new HashMap<>();
       patchMap.put("name", originalName); // Same name
       patchMap.put("description", "Updated description");
@@ -883,30 +887,6 @@ class PipelineControllerIntegrationTest
     }
 
     @Test
-    @DisplayName("Should only return pipelines belonging to the specified dataset")
-    void shouldOnlyReturnPipelinesForSpecifiedDataset() {
-      performCreate(createValidInput());
-
-      DataSet dataSet2 = createTestDataSet();
-      PipelineInputDTO input2 = createValidInput();
-      input2.setName("pipeline_in_other_dataset_" + System.currentTimeMillis());
-      exchange(
-          "/datasets/" + dataSet2.getId() + "/pipelines",
-          org.springframework.http.HttpMethod.POST,
-          createAuthHeaders(),
-          input2,
-          getOutputTypeReference());
-
-      ResponseEntity<RestPage<PipelineOutputDTO>> response = performGetAll();
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-      assertThat(response.getBody()).isNotNull();
-      assertThat(response.getBody().getTotalElements())
-          .as("Should only return pipelines belonging to the test dataset")
-          .isEqualTo(1);
-    }
-
-    @Test
     @DisplayName(
         "Should return 404, not the parent's status, for PUT from a non-DRAFT wrong dataset")
     void shouldNotRevealParentStatusOnPutFromWrongDataset() {
@@ -929,9 +909,8 @@ class PipelineControllerIntegrationTest
           .isEqualTo(HttpStatus.NOT_FOUND);
     }
 
-    // Without these three, nothing would catch the removal of the path-injection in
-    // DataSetSubEntityController.preProcessInput, the only mechanism keeping a
-    // sub-entity in its path dataset since the per-service guards were consolidated.
+    // Without these three, nothing would catch a handler that stores a pipeline in the dataset
+    // named in the body instead of the one in the path.
     @Test
     @DisplayName("Should ignore a foreign dataSetId in the create body and use the path dataset")
     void shouldIgnoreForeignDataSetIdOnCreate() {

@@ -16,6 +16,7 @@ import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
 import de.civitascore.portal.repository.DataPoolRepository;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
+import de.civitascore.portal.security.AllowedScopes;
 import de.civitascore.portal.security.AssignmentChangeAuthorizer;
 import de.civitascore.portal.security.ScopeAccessAuthorizer;
 import de.civitascore.portal.service.connector.ConnectorValidator;
@@ -29,6 +30,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -57,6 +59,7 @@ public class DataSourceService
   private final ScopeAccessAuthorizer scopeAccessAuthorizer;
   private final DataSourceDatapoolScopeValidator datapoolScopeValidator;
   private final ArtifactUsageLookup artifactUsageLookup;
+  private final ObjectProvider<AllowedScopes> allowedScopesProvider;
 
   @Override
   protected DataSourceRepository getRepository() {
@@ -81,6 +84,11 @@ public class DataSourceService
   @Override
   protected AssignmentChangeAuthorizer getAssignmentChangeAuthorizer() {
     return assignmentChangeAuthorizer;
+  }
+
+  @Override
+  protected ObjectProvider<AllowedScopes> getAllowedScopes() {
+    return allowedScopesProvider;
   }
 
   @Override
