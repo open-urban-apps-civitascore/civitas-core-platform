@@ -253,6 +253,28 @@ class RecordPathCompilerTest {
   }
 
   @Test
+  void rulesBuiltFromFieldsOutsideTheArrayReadTheirCopies() throws Exception {
+    // A gauge's longitude and latitude reach every time series only through the copies; a rewrite
+    // that skips the inputs of a geoPoint or a concat would read the element's fields instead.
+    CompiledMapping compiled =
+        compiler.compile(
+            parse(
+                "{ \"$.geo\": { \"op\": \"geoPoint\", \"lon\": \"$.longitude\","
+                    + " \"lat\": \"$.latitude\" },"
+                    + " \"$.label\": { \"op\": \"concat\", \"separator\": \" \","
+                    + " \"inputs\": [\"$.longname\", \"$.timeseries[].shortname\"] },"
+                    + " \"$.level\": \"$.timeseries[].value\" }"),
+            GeometryEncoding.WKT);
+
+    Map<String, UpdateRecordProperty> props = byPath(compiled.properties());
+    String geo = props.get("/geo").value();
+    assertTrue(
+        geo.contains("/__core_parent_0") && geo.contains("/__core_parent_1"), "geo reads " + geo);
+    assertEquals("concat(/__core_parent_2, ' ', /shortname)", props.get("/label").value());
+    assertEquals(3, compiled.fork().parentCopies().size());
+  }
+
+  @Test
   void aNestedAncestorObjectStaysAddressableThroughItsOwnField() throws Exception {
     // Dropping the ancestor segments from the copy would resolve to nothing and write a silent
     // NULL.

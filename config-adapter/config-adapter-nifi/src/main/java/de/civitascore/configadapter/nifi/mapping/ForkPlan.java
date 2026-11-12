@@ -62,7 +62,7 @@ public record ForkPlan(List<String> forkedArray, Map<JsonPaths.ParsedPath, Strin
    * Field-name prefix of the copies. Chosen so that no payload field plausibly carries it, since an
    * element field of the same name would hide the copy as it hides any ancestor field.
    */
-  static final String PARENT_FIELD_PREFIX = "__core_parent_";
+  private static final String PARENT_FIELD_PREFIX = "__core_parent_";
 
   public ForkPlan {
     forkedArray = List.copyOf(forkedArray);
@@ -167,21 +167,15 @@ public record ForkPlan(List<String> forkedArray, Map<JsonPaths.ParsedPath, Strin
     List<UpdateRecordProperty> copies = new ArrayList<>();
     for (Map.Entry<JsonPaths.ParsedPath, String> parent : parentFields.entrySet()) {
       JsonPaths.ParsedPath source = parent.getKey();
+      String target = "/" + parent.getValue();
+      String value = source.recordPath();
       if (source.hasArrayContext()) {
         JsonPaths.ParsedPath element =
             new JsonPaths.ParsedPath(source.arrayContext(), source.lastArraySegment());
-        copies.add(
-            new UpdateRecordProperty(
-                element.recordPath() + "/" + parent.getValue(),
-                "../" + String.join("/", source.suffixWithinArray()),
-                ReplacementStrategy.RECORD_PATH_VALUE));
-      } else {
-        copies.add(
-            new UpdateRecordProperty(
-                "/" + parent.getValue(),
-                source.recordPath(),
-                ReplacementStrategy.RECORD_PATH_VALUE));
+        target = element.recordPath() + target;
+        value = "../" + String.join("/", source.suffixWithinArray());
       }
+      copies.add(new UpdateRecordProperty(target, value, ReplacementStrategy.RECORD_PATH_VALUE));
     }
     return copies;
   }
@@ -191,8 +185,8 @@ public record ForkPlan(List<String> forkedArray, Map<JsonPaths.ParsedPath, Strin
     Map<JsonPaths.ParsedPath, String> fields = new LinkedHashMap<>();
     for (Read read : reads) {
       JsonPaths.ParsedPath source = parse(read.sourcePath());
-      if (!isBelow(source, innermost) && !fields.containsKey(source)) {
-        fields.put(source, PARENT_FIELD_PREFIX + fields.size());
+      if (!isBelow(source, innermost)) {
+        fields.putIfAbsent(source, PARENT_FIELD_PREFIX + fields.size());
       }
     }
     return fields;
