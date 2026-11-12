@@ -76,6 +76,7 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
   private static final String UPSERT_FANOUT_TOPIC = "civitas/it/postgis-fanout-upsert";
   private static final String COLLISION_FANOUT_TOPIC = "civitas/it/postgis-fanout-collision";
   private static final String SPARSE_FANOUT_TOPIC = "civitas/it/postgis-fanout-sparse";
+  private static final String NESTED_FANOUT_TOPIC = "civitas/it/postgis-fanout-nested";
   private static final String GEO_FANOUT_TOPIC = "civitas/it/postgis-fanout-geo";
   private static final String CHAINED_FANOUT_TOPIC = "civitas/it/postgis-fanout-chained";
   private static final String GEO_TOPIC = "civitas/it/postgis-geo";
@@ -585,14 +586,14 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
   }
 
   @Test
-  void childFieldWinsOverAParentFieldOfTheSameName() throws Exception {
-    // ForkRecord's Include Parent Fields is documented to let the child win on a name clash. That
-    // claim is load-bearing here: if the precedence were reversed, every row would silently carry
-    // the parent's id instead of the element's.
+  void aParentFieldAndAnElementFieldOfTheSameNameKeepTheirOwnValues() throws Exception {
+    // ForkRecord's Include Parent Fields lets the element win on a name clash. Without the copy
+    // ahead of the fork, '$.id' would read the element's id on every row.
     Map<String, Map<String, Object>> mappings =
         fanoutMappings(
             """
             { "$.stationid": "$.stationid",
+              "$.parentid": "$.id",
               "$.id": "$.measurements[].id" }
             """);
 
@@ -609,8 +610,48 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
 
     assertEquals(
         2,
-        rowCount("collision_fanout_observation", "stationid = 'S12' AND id LIKE 'CHILD-%'"),
-        "the element's id must win over the identically named parent field");
+        rowCount(
+            "collision_fanout_observation",
+            "stationid = 'S12' AND id LIKE 'CHILD-%' AND parentid = 'PARENT'"),
+        "each row must carry the element's id and the parent's id");
+  }
+
+  @Test
+  void eachReadingCarriesTheIdOfItsOwnStationAcrossTwoArrayLevels() throws Exception {
+    // The station id is copied into each station ahead of the fork. Read after the fork without
+    // that copy, it would be the reading's own id, or the id of another station.
+    Map<String, Map<String, Object>> mappings =
+        fanoutMappings(
+            """
+            { "$.stationid": "$.stations[].id",
+              "$.readingid": "$.stations[].readings[].id",
+              "$.value": "$.stations[].readings[].value" }
+            """);
+
+    deployAndPublishOnce(
+        "ds-pg-nested-it",
+        "pg-nested-it",
+        NESTED_FANOUT_TOPIC,
+        fanoutGraph(),
+        mappings,
+        new PostgisSinkSpec("nested_fanout_observation"),
+        "{\"stations\":["
+            + "{\"id\":\"S20\",\"readings\":[{\"id\":\"R1\",\"value\":1},{\"id\":\"R2\",\"value\":2}]},"
+            + "{\"id\":\"S21\",\"readings\":[{\"id\":\"R3\",\"value\":3}]}]}",
+        publisher -> rowCount("nested_fanout_observation", "true") >= 3);
+
+    try (Connection c = dbConnection();
+        Statement st = c.createStatement();
+        ResultSet rs =
+            st.executeQuery(
+                "SELECT stationid || '/' || readingid || '/' || value AS line"
+                    + " FROM nested_fanout_observation ORDER BY readingid")) {
+      List<String> lines = new ArrayList<>();
+      while (rs.next()) {
+        lines.add(rs.getString("line"));
+      }
+      assertEquals(List.of("S20/R1/1", "S20/R2/2", "S21/R3/3"), lines);
+    }
   }
 
   @Test
@@ -1147,8 +1188,11 @@ class NifiPostgisDataFlowIT extends AbstractNifiIT {
           "CREATE TABLE upsert_fanout_observation ("
               + "stationid text, measured_at text, value integer,"
               + " PRIMARY KEY (stationid, measured_at))");
-      st.execute("CREATE TABLE collision_fanout_observation (id text, stationid text)");
+      st.execute(
+          "CREATE TABLE collision_fanout_observation (id text, parentid text, stationid text)");
       st.execute("CREATE TABLE sparse_fanout_observation (stationid text, measured_at text)");
+      st.execute(
+          "CREATE TABLE nested_fanout_observation (stationid text, readingid text, value integer)");
       st.execute(
           "CREATE TABLE geo_fanout_observation ("
               + "stationid text, geom geometry(Point,4326), measured_at text)");

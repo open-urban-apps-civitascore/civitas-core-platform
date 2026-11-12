@@ -42,6 +42,8 @@ public final class RecordMappingStage implements TransformStage {
 
   private static final String FORK_DISCRIMINATOR = "FORK";
 
+  private static final String PARENT_COPY_DISCRIMINATOR = "FORKPARENTS";
+
   private static final String FORK_GUARD_DISCRIMINATOR = "FORKGUARD";
 
   /**
@@ -79,6 +81,15 @@ public final class RecordMappingStage implements TransformStage {
     List<Processor> result = new ArrayList<>();
     List<Processor> failureSources = new ArrayList<>();
     if (mapping.fork().required()) {
+      List<UpdateRecordProperty> parentCopies = mapping.fork().parentCopies();
+      if (!parentCopies.isEmpty()) {
+        Processor copy =
+            ctx.loadProcessor(
+                Fragment.UPDATE_RECORD, "success", discriminator(PARENT_COPY_DISCRIMINATOR));
+        applyMapping(copy, ReplacementStrategy.RECORD_PATH_VALUE, parentCopies);
+        result.add(copy);
+        failureSources.add(copy);
+      }
       Processor fork = buildFork(ctx);
       result.add(fork);
       failureSources.add(fork);

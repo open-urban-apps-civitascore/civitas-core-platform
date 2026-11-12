@@ -908,7 +908,10 @@ class FrostMappingCompilerTest {
     List<String> values =
         compilation.flatProperties().stream().map(UpdateRecordProperty::value).toList();
     assertTrue(values.contains("/ts"), "the timestamp must read the forked element: " + values);
-    assertTrue(values.contains("/ref"), "the root-level reference must stay absolute: " + values);
+    assertTrue(
+        values.contains("/__core_parent_0"),
+        "the root-level reference must read its copy from ahead of the fork: " + values);
+    assertEquals("/ref", compilation.fork().parentCopies().getFirst().value());
   }
 
   @Test

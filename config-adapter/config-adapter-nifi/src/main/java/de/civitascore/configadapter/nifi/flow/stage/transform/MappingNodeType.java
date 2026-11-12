@@ -122,8 +122,8 @@ public final class MappingNodeType implements TransformNodeType {
    * winning, with no failure route and no error — the batching is what keeps Postgres from raising
    * its usual "cannot affect row a second time".
    *
-   * <p>A key column is element-level when its rule reads a source below the fork's innermost array,
-   * which is exactly what {@link ForkPlan#required()} rewrites to a root-level path.
+   * <p>A key column is element-level when its rule reads a source below the forked array, see
+   * {@link ForkPlan#readsAnElement}.
    */
   private static void requireElementLevelKey(
       CompiledMapping compiled, MappingConfig config, SinkSpec sinkSpec)
@@ -132,7 +132,8 @@ public final class MappingNodeType implements TransformNodeType {
       return;
     }
     List<String> keyColumns = postgis.primaryKeyColumns();
-    if (keyColumns.isEmpty() || keyColumns.stream().anyMatch(key -> readsAnElement(config, key))) {
+    if (keyColumns.isEmpty()
+        || keyColumns.stream().anyMatch(key -> readsAnElement(compiled.fork(), config, key))) {
       return;
     }
     throw new FatalAdapterException(
@@ -145,10 +146,9 @@ public final class MappingNodeType implements TransformNodeType {
             + " each other down to one; map a field from below the array onto a key column");
   }
 
-  /** Whether the rule writing {@code column} reads a source below the fan-out's innermost array. */
-  private static boolean readsAnElement(MappingConfig config, String column) {
+  private static boolean readsAnElement(ForkPlan fork, MappingConfig config, String column) {
     ValueNode rule = config.fields().get("$." + column);
-    return rule != null && ForkPlan.readsBelowTheArray(rule);
+    return rule != null && fork.readsAnElement(rule);
   }
 
   /**

@@ -137,8 +137,9 @@ class RecordPathCompilerTest {
 
   @Test
   void nestedArraysOnOnePathForkTheInnermostOne() throws Exception {
-    // Two array levels on one hierarchical line are a single fan-out over the innermost array; the
-    // outer level rides along as a parent field, which is why its path also flattens to root level.
+    // Two array levels on one hierarchical line are a single fan-out over the innermost array. The
+    // outer level is copied into each of its elements ahead of the fork and rides along as a parent
+    // field, so each record reads the name of its own station.
     CompiledMapping compiled =
         compiler.compile(
             parse(
@@ -148,8 +149,11 @@ class RecordPathCompilerTest {
 
     assertEquals("/stations[*]/readings", compiled.fork().recordPath());
     Map<String, UpdateRecordProperty> props = byPath(compiled.properties());
-    assertEquals("/name", props.get("/station").value());
+    assertEquals("/__core_parent_0", props.get("/station").value());
     assertEquals("/value", props.get("/value").value());
+    assertEquals(
+        "../name",
+        byPath(compiled.fork().parentCopies()).get("/stations[*]/__core_parent_0").value());
   }
 
   @Test
@@ -201,42 +205,87 @@ class RecordPathCompilerTest {
   }
 
   @Test
-  void twoSourcesCollapsingOntoOnePostForkPathAreRejected() throws Exception {
-    // ForkRecord hoists the element field over the ancestor one, so both rules would read '/id' and
-    // silently carry the same value where the author asked for two distinct fields.
-    FatalAdapterException error =
-        assertThrows(
-            FatalAdapterException.class,
-            () -> compile("{ \"$.a\": \"$.id\", \"$.b\": \"$.readings[].id\" }"));
+  void aSourceOutsideTheArrayReadsItsCopyWhenAnElementHasAFieldOfTheSameName() throws Exception {
+    // ForkRecord keeps the element's 'id' and drops the ancestor's: read directly after the fork,
+    // '$.id' would carry the element's value where the author asked for the ancestor's.
+    CompiledMapping compiled =
+        compiler.compile(
+            parse("{ \"$.a\": \"$.id\", \"$.b\": \"$.readings[].id\" }"), GeometryEncoding.WKT);
 
-    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, error.getErrorCode());
-    assertTrue(error.getMessage().contains("after the fan-out over"), error.getMessage());
+    Map<String, UpdateRecordProperty> props = byPath(compiled.properties());
+    assertEquals("/__core_parent_0", props.get("/a").value());
+    assertEquals("/id", props.get("/b").value());
+    assertEquals("/id", byPath(compiled.fork().parentCopies()).get("/__core_parent_0").value());
   }
 
   @Test
-  void theSameSourceReadTwiceIsNotACollision() throws Exception {
-    // The collision check keys on the post-fork path, so it must not fire on two rules that
-    // legitimately read the same source.
+  void twoRulesReadingOneSourceShareOnePath() throws Exception {
+    // Two rules reading one source must share one post-fork path, not each claim a copy of its own.
     CompiledMapping compiled =
         compiler.compile(
-            parse("{ \"$.a\": \"$.items[].v\", \"$.b\": \"$.items[].v\" }"), GeometryEncoding.WKT);
+            parse(
+                "{ \"$.a\": \"$.items[].v\", \"$.b\": \"$.items[].v\","
+                    + " \"$.c\": \"$.id\", \"$.d\": \"$.id\" }"),
+            GeometryEncoding.WKT);
 
     assertEquals("/items", compiled.fork().recordPath());
     Map<String, UpdateRecordProperty> props = byPath(compiled.properties());
     assertEquals("/v", props.get("/a").value());
     assertEquals("/v", props.get("/b").value());
+    assertEquals("/__core_parent_0", props.get("/c").value());
+    assertEquals("/__core_parent_0", props.get("/d").value());
+    assertEquals(1, compiled.fork().parentCopies().size());
+  }
+
+  @Test
+  void aNestedObjectOnAnOuterArrayIsCopiedThroughItsWholePath() throws Exception {
+    // Dropping the object segments from the copy would resolve to nothing and write a silent NULL.
+    CompiledMapping compiled =
+        compiler.compile(
+            parse(
+                "{ \"$.station\": \"$.stations[].meta.name\","
+                    + " \"$.value\": \"$.stations[].readings[].value\" }"),
+            GeometryEncoding.WKT);
+
+    assertEquals(
+        "../meta/name",
+        byPath(compiled.fork().parentCopies()).get("/stations[*]/__core_parent_0").value());
+  }
+
+  @Test
+  void rulesBuiltFromFieldsOutsideTheArrayReadTheirCopies() throws Exception {
+    // A gauge's longitude and latitude reach every time series only through the copies; a rewrite
+    // that skips the inputs of a geoPoint or a concat would read the element's fields instead.
+    CompiledMapping compiled =
+        compiler.compile(
+            parse(
+                "{ \"$.geo\": { \"op\": \"geoPoint\", \"lon\": \"$.longitude\","
+                    + " \"lat\": \"$.latitude\" },"
+                    + " \"$.label\": { \"op\": \"concat\", \"separator\": \" \","
+                    + " \"inputs\": [\"$.longname\", \"$.timeseries[].shortname\"] },"
+                    + " \"$.level\": \"$.timeseries[].value\" }"),
+            GeometryEncoding.WKT);
+
+    Map<String, UpdateRecordProperty> props = byPath(compiled.properties());
+    String geo = props.get("/geo").value();
+    assertTrue(
+        geo.contains("/__core_parent_0") && geo.contains("/__core_parent_1"), "geo reads " + geo);
+    assertEquals("concat(/__core_parent_2, ' ', /shortname)", props.get("/label").value());
+    assertEquals(3, compiled.fork().parentCopies().size());
   }
 
   @Test
   void aNestedAncestorObjectStaysAddressableThroughItsOwnField() throws Exception {
-    // ForkRecord copies ancestor fields up under their own name and keeps their value shape, so
-    // dropping the ancestor segments would resolve to nothing and write a silent NULL.
+    // Dropping the ancestor segments from the copy would resolve to nothing and write a silent
+    // NULL.
     CompiledMapping compiled =
         compiler.compile(
             parse("{ \"$.gw\": \"$.gateway.id\", \"$.v\": \"$.items[].value\" }"),
             GeometryEncoding.WKT);
 
-    assertEquals("/gateway/id", byPath(compiled.properties()).get("/gw").value());
+    assertEquals("/__core_parent_0", byPath(compiled.properties()).get("/gw").value());
+    assertEquals(
+        "/gateway/id", byPath(compiled.fork().parentCopies()).get("/__core_parent_0").value());
   }
 
   @Test

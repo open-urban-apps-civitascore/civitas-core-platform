@@ -179,6 +179,69 @@ class MappingNodeTypeTest {
   }
 
   @Test
+  void aFanOutWhoseKeyColumnSitsOnAnOuterArrayIsRejected() {
+    // Every reading of one station shares the station's id, so the readings overwrite each other.
+    GraphNode mapping = mappingNode("m1", REF_1);
+    Map<String, Map<String, Object>> artifacts =
+        Map.of(
+            REF_1,
+            mappingDoc(
+                Map.of(
+                    "$.stationid", "$.stations[].id",
+                    "$.readingid", "$.stations[].readings[].id")));
+
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                mappingNodeType.compile(
+                    List.of(mapping),
+                    new PostgisSinkStage(null),
+                    new PostgisSinkSpec("readings", List.of("stationid")),
+                    artifacts));
+
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+    assertTrue(ex.getMessage().contains("every primary-key column"), ex.getMessage());
+  }
+
+  @Test
+  void aFanOutWhoseConcatKeyReadsOnlyOuterArrayFieldsIsRejected() {
+    // Every reading of one station would share the key built from the station's fields.
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () -> compileConcatKey("$.stations[].id", "$.stations[].code"));
+
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+    assertTrue(ex.getMessage().contains("every primary-key column"), ex.getMessage());
+  }
+
+  @Test
+  void aFanOutWhoseConcatKeyReadsOneElementFieldCompiles() throws Exception {
+    // The counterpart: one input from inside the forked array makes the key distinct per row.
+    assertEquals(
+        1, compileConcatKey("$.stations[].id", "$.stations[].readings[].id").units().size());
+  }
+
+  private MappingNodeType.Compilation compileConcatKey(String first, String second)
+      throws FatalAdapterException {
+    Map<String, Map<String, Object>> artifacts =
+        Map.of(
+            REF_1,
+            mappingDoc(
+                Map.of(
+                    "$.key",
+                    Map.of("op", "concat", "separator", "-", "inputs", List.of(first, second)),
+                    "$.value",
+                    "$.stations[].readings[].value")));
+    return mappingNodeType.compile(
+        List.of(mappingNode("m1", REF_1)),
+        new PostgisSinkStage(null),
+        new PostgisSinkSpec("readings", List.of("key")),
+        artifacts);
+  }
+
+  @Test
   void aFanOutWithOneElementLevelKeyColumnCompiles() throws Exception {
     // The counterpart: one key column read from below the array makes the rows distinct, which is
     // the shape the IT deploys.
