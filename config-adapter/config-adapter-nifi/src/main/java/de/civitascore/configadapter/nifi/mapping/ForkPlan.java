@@ -49,13 +49,14 @@ import java.util.stream.Collectors;
  * (see {@link #parentCopies()}), because {@code ForkRecord} skips an ancestor field whose name the
  * element also carries, and the ancestor value is then no longer reachable under any path.
  *
- * @param recordPath the RecordPath of the forked array, or null without a fan-out
- * @param parentFields each source outside the innermost array, mapped to the field it is copied to
+ * @param forkedArray the path from the root through the forked array, in CORE notation; empty
+ *     without a fan-out
+ * @param parentFields each source outside the forked array, mapped to the field it is copied to
  */
-public record ForkPlan(String recordPath, Map<JsonPaths.ParsedPath, String> parentFields) {
+public record ForkPlan(List<String> forkedArray, Map<JsonPaths.ParsedPath, String> parentFields) {
 
   /** The plan for a mapping that reads no array and therefore needs no fan-out. */
-  public static final ForkPlan NONE = new ForkPlan(null, Map.of());
+  public static final ForkPlan NONE = new ForkPlan(List.of(), Map.of());
 
   /**
    * Field-name prefix of the copies. Chosen so that no payload field plausibly carries it, since an
@@ -64,21 +65,33 @@ public record ForkPlan(String recordPath, Map<JsonPaths.ParsedPath, String> pare
   static final String PARENT_FIELD_PREFIX = "__core_parent_";
 
   public ForkPlan {
+    forkedArray = List.copyOf(forkedArray);
     parentFields = Collections.unmodifiableMap(new LinkedHashMap<>(parentFields));
-  }
-
-  /**
-   * A fan-out with no source outside the forked array.
-   *
-   * @param recordPath the RecordPath of the forked array
-   */
-  public ForkPlan(String recordPath) {
-    this(recordPath, Map.of());
   }
 
   /** Whether the mapping needs a fan-out at all. */
   public boolean required() {
-    return recordPath != null;
+    return !forkedArray.isEmpty();
+  }
+
+  /**
+   * The RecordPath naming the array to fork, or null without a fan-out. Every array selector on the
+   * way stays a wildcard, but the innermost one is dropped: the property must point <em>at</em> the
+   * array, not into it.
+   */
+  public String recordPath() {
+    if (!required()) {
+      return null;
+    }
+    List<String> segments = new ArrayList<>(forkedArray);
+    int last = segments.size() - 1;
+    segments.set(last, segments.get(last).replace("[]", ""));
+    return "/" + String.join("/", segments.stream().map(ForkPlan::allElements).toList());
+  }
+
+  /** Whether a source reads a field of the forked array's elements. */
+  private static boolean isBelow(JsonPaths.ParsedPath source, List<String> forkedArray) {
+    return source.hasArrayContext() && source.arrayContext().equals(forkedArray);
   }
 
   /**
@@ -139,7 +152,7 @@ public record ForkPlan(String recordPath, Map<JsonPaths.ParsedPath, String> pare
               + " targets to rewrite; map the array-valued rules in their own mapping node instead");
     }
     rejectIndexedReadsInsideFork(innermost, reads);
-    return new ForkPlan(forkRecordPath(innermost), parentFields(innermost, reads));
+    return new ForkPlan(innermost, parentFields(innermost, reads));
   }
 
   /**
@@ -178,7 +191,7 @@ public record ForkPlan(String recordPath, Map<JsonPaths.ParsedPath, String> pare
     Map<JsonPaths.ParsedPath, String> fields = new LinkedHashMap<>();
     for (Read read : reads) {
       JsonPaths.ParsedPath source = parse(read.sourcePath());
-      if (!source.arrayContext().equals(innermost) && !fields.containsKey(source)) {
+      if (!isBelow(source, innermost) && !fields.containsKey(source)) {
         fields.put(source, PARENT_FIELD_PREFIX + fields.size());
       }
     }
@@ -249,6 +262,10 @@ public record ForkPlan(String recordPath, Map<JsonPaths.ParsedPath, String> pare
    * array keeps the segments below that array. A source outside it reads its copy from {@link
    * #parentCopies()}, which {@code ForkRecord} carries along as a parent field.
    *
+   * <p>{@code ForkRecord} also carries the original ancestor fields, and copies an ancestor value
+   * into an element whose field of the same name is null or absent. A source below the forked array
+   * then reads the ancestor's value for that element.
+   *
    * @param source the parsed source path
    * @return the RecordPath to read after the fan-out
    * @throws IllegalStateException if there is no fan-out, since the rewrite would then silently
@@ -267,17 +284,6 @@ public record ForkPlan(String recordPath, Map<JsonPaths.ParsedPath, String> pare
   }
 
   /**
-   * The RecordPath naming the array to fork. Every array selector on the way stays a wildcard, but
-   * the innermost one is dropped: the property must point <em>at</em> the array, not into it.
-   */
-  private static String forkRecordPath(List<String> context) {
-    List<String> segments = new ArrayList<>(context);
-    int last = segments.size() - 1;
-    segments.set(last, segments.get(last).replace("[]", ""));
-    return "/" + String.join("/", segments.stream().map(ForkPlan::allElements).toList());
-  }
-
-  /**
    * Whether a rule reads at least one source from below the forked array — a value that varies per
    * record the fan-out produces. A source below an outer array is shared by every record forked
    * from the same outer element.
@@ -288,8 +294,7 @@ public record ForkPlan(String recordPath, Map<JsonPaths.ParsedPath, String> pare
     return switch (rule) {
       case CopyNode copy -> {
         try {
-          JsonPaths.ParsedPath source = JsonPaths.parse(copy.sourcePath());
-          yield source.hasArrayContext() && !parentFields.containsKey(source);
+          yield isBelow(JsonPaths.parse(copy.sourcePath()), forkedArray);
         } catch (IllegalArgumentException malformed) {
           // Left for the compiler to reject with its own message rather than second-guessed here.
           yield false;

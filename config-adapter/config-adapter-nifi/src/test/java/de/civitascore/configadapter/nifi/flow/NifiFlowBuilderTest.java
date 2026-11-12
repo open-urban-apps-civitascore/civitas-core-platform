@@ -556,7 +556,7 @@ class NifiFlowBuilderTest {
             withoutFork.sourceProperties(),
             withoutFork.sinkType(),
             withoutFork.sinkProperties(),
-            List.of(new CompiledMapping(mapping(), new ForkPlan("/items"))),
+            List.of(new CompiledMapping(mapping(), new ForkPlan(List.of("items[]"), Map.of()))),
             withoutFork.controllerServiceProperties(),
             null,
             null);

@@ -219,7 +219,7 @@ class RecordPathCompilerTest {
   }
 
   @Test
-  void theSameSourceReadTwiceIsNotACollision() throws Exception {
+  void twoRulesReadingOneSourceShareOnePath() throws Exception {
     // Two rules reading one source must share one post-fork path, not each claim a copy of its own.
     CompiledMapping compiled =
         compiler.compile(
@@ -235,6 +235,21 @@ class RecordPathCompilerTest {
     assertEquals("/__core_parent_0", props.get("/c").value());
     assertEquals("/__core_parent_0", props.get("/d").value());
     assertEquals(1, compiled.fork().parentCopies().size());
+  }
+
+  @Test
+  void aNestedObjectOnAnOuterArrayIsCopiedThroughItsWholePath() throws Exception {
+    // Dropping the object segments from the copy would resolve to nothing and write a silent NULL.
+    CompiledMapping compiled =
+        compiler.compile(
+            parse(
+                "{ \"$.station\": \"$.stations[].meta.name\","
+                    + " \"$.value\": \"$.stations[].readings[].value\" }"),
+            GeometryEncoding.WKT);
+
+    assertEquals(
+        "../meta/name",
+        byPath(compiled.fork().parentCopies()).get("/stations[*]/__core_parent_0").value());
   }
 
   @Test
