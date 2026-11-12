@@ -179,6 +179,32 @@ class MappingNodeTypeTest {
   }
 
   @Test
+  void aFanOutWhoseKeyColumnSitsOnAnOuterArrayIsRejected() {
+    // Every reading of one station shares the station's id, so the readings overwrite each other.
+    GraphNode mapping = mappingNode("m1", REF_1);
+    Map<String, Map<String, Object>> artifacts =
+        Map.of(
+            REF_1,
+            mappingDoc(
+                Map.of(
+                    "$.stationid", "$.stations[].id",
+                    "$.readingid", "$.stations[].readings[].id")));
+
+    FatalAdapterException ex =
+        assertThrows(
+            FatalAdapterException.class,
+            () ->
+                mappingNodeType.compile(
+                    List.of(mapping),
+                    new PostgisSinkStage(null),
+                    new PostgisSinkSpec("readings", List.of("stationid")),
+                    artifacts));
+
+    assertEquals(AdapterErrorCode.NIFI_MAPPING_ERROR, ex.getErrorCode());
+    assertTrue(ex.getMessage().contains("every primary-key column"), ex.getMessage());
+  }
+
+  @Test
   void aFanOutWithOneElementLevelKeyColumnCompiles() throws Exception {
     // The counterpart: one key column read from below the array makes the rows distinct, which is
     // the shape the IT deploys.

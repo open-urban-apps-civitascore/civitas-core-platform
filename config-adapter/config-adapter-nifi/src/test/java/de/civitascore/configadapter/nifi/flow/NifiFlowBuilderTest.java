@@ -75,6 +75,20 @@ class NifiFlowBuilderTest {
     return null;
   }
 
+  /** First processor of the given type with any property whose value equals the given one. */
+  private JsonNode componentWithPropertyValue(JsonNode flow, String typeSuffix, String value) {
+    for (JsonNode c : flow.get("flowContents").get("processors")) {
+      if (c.path("type").asText().endsWith(typeSuffix)) {
+        for (JsonNode property : c.path("properties")) {
+          if (value.equals(property.asText())) {
+            return c;
+          }
+        }
+      }
+    }
+    throw new AssertionError("no " + typeSuffix + " with a property value " + value);
+  }
+
   private JsonNode component(JsonNode flow, String array, String typeSuffix) {
     for (JsonNode c : flow.get("flowContents").get(array)) {
       if (c.path("type").asText().endsWith(typeSuffix)) {
@@ -333,12 +347,16 @@ class NifiFlowBuilderTest {
         destinationOf(flow, fork.get("identifier").asText(), "failure"),
         "an unreadable FlowFile must reach the error sink");
 
-    // Selected by strategy, not by first-match: the fixture mixes a const rule with copies, so the
-    // flow holds a literal-value AND a record-path-value UpdateRecord and the fork feeds the
-    // latter.
-    JsonNode update =
-        componentByProperty(
-            flow, "UpdateRecord", "Replacement Value Strategy", "record-path-value");
+    // The fixture reads '$.station' and '$.ref' outside the forked array; ForkRecord would drop an
+    // ancestor field that an element also carries, so their copies must be made before the fork.
+    JsonNode parentCopy = componentByProperty(flow, "UpdateRecord", "/__core_parent_0", "/station");
+    assertEquals(
+        fork.get("identifier").asText(),
+        destinationOf(flow, parentCopy.get("identifier").asText(), "success"),
+        "the copies outside the forked array must feed the fork");
+
+    // Selected by its rule, not by strategy: the copy ahead of the fork uses the same strategy.
+    JsonNode update = componentWithPropertyValue(flow, "UpdateRecord", "/__core_parent_1");
     String forkId = fork.get("identifier").asText();
 
     // The guard sits between the two: a fan-out that extracted nothing must not travel the chain as
