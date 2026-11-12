@@ -63,6 +63,7 @@ const defaultProps = {
   onPaginationChange: vi.fn(),
   onSortingChange: vi.fn(),
   onDeleteDatastructureClick: vi.fn(),
+  onDeleteVersionClick: vi.fn(),
   onDuplicateVersionClick: vi.fn(),
 }
 
@@ -303,26 +304,15 @@ describe('DatastructuresTable', () => {
       expect(menuButtons).toHaveLength(2)
     })
 
-    it('action menu is shown on the top-level row but not on version sub-rows', () => {
+    it('labels the delete of a data structure row as deleting the data structure', async () => {
+      const user = userEvent.setup()
       mockCurrentUser([PERMISSION_NAMES.DATASTRUCTURE_DELETE])
-      const [datastructure] = mockDatastructures
-      renderTable({
-        ...defaultProps,
-        datastructures: [
-          {
-            ...datastructure,
-            versions: [{ ...datastructure, id: '00000000-0000-0000-0000-000000000011', versions: [] }],
-          },
-        ],
-        rowCount: 1,
-      })
+      renderTable({ ...defaultProps, datastructures: [mockDatastructures[0]], rowCount: 1 })
 
-      const [topLevelRow] = screen.getAllByRole('row').slice(1)
-      fireEvent.click(within(within(topLevelRow).getByTestId('expanderCell')).getByRole('button'))
+      await user.click(screen.getByRole('button', { name: 'Open menu' }))
+      await user.click(await screen.findByText('Datenstruktur löschen'))
 
-      const [, , subRow] = screen.getAllByRole('row')
-      expect(within(topLevelRow).getByRole('button', { name: 'Open menu' })).toBeInTheDocument()
-      expect(within(subRow).queryByRole('button', { name: 'Open menu' })).toBeNull()
+      expect(defaultProps.onDeleteDatastructureClick).toHaveBeenCalledWith(mockDatastructures[0].id)
     })
   })
 
@@ -354,6 +344,38 @@ describe('DatastructuresTable', () => {
       renderWithVersion()
 
       expect(screen.queryByRole('button', { name: 'Open menu' })).toBeNull()
+    })
+
+    it('offers deletion on a version row when the DELETE permission is scoped to its parent data structure', async () => {
+      const user = userEvent.setup()
+      mockCurrentUser([PERMISSION_NAMES.DATASTRUCTURE_DELETE], 'DATASTRUCTURE', DATASTRUCTURE_ID)
+      renderWithVersion()
+
+      const [, , subRow] = screen.getAllByRole('row')
+      await user.click(within(subRow).getByRole('button', { name: 'Open menu' }))
+
+      expect(await screen.findByText('Version löschen')).toBeInTheDocument()
+      expect(screen.queryByText('Version duplizieren')).toBeNull()
+    })
+
+    it('hides the action menu of a version row when the DELETE permission is scoped to the version itself', () => {
+      mockCurrentUser([PERMISSION_NAMES.DATASTRUCTURE_DELETE], 'DATASTRUCTURE', VERSION_ID)
+      renderWithVersion()
+
+      expect(screen.queryByRole('button', { name: 'Open menu' })).toBeNull()
+    })
+
+    it('routes deletion of a version row to onDeleteVersionClick with the parent data structure id', async () => {
+      const user = userEvent.setup()
+      mockCurrentUser([PERMISSION_NAMES.DATASTRUCTURE_DELETE], 'DATASTRUCTURE', DATASTRUCTURE_ID)
+      renderWithVersion()
+
+      const [, , subRow] = screen.getAllByRole('row')
+      await user.click(within(subRow).getByRole('button', { name: 'Open menu' }))
+      await user.click(await screen.findByText('Version löschen'))
+
+      expect(defaultProps.onDeleteVersionClick).toHaveBeenCalledWith(DATASTRUCTURE_ID, VERSION_ID)
+      expect(defaultProps.onDeleteDatastructureClick).not.toHaveBeenCalled()
     })
 
     it('routes duplication of a version row to onDuplicateVersionClick with the parent data structure id', async () => {

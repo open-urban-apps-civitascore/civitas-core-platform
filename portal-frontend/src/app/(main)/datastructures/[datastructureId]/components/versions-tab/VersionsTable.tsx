@@ -7,6 +7,9 @@ import { StatusBadge } from '@/components/status/status-badge/StatusBadge'
 import { DataTable } from '@/components/table/DataTable'
 import { LinkCell } from '@/components/table/link-cell/LinkCell'
 import { SortableTableHeader } from '@/components/table/sortable-table-header/SortableTableHeader'
+import { usePermissions } from '@/hooks/use-permissions'
+import { ASSIGNMENT_SCOPE_TYPES } from '@/types/assignments'
+import { PERMISSION_NAMES } from '@/types/currentUser'
 import { DatastructureVersionsListData } from '@/types/datastructures'
 import { TableProps } from '@/types/table'
 import { resolveUpdater } from '@/utils/table'
@@ -16,6 +19,7 @@ interface VersionsTableProps extends TableProps<DatastructureVersionsListData> {
   versions: DatastructureVersionsListData[]
   isReadOnly: boolean
   isDuplicating: boolean
+  onDeleteVersionClick: (versionId: string) => void
   onDuplicateVersionClick: (versionId: string) => void
 }
 
@@ -33,8 +37,15 @@ export const VersionsTable = (props: VersionsTableProps) => {
     rowSelection,
     onPaginationChange,
     onSortingChange,
+    onDeleteVersionClick,
     onDuplicateVersionClick,
   } = props
+  const { hasScopedPermission } = usePermissions()
+  const canDelete = hasScopedPermission(
+    PERMISSION_NAMES.DATASTRUCTURE_DELETE,
+    ASSIGNMENT_SCOPE_TYPES.DATASTRUCTURE,
+    datastructureId,
+  )
   const t = useTranslations('datastructures')
   const tVersion = useTranslations('datastructureVersions')
   const tCommon = useTranslations('common')
@@ -117,6 +128,14 @@ export const VersionsTable = (props: VersionsTableProps) => {
                 onClick: () => onDuplicateVersionClick(row.original.id),
                 disabled: isDuplicating,
               },
+              ...(canDelete
+                ? [
+                    {
+                      label: tCommon('actions.deleteItem', { item: tCommon('items.datastructureVersion') }),
+                      onClick: () => onDeleteVersionClick(row.original.id),
+                    },
+                  ]
+                : []),
             ]}
           />
         ),

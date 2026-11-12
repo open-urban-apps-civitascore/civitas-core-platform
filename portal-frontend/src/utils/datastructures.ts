@@ -73,6 +73,7 @@ export const mapDatastructuresApiToListData = (datastructures: Datastructure[]):
         description: version.description || '-',
         status: version.dataStructureVersionStatus,
         source: version.dataStructureVersionSource,
+        inUse: version.inUse,
         inUseByReleased: version.inUseByReleased,
         versions: [],
       })),
@@ -90,6 +91,7 @@ export const mapDatastructureVersionsApiToListData = (
     description: version.description || '-',
     status: version.dataStructureVersionStatus,
     source: version.dataStructureVersionSource,
+    inUse: version.inUse,
     inUseByReleased: version.inUseByReleased,
   }))
 

@@ -1,12 +1,31 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { NextIntlClientProvider } from 'next-intl'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { useGetCurrentUser } from '@/app/services/api/users/clientRequests'
 import messages from '@/messages/de.json'
+import { PERMISSION_NAMES, PermissionName } from '@/types/currentUser'
 import { DatastructureVersionsListData } from '@/types/datastructures'
 
 import { VersionsTable } from './VersionsTable'
+
+vi.mock('@/app/services/api/users/clientRequests', () => ({
+  useGetCurrentUser: vi.fn(),
+}))
+
+const mockCurrentUser = (permissions: PermissionName[], scopeId = 'ds-1') => {
+  vi.mocked(useGetCurrentUser).mockReturnValue({
+    data: {
+      username: 'test',
+      email: 'test@test.com',
+      title: 'MR' as const,
+      firstName: 'Test',
+      lastName: 'User',
+      assignments: [{ scopeType: 'DATASTRUCTURE', scopeId, permissions }],
+    },
+  } as ReturnType<typeof useGetCurrentUser>)
+}
 
 const versions: DatastructureVersionsListData[] = [
   {
@@ -41,6 +60,7 @@ const defaultProps = {
   totalPages: 1,
   onPaginationChange: vi.fn(),
   onSortingChange: vi.fn(),
+  onDeleteVersionClick: vi.fn(),
   onDuplicateVersionClick: vi.fn(),
 }
 
@@ -52,6 +72,11 @@ const renderTable = (props = defaultProps) =>
   )
 
 describe('VersionsTable', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockCurrentUser([PERMISSION_NAMES.DATASTRUCTURE_UPDATE, PERMISSION_NAMES.DATASTRUCTURE_DELETE])
+  })
+
   it('renders the Usage column', () => {
     renderTable()
     expect(screen.getByRole('columnheader', { name: 'Verwendung' })).toBeDefined()
@@ -96,6 +121,27 @@ describe('VersionsTable', () => {
     await user.click(duplicateItem)
 
     expect(onDuplicateVersionClick).not.toHaveBeenCalled()
+  })
+
+  it('offers deletion of each version in edit mode', async () => {
+    const user = userEvent.setup()
+    renderTable()
+
+    await user.click(screen.getAllByRole('button', { name: 'Open menu' })[0])
+    await user.click(await screen.findByText('Version löschen'))
+
+    expect(defaultProps.onDeleteVersionClick).toHaveBeenCalledWith('v-1')
+  })
+
+  it('offers no deletion without the DELETE permission on the data structure', async () => {
+    const user = userEvent.setup()
+    mockCurrentUser([PERMISSION_NAMES.DATASTRUCTURE_UPDATE, PERMISSION_NAMES.DATASTRUCTURE_DELETE], 'ds-other')
+    renderTable()
+
+    await user.click(screen.getAllByRole('button', { name: 'Open menu' })[0])
+
+    expect(await screen.findByText('Version duplizieren')).toBeInTheDocument()
+    expect(screen.queryByText('Version löschen')).toBeNull()
   })
 
   it('offers no action menu in read-only mode', () => {

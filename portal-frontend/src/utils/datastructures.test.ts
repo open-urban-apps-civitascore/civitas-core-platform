@@ -160,6 +160,18 @@ describe('mapDatastructuresApiToListData', () => {
     expect(byVersion['2.0'].inUseByReleased).toBeUndefined()
   })
 
+  it('carries the in-use flag onto each version row, which decides whether its delete asks for confirmation', () => {
+    const datastructure: Datastructure = createDatastructure(['1.0', '2.0'])
+    datastructure.dataStructureVersions[0].inUse = true
+    datastructure.dataStructureVersions[1].inUse = false
+
+    const result = mapDatastructuresApiToListData([datastructure])
+    const byVersion = Object.fromEntries(result[0].versions.map(version => [version.versionNumber, version]))
+
+    expect(byVersion['1.0'].inUse).toBe(true)
+    expect(byVersion['2.0'].inUse).toBe(false)
+  })
+
   it('counts the versions of each status on the structure row', () => {
     const datastructure: Datastructure = createDatastructure(['1.0', '2.0', '3.0'])
     datastructure.dataStructureVersions[0].dataStructureVersionStatus = DATASTRUCTURE_STATUS_TYPES.AVAILABLE
@@ -304,6 +316,17 @@ describe('mapDatastructureVersionsApiToListData', () => {
         source: versions[0].dataStructureVersionSource,
       },
     ])
+  })
+
+  it('carries the in-use flag of each version', () => {
+    const result = mapDatastructureVersionsApiToListData([
+      createVersionSummary({ id: 'v1', version: '1.0', inUse: true }),
+      createVersionSummary({ id: 'v2', version: '2.0', inUse: false }),
+    ])
+    const byId = Object.fromEntries(result.map(version => [version.id, version]))
+
+    expect(byId.v1.inUse).toBe(true)
+    expect(byId.v2.inUse).toBe(false)
   })
 
   it('falls back to "-" when description is null', () => {
