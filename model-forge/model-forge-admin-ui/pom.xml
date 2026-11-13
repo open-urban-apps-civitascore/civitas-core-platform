@@ -65,7 +65,7 @@
     <dependency>
       <groupId>org.objenesis</groupId>
       <artifactId>objenesis</artifactId>
-      <version>3.3</version>
+      <version>3.6</version>
     </dependency>
     <!-- NestedTree/ITreeProvider for the lazily-expanding artifact tree (relations/dependencies). -->
     <dependency>
