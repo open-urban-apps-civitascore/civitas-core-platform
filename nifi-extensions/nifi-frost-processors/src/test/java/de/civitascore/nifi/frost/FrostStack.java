@@ -42,7 +42,7 @@ final class FrostStack implements AutoCloseable {
   private static final String SERVICE_PATH = "/FROST-Server/v1.1";
 
   // renovate: datasource=docker
-  private static final String FROST_IMAGE = "fraunhoferiosb/frost-server-http:2.7.3";
+  private static final String FROST_IMAGE = "fraunhoferiosb/frost-server-http:2.8.1";
 
   // renovate: datasource=docker
   private static final String POSTGIS_IMAGE = "postgis/postgis:16-3.5-alpine";

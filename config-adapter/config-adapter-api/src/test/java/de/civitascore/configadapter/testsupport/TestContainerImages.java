@@ -20,19 +20,19 @@ public final class TestContainerImages {
   private TestContainerImages() {}
 
   // renovate: datasource=docker
-  public static final String KAFKA = "confluentinc/cp-kafka:7.5.3";
+  public static final String KAFKA = "confluentinc/cp-kafka:7.9.11";
 
   // renovate: datasource=docker
-  public static final String KEYCLOAK = "quay.io/keycloak/keycloak:26.6.4";
+  public static final String KEYCLOAK = "quay.io/keycloak/keycloak:26.8.2";
 
   // renovate: datasource=docker
-  public static final String MAILPIT = "axllent/mailpit:v1.30";
+  public static final String MAILPIT = "axllent/mailpit:v1.32";
 
   // renovate: datasource=docker
-  public static final String ETCD = "quay.io/coreos/etcd:v3.6.6";
+  public static final String ETCD = "quay.io/coreos/etcd:v3.7.3";
 
   // renovate: datasource=docker
-  public static final String APISIX = "apache/apisix:3.17.0-debian";
+  public static final String APISIX = "apache/apisix:3.19.0-debian";
 
   // renovate: datasource=docker
   public static final String HTTP_ECHO = "mendhak/http-https-echo:34";
@@ -48,13 +48,13 @@ public final class TestContainerImages {
   public static final String GEOSERVER_CLOUD_REST = "geoservercloud/geoserver-cloud-rest:3.0.1.1";
 
   // renovate: datasource=docker
-  public static final String FROST = "fraunhoferiosb/frost-server-http:2.7.3";
+  public static final String FROST = "fraunhoferiosb/frost-server-http:2.8.1";
 
   // renovate: datasource=docker
-  public static final String RABBITMQ = "rabbitmq:4.1.3-alpine";
+  public static final String RABBITMQ = "rabbitmq:4.4.0-alpine";
 
   // renovate: datasource=docker
-  public static final String NIFI = "apache/nifi:2.9.0";
+  public static final String NIFI = "apache/nifi:2.12.0";
 
   // renovate: datasource=docker
   public static final String MOSQUITTO = "eclipse-mosquitto:2.0";
@@ -63,5 +63,5 @@ public final class TestContainerImages {
   public static final String POSTGRES = "postgres:16-alpine";
 
   // renovate: datasource=docker
-  public static final String WIREMOCK = "wiremock/wiremock:3.9.2";
+  public static final String WIREMOCK = "wiremock/wiremock:3.13.2";
 }

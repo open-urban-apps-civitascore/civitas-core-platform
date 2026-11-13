@@ -20,10 +20,10 @@ public final class TestContainerImages {
   public static final String POSTGRES = "postgres:16-alpine";
 
   // renovate: datasource=docker
-  public static final String KEYCLOAK = "quay.io/keycloak/keycloak:26.6.4";
+  public static final String KEYCLOAK = "quay.io/keycloak/keycloak:26.8.2";
 
   // renovate: datasource=docker
-  public static final String KAFKA = "apache/kafka:3.8.0";
+  public static final String KAFKA = "apache/kafka:3.9.2";
 
   // renovate: datasource=docker
   public static final String MOSQUITTO = "eclipse-mosquitto:2.0.20";
@@ -32,5 +32,5 @@ public final class TestContainerImages {
   public static final String POSTGIS = "postgis/postgis:16-3.5-alpine";
 
   // renovate: datasource=docker
-  public static final String FROST = "fraunhoferiosb/frost-server-http:2.7.3";
+  public static final String FROST = "fraunhoferiosb/frost-server-http:2.8.1";
 }
