@@ -45,9 +45,9 @@
 
 		<!-- Must track the NiFi version the platform deploys to (apache/nifi:2.9.0). The NAR is
 		     compiled against this API and is installed into that image. -->
-		<nifi.version>2.9.0</nifi.version>
+		<nifi.version>2.12.0</nifi.version>
 
-		<jackson.version>2.21.8</jackson.version>
+		<jackson.version>2.22.4</jackson.version>
 		<!-- The version of model-forge-runtime: GetHttpApiCall validates a response against a Data
 		     structure as Model Forge validates data against it, so the two must not disagree. -->
 		<networknt.version>1.5.9</networknt.version>
@@ -200,7 +200,7 @@
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
 					<artifactId>maven-compiler-plugin</artifactId>
-					<version>3.11.0</version>
+					<version>3.16.0</version>
 				</plugin>
 				<plugin>
 					<groupId>org.apache.maven.plugins</groupId>
@@ -329,7 +329,7 @@
 			<plugin>
 				<groupId>org.codehaus.mojo</groupId>
 				<artifactId>flatten-maven-plugin</artifactId>
-				<version>1.6.0</version>
+				<version>1.8.0</version>
 				<configuration>
 					<updatePomFile>true</updatePomFile>
 					<flattenMode>resolveCiFriendliesOnly</flattenMode>
