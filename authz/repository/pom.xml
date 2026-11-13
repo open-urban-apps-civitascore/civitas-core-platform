@@ -19,7 +19,7 @@
     <properties>
         <java.version>25</java.version>
         <testcontainers.version>2.0.5</testcontainers.version>
-        <owasp.encoder.version>1.4.1</owasp.encoder.version>
+        <owasp.encoder.version>1.6.0</owasp.encoder.version>
         <portal-model.version>1.0.0</portal-model.version>
         <assertj.version>3.27.7</assertj.version>
         <!-- Drop once the Spring Boot parent manages Tomcat >= 11.0.25: Boot 4.1.1 pins 11.0.24,
@@ -52,7 +52,7 @@
             <dependency>
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-compress</artifactId>
-                <version>1.26.2</version>
+                <version>1.28.0</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
