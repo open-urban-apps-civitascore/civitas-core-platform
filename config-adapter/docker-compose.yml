@@ -1,6 +1,6 @@
 services:
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.5.3
+    image: confluentinc/cp-zookeeper:7.5.3@sha256:000f1d11090f49fa8f67567e633bab4fea5dbd7d9119e7ee2ef259c509063593
     hostname: zookeeper
     container_name: zookeeper
     ports:
@@ -12,7 +12,7 @@ services:
       - civitas-network
 
   kafka:
-    image: confluentinc/cp-kafka:7.5.3
+    image: confluentinc/cp-kafka:7.5.3@sha256:51145a40d23336a11085ca695d02bdeee66fe01b582837c6d223384952226be9
     hostname: kafka
     container_name: kafka
     depends_on:
@@ -34,7 +34,7 @@ services:
       - civitas-network
 
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16-alpine@sha256:f377d590e5474681d4d7838635031a2b50647923b7abfa803ce9b5ff35d5c663
     container_name: keycloak-db
     environment:
       POSTGRES_DB: keycloak
@@ -49,7 +49,7 @@ services:
       - civitas-network
 
   keycloak:
-    image: quay.io/keycloak/keycloak:23.0.3
+    image: quay.io/keycloak/keycloak:23.0.3@sha256:4f72a5b0c076755e806457d96404dd28dc1394013933d7170c154c26db9b6a16
     container_name: keycloak
     command: start-dev
     environment:

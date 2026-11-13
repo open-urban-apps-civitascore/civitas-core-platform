@@ -8,7 +8,7 @@
 # (.dockerignore):
 #   mvn -f nifi-extensions/pom.xml package -DskipTests
 
-FROM alpine:3.23.5
+FROM alpine:3.23.7@sha256:ff7f0c727dd796aa36787bfcd9a64bf35a6ce72a73451b3359fde849b6703d63
 
 # The directory is created before the copy, because a path COPY --chmod creates inherits that mode
 # and a directory without the execute bit cannot be entered.
