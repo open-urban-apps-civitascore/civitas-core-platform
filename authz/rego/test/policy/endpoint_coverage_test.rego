@@ -207,17 +207,17 @@ test_mapping_item_writes_denied_with_read_only if {
 }
 
 # =============================================================================
-# INSTALLATIONS
+# USE CASES
 # =============================================================================
-# An installation is a resource of the whole tenant: it has no scope of its own.
+# A use case is a resource of the whole tenant: it has no scope of its own.
 # Only a tenant-wide grant gives access. An install creates the artifacts of a
 # package: Data structures and their first versions, Data sources, a Dataset and
-# the sub-resources of the Dataset. So POST /v1/installations needs all
+# the sub-resources of the Dataset. So POST /v1/use-cases needs all
 # permissions in installer_permissions (an AND list in data.json): the
 # permissions that the API needs for the same work.
 
 installer_permissions := [
-	"INSTALLATION_CREATE",
+	"USECASE_CREATE",
 	"DATASTRUCTURE_CREATE",
 	"DATASTRUCTURE_UPDATE",
 	"DATASOURCE_CREATE",
@@ -228,9 +228,9 @@ installer_permissions := [
 # The installer permissions without the given one.
 installer_permissions_without(name) := [permission | some permission in installer_permissions; permission != name]
 
-mock_send_installation_reader(_) := {"status_code": 200, "body": mock_http.user_with_permissions(["INSTALLATION_READ"])}
+mock_send_use_case_reader(_) := {"status_code": 200, "body": mock_http.user_with_permissions(["USECASE_READ"])}
 mock_send_installer(_) := {"status_code": 200, "body": mock_http.user_with_permissions(installer_permissions)}
-mock_send_installer_without_installation_create(_) := {"status_code": 200, "body": mock_http.user_with_permissions(installer_permissions_without("INSTALLATION_CREATE"))}
+mock_send_installer_without_use_case_create(_) := {"status_code": 200, "body": mock_http.user_with_permissions(installer_permissions_without("USECASE_CREATE"))}
 mock_send_installer_without_datastructure_create(_) := {"status_code": 200, "body": mock_http.user_with_permissions(installer_permissions_without("DATASTRUCTURE_CREATE"))}
 mock_send_installer_without_datastructure_update(_) := {"status_code": 200, "body": mock_http.user_with_permissions(installer_permissions_without("DATASTRUCTURE_UPDATE"))}
 mock_send_installer_without_datasource_create(_) := {"status_code": 200, "body": mock_http.user_with_permissions(installer_permissions_without("DATASOURCE_CREATE"))}
@@ -238,19 +238,19 @@ mock_send_installer_without_dataset_create(_) := {"status_code": 200, "body": mo
 mock_send_installer_without_dataset_update(_) := {"status_code": 200, "body": mock_http.user_with_permissions(installer_permissions_without("DATASET_UPDATE"))}
 mock_send_pool_installer(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(installer_permissions, "DATAPOOL", "pool-1")}
 
-test_installation_read_allowed_with_tenant_grant if {
-	result := authz.decision with http.send as mock_send_installation_reader
+test_use_case_read_allowed_with_tenant_grant if {
+	result := authz.decision with http.send as mock_send_use_case_reader
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v1/installations/installation-1")
+		with input as portal_request("GET", "/v1/use-cases/use-case-1")
 	result.allow == true
 	result.reason == "permission_granted"
-	result.required_permissions == {"INSTALLATION_READ"}
+	result.required_permissions == {"USECASE_READ"}
 }
 
 test_install_allowed_with_all_required_permissions if {
 	result := authz.decision with http.send as mock_send_installer
 		with data.config as mock_http.mock_config
-		with input as portal_request("POST", "/v1/installations")
+		with input as portal_request("POST", "/v1/use-cases")
 	result.allow == true
 	result.reason == "permission_granted"
 	result.required_permissions == {permission | some permission in installer_permissions}
@@ -260,7 +260,7 @@ test_install_allowed_with_all_required_permissions if {
 test_install_denied_without_datastructure_create if {
 	result := authz.decision with http.send as mock_send_installer_without_datastructure_create
 		with data.config as mock_http.mock_config
-		with input as portal_request("POST", "/v1/installations")
+		with input as portal_request("POST", "/v1/use-cases")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -269,16 +269,16 @@ test_install_denied_without_datastructure_create if {
 test_install_denied_without_datastructure_update if {
 	result := authz.decision with http.send as mock_send_installer_without_datastructure_update
 		with data.config as mock_http.mock_config
-		with input as portal_request("POST", "/v1/installations")
+		with input as portal_request("POST", "/v1/use-cases")
 	result.allow == false
 	result.reason == "permission_denied"
 }
 
 # The permissions for the artifacts of a package do not include the permission to install.
-test_install_denied_without_installation_create if {
-	result := authz.decision with http.send as mock_send_installer_without_installation_create
+test_install_denied_without_use_case_create if {
+	result := authz.decision with http.send as mock_send_installer_without_use_case_create
 		with data.config as mock_http.mock_config
-		with input as portal_request("POST", "/v1/installations")
+		with input as portal_request("POST", "/v1/use-cases")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -287,7 +287,7 @@ test_install_denied_without_installation_create if {
 test_install_denied_without_datasource_create if {
 	result := authz.decision with http.send as mock_send_installer_without_datasource_create
 		with data.config as mock_http.mock_config
-		with input as portal_request("POST", "/v1/installations")
+		with input as portal_request("POST", "/v1/use-cases")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -296,7 +296,7 @@ test_install_denied_without_datasource_create if {
 test_install_denied_without_dataset_create if {
 	result := authz.decision with http.send as mock_send_installer_without_dataset_create
 		with data.config as mock_http.mock_config
-		with input as portal_request("POST", "/v1/installations")
+		with input as portal_request("POST", "/v1/use-cases")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -306,33 +306,33 @@ test_install_denied_without_dataset_create if {
 test_install_denied_without_dataset_update if {
 	result := authz.decision with http.send as mock_send_installer_without_dataset_update
 		with data.config as mock_http.mock_config
-		with input as portal_request("POST", "/v1/installations")
+		with input as portal_request("POST", "/v1/use-cases")
 	result.allow == false
 	result.reason == "permission_denied"
 }
 
-# A grant on one data pool is not tenant-wide, so it does not reach the installations.
+# A grant on one data pool is not tenant-wide, so it does not reach the use cases.
 test_install_denied_with_pool_grant if {
 	result := authz.decision with http.send as mock_send_pool_installer
 		with data.config as mock_http.mock_config
-		with input as portal_request("POST", "/v1/installations")
+		with input as portal_request("POST", "/v1/use-cases")
 	result.allow == false
 	result.reason == "permission_denied"
 }
 
 test_install_denied_unauthenticated if {
-	result := authz.decision with input as portal_request_no_auth("POST", "/v1/installations")
+	result := authz.decision with input as portal_request_no_auth("POST", "/v1/use-cases")
 	result.allow == false
 }
 
 # An uninstall removes what the install created: the Dataset with its
 # sub-resources, the Data sources and the Data structures. So
-# DELETE /v1/installations/{id} needs all permissions in uninstaller_permissions
+# DELETE /v1/use-cases/{id} needs all permissions in uninstaller_permissions
 # (an AND list in data.json): the permissions that the API needs to delete
 # the same artifacts.
 
 uninstaller_permissions := [
-	"INSTALLATION_DELETE",
+	"USECASE_DELETE",
 	"DATASET_DELETE",
 	"DATASOURCE_DELETE",
 	"DATASTRUCTURE_DELETE",
@@ -342,7 +342,7 @@ uninstaller_permissions := [
 uninstaller_permissions_without(name) := [permission | some permission in uninstaller_permissions; permission != name]
 
 mock_send_uninstaller(_) := {"status_code": 200, "body": mock_http.user_with_permissions(uninstaller_permissions)}
-mock_send_uninstaller_without_installation_delete(_) := {"status_code": 200, "body": mock_http.user_with_permissions(uninstaller_permissions_without("INSTALLATION_DELETE"))}
+mock_send_uninstaller_without_use_case_delete(_) := {"status_code": 200, "body": mock_http.user_with_permissions(uninstaller_permissions_without("USECASE_DELETE"))}
 mock_send_uninstaller_without_dataset_delete(_) := {"status_code": 200, "body": mock_http.user_with_permissions(uninstaller_permissions_without("DATASET_DELETE"))}
 mock_send_uninstaller_without_datasource_delete(_) := {"status_code": 200, "body": mock_http.user_with_permissions(uninstaller_permissions_without("DATASOURCE_DELETE"))}
 mock_send_uninstaller_without_datastructure_delete(_) := {"status_code": 200, "body": mock_http.user_with_permissions(uninstaller_permissions_without("DATASTRUCTURE_DELETE"))}
@@ -351,17 +351,17 @@ mock_send_pool_uninstaller(_) := {"status_code": 200, "body": mock_http.user_wit
 test_uninstall_allowed_with_all_required_permissions if {
 	result := authz.decision with http.send as mock_send_uninstaller
 		with data.config as mock_http.mock_config
-		with input as portal_request("DELETE", "/v1/installations/installation-1")
+		with input as portal_request("DELETE", "/v1/use-cases/use-case-1")
 	result.allow == true
 	result.reason == "permission_granted"
 	result.required_permissions == {permission | some permission in uninstaller_permissions}
 }
 
 # The permissions for the artifacts of a package do not include the permission to uninstall.
-test_uninstall_denied_without_installation_delete if {
-	result := authz.decision with http.send as mock_send_uninstaller_without_installation_delete
+test_uninstall_denied_without_use_case_delete if {
+	result := authz.decision with http.send as mock_send_uninstaller_without_use_case_delete
 		with data.config as mock_http.mock_config
-		with input as portal_request("DELETE", "/v1/installations/installation-1")
+		with input as portal_request("DELETE", "/v1/use-cases/use-case-1")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -370,7 +370,7 @@ test_uninstall_denied_without_installation_delete if {
 test_uninstall_denied_without_dataset_delete if {
 	result := authz.decision with http.send as mock_send_uninstaller_without_dataset_delete
 		with data.config as mock_http.mock_config
-		with input as portal_request("DELETE", "/v1/installations/installation-1")
+		with input as portal_request("DELETE", "/v1/use-cases/use-case-1")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -379,7 +379,7 @@ test_uninstall_denied_without_dataset_delete if {
 test_uninstall_denied_without_datasource_delete if {
 	result := authz.decision with http.send as mock_send_uninstaller_without_datasource_delete
 		with data.config as mock_http.mock_config
-		with input as portal_request("DELETE", "/v1/installations/installation-1")
+		with input as portal_request("DELETE", "/v1/use-cases/use-case-1")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -388,7 +388,7 @@ test_uninstall_denied_without_datasource_delete if {
 test_uninstall_denied_without_datastructure_delete if {
 	result := authz.decision with http.send as mock_send_uninstaller_without_datastructure_delete
 		with data.config as mock_http.mock_config
-		with input as portal_request("DELETE", "/v1/installations/installation-1")
+		with input as portal_request("DELETE", "/v1/use-cases/use-case-1")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -397,40 +397,40 @@ test_uninstall_denied_without_datastructure_delete if {
 test_uninstall_denied_with_installer_permissions if {
 	result := authz.decision with http.send as mock_send_installer
 		with data.config as mock_http.mock_config
-		with input as portal_request("DELETE", "/v1/installations/installation-1")
+		with input as portal_request("DELETE", "/v1/use-cases/use-case-1")
 	result.allow == false
 	result.reason == "permission_denied"
 }
 
-# A grant on one data pool is not tenant-wide, so it does not reach the installations.
+# A grant on one data pool is not tenant-wide, so it does not reach the use cases.
 test_uninstall_denied_with_pool_grant if {
 	result := authz.decision with http.send as mock_send_pool_uninstaller
 		with data.config as mock_http.mock_config
-		with input as portal_request("DELETE", "/v1/installations/installation-1")
+		with input as portal_request("DELETE", "/v1/use-cases/use-case-1")
 	result.allow == false
 	result.reason == "permission_denied"
 }
 
 test_uninstall_denied_unauthenticated if {
-	result := authz.decision with input as portal_request_no_auth("DELETE", "/v1/installations/installation-1")
+	result := authz.decision with input as portal_request_no_auth("DELETE", "/v1/use-cases/use-case-1")
 	result.allow == false
 }
 
 # =============================================================================
-# INSTALLATIONS IN A DATA POOL
+# USE CASES IN A DATA POOL
 # =============================================================================
 # The same permissions as above, under the path of a data pool. The {id} of the
 # data pool is the scopeId, so a grant on the data pool is sufficient. OPA does
-# not see in which data pool an installation is: the backend answers 404 for an
-# installation of another data pool.
+# not see in which data pool a use case is: the backend answers 404 for a use
+# case of another data pool.
 
-mock_send_pool_reader(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["INSTALLATION_READ"], "DATAPOOL", "pool-1")}
+mock_send_pool_reader(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(["USECASE_READ"], "DATAPOOL", "pool-1")}
 mock_send_pool_installer_without_datastructure_create(_) := {"status_code": 200, "body": mock_http.user_with_scoped_permissions(installer_permissions_without("DATASTRUCTURE_CREATE"), "DATAPOOL", "pool-1")}
 
 test_install_in_pool_allowed_with_pool_grant if {
 	result := authz.decision with http.send as mock_send_pool_installer
 		with data.config as mock_http.mock_config
-		with input as portal_request("POST", "/v1/datapools/pool-1/installations")
+		with input as portal_request("POST", "/v1/datapools/pool-1/use-cases")
 	result.allow == true
 	result.reason == "permission_granted"
 	result.required_permissions == {permission | some permission in installer_permissions}
@@ -440,7 +440,7 @@ test_install_in_pool_allowed_with_pool_grant if {
 test_install_in_pool_allowed_with_tenant_grant if {
 	result := authz.decision with http.send as mock_send_installer
 		with data.config as mock_http.mock_config
-		with input as portal_request("POST", "/v1/datapools/pool-1/installations")
+		with input as portal_request("POST", "/v1/datapools/pool-1/use-cases")
 	result.allow == true
 	result.headers["X-Allowed-Scope-Ids"] == "*"
 }
@@ -449,7 +449,7 @@ test_install_in_pool_allowed_with_tenant_grant if {
 test_install_in_pool_denied_with_grant_on_other_pool if {
 	result := authz.decision with http.send as mock_send_pool_installer
 		with data.config as mock_http.mock_config
-		with input as portal_request("POST", "/v1/datapools/pool-2/installations")
+		with input as portal_request("POST", "/v1/datapools/pool-2/use-cases")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -458,31 +458,31 @@ test_install_in_pool_denied_with_grant_on_other_pool if {
 test_install_in_pool_denied_without_datastructure_create if {
 	result := authz.decision with http.send as mock_send_pool_installer_without_datastructure_create
 		with data.config as mock_http.mock_config
-		with input as portal_request("POST", "/v1/datapools/pool-1/installations")
+		with input as portal_request("POST", "/v1/datapools/pool-1/use-cases")
 	result.allow == false
 	result.reason == "permission_denied"
 }
 
 test_install_in_pool_denied_unauthenticated if {
-	result := authz.decision with input as portal_request_no_auth("POST", "/v1/datapools/pool-1/installations")
+	result := authz.decision with input as portal_request_no_auth("POST", "/v1/datapools/pool-1/use-cases")
 	result.allow == false
 }
 
-test_installations_of_pool_read_allowed_with_pool_grant if {
-	every path in {"/v1/datapools/pool-1/installations", "/v1/datapools/pool-1/installations/installation-1"} {
+test_use_cases_of_pool_read_allowed_with_pool_grant if {
+	every path in {"/v1/datapools/pool-1/use-cases", "/v1/datapools/pool-1/use-cases/use-case-1"} {
 		result := authz.decision with http.send as mock_send_pool_reader
 			with data.config as mock_http.mock_config
 			with input as portal_request("GET", path)
 		result.allow == true
-		result.required_permissions == {"INSTALLATION_READ"}
+		result.required_permissions == {"USECASE_READ"}
 		result.headers["X-Allowed-Scope-Ids"] == "pool-1"
 	}
 }
 
-test_installations_of_pool_read_denied_with_grant_on_other_pool if {
+test_use_cases_of_pool_read_denied_with_grant_on_other_pool if {
 	result := authz.decision with http.send as mock_send_pool_reader
 		with data.config as mock_http.mock_config
-		with input as portal_request("GET", "/v1/datapools/pool-2/installations")
+		with input as portal_request("GET", "/v1/datapools/pool-2/use-cases")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -490,7 +490,7 @@ test_installations_of_pool_read_denied_with_grant_on_other_pool if {
 test_uninstall_in_pool_allowed_with_pool_grant if {
 	result := authz.decision with http.send as mock_send_pool_uninstaller
 		with data.config as mock_http.mock_config
-		with input as portal_request("DELETE", "/v1/datapools/pool-1/installations/installation-1")
+		with input as portal_request("DELETE", "/v1/datapools/pool-1/use-cases/use-case-1")
 	result.allow == true
 	result.required_permissions == {permission | some permission in uninstaller_permissions}
 	result.headers["X-Allowed-Scope-Ids"] == "pool-1"
@@ -499,7 +499,7 @@ test_uninstall_in_pool_allowed_with_pool_grant if {
 test_uninstall_in_pool_denied_with_grant_on_other_pool if {
 	result := authz.decision with http.send as mock_send_pool_uninstaller
 		with data.config as mock_http.mock_config
-		with input as portal_request("DELETE", "/v1/datapools/pool-2/installations/installation-1")
+		with input as portal_request("DELETE", "/v1/datapools/pool-2/use-cases/use-case-1")
 	result.allow == false
 	result.reason == "permission_denied"
 }
@@ -508,7 +508,7 @@ test_uninstall_in_pool_denied_with_grant_on_other_pool if {
 test_uninstall_in_pool_denied_with_installer_permissions if {
 	result := authz.decision with http.send as mock_send_pool_installer
 		with data.config as mock_http.mock_config
-		with input as portal_request("DELETE", "/v1/datapools/pool-1/installations/installation-1")
+		with input as portal_request("DELETE", "/v1/datapools/pool-1/use-cases/use-case-1")
 	result.allow == false
 	result.reason == "permission_denied"
 }

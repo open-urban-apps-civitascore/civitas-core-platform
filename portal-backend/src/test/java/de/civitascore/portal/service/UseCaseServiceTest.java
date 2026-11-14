@@ -18,24 +18,23 @@ import de.civitascore.portal.model.connector.SqlConnectorConfiguration;
 import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
-import de.civitascore.portal.model.embedded.InstalledArtifactType;
+import de.civitascore.portal.model.embedded.UseCaseArtifactType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
-import de.civitascore.portal.model.entity.Installation;
-import de.civitascore.portal.model.entity.InstalledArtifact;
 import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.Style;
+import de.civitascore.portal.model.entity.UseCase;
+import de.civitascore.portal.model.entity.UseCaseArtifact;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
-import de.civitascore.portal.model.input.InstallationInputDTO;
 import de.civitascore.portal.model.input.LayerInputDTO;
 import de.civitascore.portal.model.input.MappingInputDTO;
 import de.civitascore.portal.model.input.PackageManifestInputDTO;
@@ -43,9 +42,10 @@ import de.civitascore.portal.model.input.PackageMemberInputDTO;
 import de.civitascore.portal.model.input.PackageMemberKind;
 import de.civitascore.portal.model.input.PipelineInputDTO;
 import de.civitascore.portal.model.input.StyleInputDTO;
+import de.civitascore.portal.model.input.UseCaseInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataPoolRepository;
-import de.civitascore.portal.repository.InstallationRepository;
+import de.civitascore.portal.repository.UseCaseRepository;
 import de.civitascore.portal.service.connector.ConnectorValidator;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -71,12 +71,12 @@ import org.springframework.dao.DataIntegrityViolationException;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Unit tests for {@link InstallationService}. The services of the platform and the registry are
- * mocks, so these tests do not show the rules of the platform. {@code
- * InstallationControllerIntegrationTest} shows them.
+ * Unit tests for {@link UseCaseService}. The services of the platform and the registry are mocks,
+ * so these tests do not show the rules of the platform. {@code UseCaseControllerIntegrationTest}
+ * shows them.
  */
 @ExtendWith(MockitoExtension.class)
-class InstallationServiceTest {
+class UseCaseServiceTest {
 
   private static final String PACKAGE_ID = "tree-cadastre";
   private static final String TITLE = "title";
@@ -130,7 +130,7 @@ class InstallationServiceTest {
       "urn:core:platform:civitas:datasink:common:99999999-9999-4000-8000-00000000000a";
   private static final String SINK_VERSIONED_URN = SINK_LOGICAL_URN + ":1.0.0";
 
-  @Mock private InstallationRepository installationRepository;
+  @Mock private UseCaseRepository useCaseRepository;
   @Mock private DataPoolRepository dataPoolRepository;
   @Mock private DataStructureService dataStructureService;
   @Mock private DataStructureVersionService dataStructureVersionService;
@@ -146,7 +146,7 @@ class InstallationServiceTest {
   @Spy private Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
   @Spy private ObjectMapper objectMapper = new ObjectMapper();
 
-  @InjectMocks private InstallationService installationService;
+  @InjectMocks private UseCaseService useCaseService;
 
   @Captor private ArgumentCaptor<DataStructureInputDTO> structureCaptor;
   @Captor private ArgumentCaptor<DataStructureVersionInputDTO> versionCaptor;
@@ -167,9 +167,9 @@ class InstallationServiceTest {
 
   @Test
   void install_whenPackageIsInstalled_throwsUniqueConstraintViolation() {
-    when(installationRepository.existsActive(PACKAGE_ID, null)).thenReturn(true);
+    when(useCaseRepository.existsActive(PACKAGE_ID, null)).thenReturn(true);
 
-    assertThatThrownBy(() -> installationService.install(request(tree())))
+    assertThatThrownBy(() -> useCaseService.install(request(tree())))
         .isInstanceOf(UniqueConstraintViolationException.class)
         .hasMessageContaining("is already installed");
 
@@ -178,10 +178,10 @@ class InstallationServiceTest {
 
   @Test
   void install_whenPackageIsInstalledInTheDatapool_throwsUniqueConstraintViolationWithThePool() {
-    when(installationRepository.existsActive(PACKAGE_ID, DATAPOOL_ID)).thenReturn(true);
+    when(useCaseRepository.existsActive(PACKAGE_ID, DATAPOOL_ID)).thenReturn(true);
 
     assertThatThrownBy(
-            () -> installationService.install(request(DATAPOOL_ID, tree(), sqlSource(FOREIGN_URN))))
+            () -> useCaseService.install(request(DATAPOOL_ID, tree(), sqlSource(FOREIGN_URN))))
         .isInstanceOf(UniqueConstraintViolationException.class)
         .hasMessageContaining(DATAPOOL_ID.toString());
 
@@ -193,10 +193,10 @@ class InstallationServiceTest {
     stubCreate();
 
     // The request names a Data pool, but no member of the package goes into it.
-    Installation installation = installationService.install(request(DATAPOOL_ID, tree()));
+    UseCase useCase = useCaseService.install(request(DATAPOOL_ID, tree()));
 
-    assertThat(installation.getDatapoolId()).isNull();
-    verify(installationRepository).existsActive(PACKAGE_ID, null);
+    assertThat(useCase.getDatapoolId()).isNull();
+    verify(useCaseRepository).existsActive(PACKAGE_ID, null);
   }
 
   @Test
@@ -204,10 +204,10 @@ class InstallationServiceTest {
     stubDatapool();
     stubCreate();
 
-    Installation installation = installationService.installInDatapool(DATAPOOL_ID, request(tree()));
+    UseCase useCase = useCaseService.installInDatapool(DATAPOOL_ID, request(tree()));
 
-    assertThat(installation.getDatapoolId()).isEqualTo(DATAPOOL_ID);
-    verify(installationRepository).existsActive(PACKAGE_ID, DATAPOOL_ID);
+    assertThat(useCase.getDatapoolId()).isEqualTo(DATAPOOL_ID);
+    verify(useCaseRepository).existsActive(PACKAGE_ID, DATAPOOL_ID);
   }
 
   @Test
@@ -216,7 +216,7 @@ class InstallationServiceTest {
     stubDatapool();
     stubDataSource();
 
-    installationService.installInDatapool(DATAPOOL_ID, request(tree(), sqlSource(FOREIGN_URN)));
+    useCaseService.installInDatapool(DATAPOOL_ID, request(tree(), sqlSource(FOREIGN_URN)));
 
     verify(dataSourceService).create(sourceCaptor.capture());
     assertThat(sourceCaptor.getValue().getDatapoolScope().getDatapoolIds())
@@ -228,9 +228,7 @@ class InstallationServiceTest {
     UUID otherDatapoolId = UUID.fromString("22222222-2222-4000-8000-000000000002");
 
     assertThatThrownBy(
-            () ->
-                installationService.installInDatapool(
-                    DATAPOOL_ID, request(otherDatapoolId, tree())))
+            () -> useCaseService.installInDatapool(DATAPOOL_ID, request(otherDatapoolId, tree())))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining(otherDatapoolId.toString());
 
@@ -241,7 +239,7 @@ class InstallationServiceTest {
   void installInDatapool_whenDatapoolDoesNotExist_throwsResourceNotFound() {
     when(dataPoolRepository.existsById(DATAPOOL_ID)).thenReturn(false);
 
-    assertThatThrownBy(() -> installationService.installInDatapool(DATAPOOL_ID, request(tree())))
+    assertThatThrownBy(() -> useCaseService.installInDatapool(DATAPOOL_ID, request(tree())))
         .isInstanceOf(ResourceNotFoundException.class);
 
     verifyNoChange();
@@ -250,10 +248,10 @@ class InstallationServiceTest {
   @Test
   void install_whenUniqueIndexRefusesTheRecord_createsNothing() {
     // The check passes, because the other install has not committed yet. The index refuses the row.
-    when(installationRepository.saveAndFlush(any()))
-        .thenThrow(new DataIntegrityViolationException("uq_installations_active_package"));
+    when(useCaseRepository.saveAndFlush(any()))
+        .thenThrow(new DataIntegrityViolationException("uq_use_cases_active_package_datapool"));
 
-    assertThatThrownBy(() -> installationService.install(request(tree())))
+    assertThatThrownBy(() -> useCaseService.install(request(tree())))
         .isInstanceOf(DataIntegrityViolationException.class);
 
     verifyNoArtifactCreated();
@@ -263,7 +261,7 @@ class InstallationServiceTest {
   void install_whenSecondMemberHasNoDescription_changesNothing() {
     PackageMemberInputDTO park = member("park", "Park", null, Map.of(TITLE, "Park"));
 
-    assertThatThrownBy(() -> installationService.install(request(tree(), park)))
+    assertThatThrownBy(() -> useCaseService.install(request(tree(), park)))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("needs a description");
 
@@ -272,10 +270,10 @@ class InstallationServiceTest {
 
   @Test
   void install_whenTitleIsLongerThanTheNameLimit_changesNothing() {
-    String title = "T".repeat(InstalledArtifact.NAME_LENGTH + 1);
+    String title = "T".repeat(UseCaseArtifact.NAME_LENGTH + 1);
     PackageMemberInputDTO member = member(FOREIGN_URN, null, "Trees", Map.of(TITLE, title));
 
-    assertThatThrownBy(() -> installationService.install(request(member)))
+    assertThatThrownBy(() -> useCaseService.install(request(member)))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("must not exceed");
 
@@ -287,7 +285,7 @@ class InstallationServiceTest {
     stubCreate();
     Map<String, Object> model = model();
 
-    installationService.install(request(member(FOREIGN_URN, "Tree", "Trees", model)));
+    useCaseService.install(request(member(FOREIGN_URN, "Tree", "Trees", model)));
 
     verify(dataStructureVersionService).create(versionCaptor.capture());
     Map<String, Object> expected = new LinkedHashMap<>(model);
@@ -301,15 +299,15 @@ class InstallationServiceTest {
   void install_whenMemberIsInstalled_recordsTheCopyAndItsOrigin() {
     stubCreate();
 
-    Installation installation = installationService.install(request(tree()));
+    UseCase useCase = useCaseService.install(request(tree()));
 
-    assertThat(installation.getPackageId()).isEqualTo(PACKAGE_ID);
-    assertThat(installation.getPackageVersion()).isEqualTo("1.0.0");
-    assertThat(installation.getArtifacts())
+    assertThat(useCase.getPackageId()).isEqualTo(PACKAGE_ID);
+    assertThat(useCase.getPackageVersion()).isEqualTo("1.0.0");
+    assertThat(useCase.getArtifacts())
         .singleElement()
         .satisfies(
             line -> {
-              assertThat(line.getArtifactType()).isEqualTo(InstalledArtifactType.DATA_STRUCTURE);
+              assertThat(line.getArtifactType()).isEqualTo(UseCaseArtifactType.DATA_STRUCTURE);
               assertThat(line.getName()).isEqualTo("Tree");
               assertThat(line.getShellId()).isEqualTo(STRUCTURE_ID);
               assertThat(line.getUrn()).isEqualTo(LOGICAL_URN);
@@ -322,7 +320,7 @@ class InstallationServiceTest {
   void install_whenNameIsBlank_usesTheDocumentTitle() {
     stubCreate();
 
-    installationService.install(request(member(FOREIGN_URN, " ", "Trees", model())));
+    useCaseService.install(request(member(FOREIGN_URN, " ", "Trees", model())));
 
     verify(dataStructureService).create(structureCaptor.capture());
     assertThat(structureCaptor.getValue().getName()).isEqualTo("Tree cadastre");
@@ -335,27 +333,26 @@ class InstallationServiceTest {
     stubDataSource();
     stubDataSet();
 
-    Installation installation =
-        installationService.install(
-            request(DATAPOOL_ID, dataSet(), sqlSource(FOREIGN_URN), tree()));
+    UseCase useCase =
+        useCaseService.install(request(DATAPOOL_ID, dataSet(), sqlSource(FOREIGN_URN), tree()));
 
     InOrder order = inOrder(dataStructureService, dataSourceService, dataSetService);
     order.verify(dataStructureService).create(any());
     order.verify(dataSourceService).create(any());
     order.verify(dataSetService).create(any());
-    assertThat(installation.getArtifacts())
-        .extracting(InstalledArtifact::getArtifactType)
+    assertThat(useCase.getArtifacts())
+        .extracting(UseCaseArtifact::getArtifactType)
         .containsExactly(
-            InstalledArtifactType.DATA_STRUCTURE,
-            InstalledArtifactType.DATA_SOURCE,
-            InstalledArtifactType.DATA_SET);
+            UseCaseArtifactType.DATA_STRUCTURE,
+            UseCaseArtifactType.DATA_SOURCE,
+            UseCaseArtifactType.DATA_SET);
   }
 
   @Test
   void install_whenTwoMembersHaveTheSameIdentity_changesNothing() {
     PackageMemberInputDTO again = member(FOREIGN_URN, "Tree again", "Trees again", model());
 
-    assertThatThrownBy(() -> installationService.install(request(tree(), again)))
+    assertThatThrownBy(() -> useCaseService.install(request(tree(), again)))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("Two members of the package have the identity");
 
@@ -364,7 +361,7 @@ class InstallationServiceTest {
 
   @Test
   void install_whenPackageHasADataSourceAndNoDatapool_changesNothing() {
-    assertThatThrownBy(() -> installationService.install(request(tree(), sqlSource(FOREIGN_URN))))
+    assertThatThrownBy(() -> useCaseService.install(request(tree(), sqlSource(FOREIGN_URN))))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("datapoolId");
 
@@ -376,7 +373,7 @@ class InstallationServiceTest {
     when(dataPoolRepository.existsById(DATAPOOL_ID)).thenReturn(false);
 
     assertThatThrownBy(
-            () -> installationService.install(request(DATAPOOL_ID, tree(), sqlSource(FOREIGN_URN))))
+            () -> useCaseService.install(request(DATAPOOL_ID, tree(), sqlSource(FOREIGN_URN))))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining(DATAPOOL_ID.toString());
 
@@ -389,7 +386,7 @@ class InstallationServiceTest {
     String unknown = "urn:core:standard:test:datastructure:environment:other:z9y8x7w6v5";
 
     assertThatThrownBy(
-            () -> installationService.install(request(DATAPOOL_ID, tree(), sqlSource(unknown))))
+            () -> useCaseService.install(request(DATAPOOL_ID, tree(), sqlSource(unknown))))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("the package has no member with this identity");
 
@@ -401,7 +398,7 @@ class InstallationServiceTest {
     stubDatapool();
 
     assertThatThrownBy(
-            () -> installationService.install(request(DATAPOOL_ID, tree(), sqlSource(SOURCE_URN))))
+            () -> useCaseService.install(request(DATAPOOL_ID, tree(), sqlSource(SOURCE_URN))))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("is not of the kind datastructure");
 
@@ -413,7 +410,7 @@ class InstallationServiceTest {
     stubDatapool();
     PackageMemberInputDTO feed = mqttSource(1, Map.of("client_id", "air-quality"));
 
-    assertThatThrownBy(() -> installationService.install(request(DATAPOOL_ID, tree(), feed)))
+    assertThatThrownBy(() -> useCaseService.install(request(DATAPOOL_ID, tree(), feed)))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining(SOURCE_URN)
         .hasMessageContaining("Unknown key: connector.client_id");
@@ -426,7 +423,7 @@ class InstallationServiceTest {
     stubDatapool();
     PackageMemberInputDTO feed = mqttSource(5, Map.of());
 
-    assertThatThrownBy(() -> installationService.install(request(DATAPOOL_ID, tree(), feed)))
+    assertThatThrownBy(() -> useCaseService.install(request(DATAPOOL_ID, tree(), feed)))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("connector.qos");
 
@@ -439,8 +436,7 @@ class InstallationServiceTest {
     stubDatapool();
     stubDataSource();
 
-    Installation installation =
-        installationService.install(request(DATAPOOL_ID, tree(), sqlSource(FOREIGN_URN)));
+    UseCase useCase = useCaseService.install(request(DATAPOOL_ID, tree(), sqlSource(FOREIGN_URN)));
 
     verify(dataSourceService).create(sourceCaptor.capture());
     DataSourceInputDTO input = sourceCaptor.getValue();
@@ -456,9 +452,9 @@ class InstallationServiceTest {
               assertThat(connector.dsn()).isEqualTo("postgres://trees-db:5432/city");
               assertThat(connector.table()).isEqualTo("trees");
             });
-    assertThat(installation.getDatapoolId()).isEqualTo(DATAPOOL_ID);
-    assertThat(installation.getArtifacts())
-        .filteredOn(line -> line.getArtifactType() == InstalledArtifactType.DATA_SOURCE)
+    assertThat(useCase.getDatapoolId()).isEqualTo(DATAPOOL_ID);
+    assertThat(useCase.getArtifacts())
+        .filteredOn(line -> line.getArtifactType() == UseCaseArtifactType.DATA_SOURCE)
         .singleElement()
         .satisfies(
             line -> {
@@ -478,7 +474,7 @@ class InstallationServiceTest {
             "Parks of the city",
             Map.of("openDataAccess", false));
 
-    assertThatThrownBy(() -> installationService.install(request(DATAPOOL_ID, dataSet(), parks)))
+    assertThatThrownBy(() -> useCaseService.install(request(DATAPOOL_ID, dataSet(), parks)))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("has 2 Datasets");
 
@@ -487,7 +483,7 @@ class InstallationServiceTest {
 
   @Test
   void install_whenPackageHasAnApiAndNoDataSet_changesNothing() {
-    assertThatThrownBy(() -> installationService.install(request(api("map"))))
+    assertThatThrownBy(() -> useCaseService.install(request(api("map"))))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("it has no Dataset");
 
@@ -499,7 +495,7 @@ class InstallationServiceTest {
     stubDatapool();
 
     assertThatThrownBy(
-            () -> installationService.install(request(DATAPOOL_ID, dataSet(), api("Not a slug"))))
+            () -> useCaseService.install(request(DATAPOOL_ID, dataSet(), api("Not a slug"))))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining(API_URN)
         .hasMessageContaining("field 'slug'");
@@ -520,8 +516,7 @@ class InstallationServiceTest {
             "Trees of the city",
             Map.of("openDataAccess", true));
 
-    Installation installation =
-        installationService.install(request(DATAPOOL_ID, api("map"), openDataSet));
+    UseCase useCase = useCaseService.install(request(DATAPOOL_ID, api("map"), openDataSet));
 
     verify(dataSetService).create(dataSetCaptor.capture());
     DataSetInputDTO created = dataSetCaptor.getValue();
@@ -543,14 +538,14 @@ class InstallationServiceTest {
               assertThat(api.getSlug()).isEqualTo("map");
               assertThat(api.getStandard()).isEqualTo(ApiStandard.OWS);
             });
-    assertThat(installation.getArtifacts())
+    assertThat(useCase.getArtifacts())
         .extracting(
-            InstalledArtifact::getArtifactType,
-            InstalledArtifact::getShellId,
-            InstalledArtifact::getOrigin)
+            UseCaseArtifact::getArtifactType,
+            UseCaseArtifact::getShellId,
+            UseCaseArtifact::getOrigin)
         .containsExactly(
-            tuple(InstalledArtifactType.DATA_SET, DATASET_ID, DATASET_URN),
-            tuple(InstalledArtifactType.NAMED_API, API_ID, API_URN));
+            tuple(UseCaseArtifactType.DATA_SET, DATASET_ID, DATASET_URN),
+            tuple(UseCaseArtifactType.NAMED_API, API_ID, API_URN));
   }
 
   @Test
@@ -563,8 +558,8 @@ class InstallationServiceTest {
     stubDataSink();
     stubPipeline();
 
-    Installation installation =
-        installationService.install(
+    UseCase useCase =
+        useCaseService.install(
             request(
                 DATAPOOL_ID,
                 pipeline(SINK_URN),
@@ -595,15 +590,15 @@ class InstallationServiceTest {
         .containsKey("x-ui-position");
     assertThat(nodes.get(2)).containsEntry("mappingRef", MAPPING_VERSIONED_URN);
     assertThat(nodes.get(3)).containsEntry("sinkRef", SINK_VERSIONED_URN);
-    assertThat(installation.getArtifacts())
-        .extracting(InstalledArtifact::getArtifactType)
+    assertThat(useCase.getArtifacts())
+        .extracting(UseCaseArtifact::getArtifactType)
         .containsExactly(
-            InstalledArtifactType.DATA_STRUCTURE,
-            InstalledArtifactType.DATA_SOURCE,
-            InstalledArtifactType.DATA_SET,
-            InstalledArtifactType.MAPPING,
-            InstalledArtifactType.DATA_SINK,
-            InstalledArtifactType.PIPELINE);
+            UseCaseArtifactType.DATA_STRUCTURE,
+            UseCaseArtifactType.DATA_SOURCE,
+            UseCaseArtifactType.DATA_SET,
+            UseCaseArtifactType.MAPPING,
+            UseCaseArtifactType.DATA_SINK,
+            UseCaseArtifactType.PIPELINE);
   }
 
   @Test
@@ -615,8 +610,8 @@ class InstallationServiceTest {
     stubLayer();
     stubSave();
 
-    Installation installation =
-        installationService.install(
+    UseCase useCase =
+        useCaseService.install(
             request(
                 DATAPOOL_ID,
                 layer("trees", GREEN_STYLE_URN, List.of(ORANGE_STYLE_URN)),
@@ -635,19 +630,19 @@ class InstallationServiceTest {
     assertThat(layer.getTitle()).isEqualTo("Street trees");
     assertThat(layer.getAttribute()).containsExactly("treeId", "position");
     assertThat(layer.getNativeBoundingBox()).containsEntry("minX", 7.625);
-    assertThat(installation.getArtifacts())
-        .extracting(InstalledArtifact::getArtifactType, InstalledArtifact::getName)
+    assertThat(useCase.getArtifacts())
+        .extracting(UseCaseArtifact::getArtifactType, UseCaseArtifact::getName)
         .containsExactly(
-            tuple(InstalledArtifactType.DATA_SET, "Trees"),
-            tuple(InstalledArtifactType.DATA_SINK, "Sensor store"),
-            tuple(InstalledArtifactType.STYLE, "trees-orange"),
-            tuple(InstalledArtifactType.STYLE, "trees-green"),
-            tuple(InstalledArtifactType.LAYER, "trees"));
+            tuple(UseCaseArtifactType.DATA_SET, "Trees"),
+            tuple(UseCaseArtifactType.DATA_SINK, "Sensor store"),
+            tuple(UseCaseArtifactType.STYLE, "trees-orange"),
+            tuple(UseCaseArtifactType.STYLE, "trees-green"),
+            tuple(UseCaseArtifactType.LAYER, "trees"));
   }
 
   @Test
   void install_whenMappingHasNoDataSet_changesNothing() {
-    assertThatThrownBy(() -> installationService.install(request(tree(), mapping())))
+    assertThatThrownBy(() -> useCaseService.install(request(tree(), mapping())))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("it has no Dataset");
 
@@ -660,7 +655,7 @@ class InstallationServiceTest {
 
     assertThatThrownBy(
             () ->
-                installationService.install(
+                useCaseService.install(
                     request(
                         DATAPOOL_ID,
                         tree(),
@@ -682,7 +677,7 @@ class InstallationServiceTest {
 
     assertThatThrownBy(
             () ->
-                installationService.install(
+                useCaseService.install(
                     request(DATAPOOL_ID, dataSet(), frostSink(), layer("trees", unknown, null))))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("defaultStyleRef")
@@ -695,8 +690,7 @@ class InstallationServiceTest {
   void install_whenSinkTypeIsUnknown_changesNothing() {
     stubDatapool();
 
-    assertThatThrownBy(
-            () -> installationService.install(request(DATAPOOL_ID, dataSet(), sink("kafka"))))
+    assertThatThrownBy(() -> useCaseService.install(request(DATAPOOL_ID, dataSet(), sink("kafka"))))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining("unknown sink type 'kafka'");
 
@@ -709,7 +703,7 @@ class InstallationServiceTest {
 
     assertThatThrownBy(
             () ->
-                installationService.install(
+                useCaseService.install(
                     request(DATAPOOL_ID, dataSet(), frostSink(), layer("1trees", null, null))))
         .isInstanceOf(InvalidInputException.class)
         .hasMessageContaining(LAYER_URN)
@@ -719,17 +713,17 @@ class InstallationServiceTest {
   }
 
   @Test
-  void findByIdOrThrow_whenInstallationDoesNotExist_throwsResourceNotFound() {
+  void findByIdOrThrow_whenUseCaseDoesNotExist_throwsResourceNotFound() {
     UUID unknownId = UUID.fromString("99999999-9999-4000-8000-000000000009");
-    when(installationRepository.findById(unknownId)).thenReturn(Optional.empty());
+    when(useCaseRepository.findById(unknownId)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> installationService.findByIdOrThrow(unknownId))
+    assertThatThrownBy(() -> useCaseService.findByIdOrThrow(unknownId))
         .isInstanceOf(ResourceNotFoundException.class);
   }
 
   /** The install failed before its first change: no record and no artifact. */
   private void verifyNoChange() {
-    verify(installationRepository, never()).saveAndFlush(any());
+    verify(useCaseRepository, never()).saveAndFlush(any());
     verifyNoArtifactCreated();
   }
 
@@ -759,7 +753,7 @@ class InstallationServiceTest {
   }
 
   private void stubSave() {
-    when(installationRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+    when(useCaseRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
   }
 
   private void stubDatapool() {
@@ -1042,16 +1036,16 @@ class InstallationServiceTest {
     return member;
   }
 
-  private static InstallationInputDTO request(PackageMemberInputDTO... members) {
+  private static UseCaseInputDTO request(PackageMemberInputDTO... members) {
     return request((UUID) null, members);
   }
 
-  private static InstallationInputDTO request(UUID datapoolId, PackageMemberInputDTO... members) {
+  private static UseCaseInputDTO request(UUID datapoolId, PackageMemberInputDTO... members) {
     PackageManifestInputDTO manifest = new PackageManifestInputDTO();
     manifest.setId(PACKAGE_ID);
     manifest.setVersion("1.0.0");
     manifest.setMembers(List.of(members));
-    InstallationInputDTO input = new InstallationInputDTO();
+    UseCaseInputDTO input = new UseCaseInputDTO();
     input.setDatapoolId(datapoolId);
     input.setPackageManifest(manifest);
     return input;

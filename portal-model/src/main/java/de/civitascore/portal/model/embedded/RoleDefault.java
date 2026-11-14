@@ -49,7 +49,7 @@ public enum RoleDefault {
       PermissionName.DATAPOOL_CREATE,
       PermissionName.DATAPOOL_UPDATE,
       PermissionName.DATAPOOL_DELETE,
-      PermissionName.INSTALLATION_READ),
+      PermissionName.USECASE_READ),
 
   DATA_CONSUMER(
       "Data Consumer",
@@ -81,7 +81,7 @@ public enum RoleDefault {
       PermissionName.DATASTRUCTURE_DELETE,
       PermissionName.DATAPOOL_READ,
       PermissionName.DATAPOOL_UPDATE,
-      PermissionName.INSTALLATION_READ),
+      PermissionName.USECASE_READ),
 
   DATA_OWNER(
       "Data Owner",
@@ -108,9 +108,9 @@ public enum RoleDefault {
       PermissionName.DATASTRUCTURE_RELEASE,
       PermissionName.DATAPOOL_READ,
       PermissionName.DATAPOOL_UPDATE,
-      PermissionName.INSTALLATION_CREATE,
-      PermissionName.INSTALLATION_READ,
-      PermissionName.INSTALLATION_DELETE),
+      PermissionName.USECASE_CREATE,
+      PermissionName.USECASE_READ,
+      PermissionName.USECASE_DELETE),
 
   DATA_GATEKEEPER(
       "Data Gatekeeper",
@@ -124,7 +124,7 @@ public enum RoleDefault {
       PermissionName.DATASTRUCTURE_READ,
       PermissionName.DATASTRUCTURE_RELEASE,
       PermissionName.DATAPOOL_READ,
-      PermissionName.INSTALLATION_READ);
+      PermissionName.USECASE_READ);
 
   final String roleName;
   final String description;

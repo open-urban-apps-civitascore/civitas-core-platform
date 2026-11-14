@@ -240,13 +240,12 @@ class RoleInitializerTest {
             "DATASTRUCTURE_READ",
             "DATASTRUCTURE_RELEASE",
             "DATAPOOL_READ",
-            "INSTALLATION_READ");
+            "USECASE_READ");
   }
 
   @Test
-  @DisplayName(
-      "Should give INSTALLATION_CREATE only with all other permissions of the install route")
-  void shouldGiveInstallationCreateOnlyWithAllPermissionsOfTheInstallRoute() {
+  @DisplayName("Should give USECASE_CREATE only with all other permissions of the install route")
+  void shouldGiveUseCaseCreateOnlyWithAllPermissionsOfTheInstallRoute() {
     // given
     when(permissionRepository.findAll()).thenReturn(allPermissions);
     when(roleRepository.findAll()).thenReturn(List.of());
@@ -261,10 +260,10 @@ class RoleInitializerTest {
             .filter(
                 role ->
                     role.getPermissions().stream()
-                        .anyMatch(permission -> "INSTALLATION_CREATE".equals(permission.getName())))
+                        .anyMatch(permission -> "USECASE_CREATE".equals(permission.getName())))
             .toList();
 
-    // POST /v1/installations requires these permissions together with INSTALLATION_CREATE
+    // POST /v1/use-cases requires these permissions together with USECASE_CREATE
     // (the route map of the policy, authz/rego/data/backends/portal_backend/data.json).
     assertThat(installers)
         .isNotEmpty()
@@ -281,9 +280,8 @@ class RoleInitializerTest {
   }
 
   @Test
-  @DisplayName(
-      "Should give INSTALLATION_DELETE only with all other permissions of the uninstall route")
-  void shouldGiveInstallationDeleteOnlyWithAllPermissionsOfTheUninstallRoute() {
+  @DisplayName("Should give USECASE_DELETE only with all other permissions of the uninstall route")
+  void shouldGiveUseCaseDeleteOnlyWithAllPermissionsOfTheUninstallRoute() {
     // given
     when(permissionRepository.findAll()).thenReturn(allPermissions);
     when(roleRepository.findAll()).thenReturn(List.of());
@@ -298,10 +296,10 @@ class RoleInitializerTest {
             .filter(
                 role ->
                     role.getPermissions().stream()
-                        .anyMatch(permission -> "INSTALLATION_DELETE".equals(permission.getName())))
+                        .anyMatch(permission -> "USECASE_DELETE".equals(permission.getName())))
             .toList();
 
-    // DELETE /v1/installations/{id} requires these permissions together with INSTALLATION_DELETE
+    // DELETE /v1/use-cases/{id} requires these permissions together with USECASE_DELETE
     // (the route map of the policy, authz/rego/data/backends/portal_backend/data.json).
     assertThat(uninstallers)
         .isNotEmpty()

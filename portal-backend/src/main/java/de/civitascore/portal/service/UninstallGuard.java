@@ -2,12 +2,12 @@ package de.civitascore.portal.service;
 
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
-import de.civitascore.portal.model.embedded.InstalledArtifactType;
+import de.civitascore.portal.model.embedded.UseCaseArtifactType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
-import de.civitascore.portal.model.entity.InstalledArtifact;
+import de.civitascore.portal.model.entity.UseCaseArtifact;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
@@ -26,7 +26,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 /**
- * Decides, before an uninstall changes anything, whether the artifacts of an installation can be
+ * Decides, before an uninstall changes anything, whether the artifacts of a use case can be
  * removed.
  *
  * <p>The services of the artifacts make the same decisions when they delete. The uninstall cannot
@@ -34,9 +34,9 @@ import org.springframework.stereotype.Component;
  * the graph. A refusal after the first removal would leave the graph without artifacts that the
  * database has again. The check thus comes first and only reads.
  *
- * <p>An artifact is in use when something that the installation did not create references it. The
- * references between the artifacts of the installation do not count, because the uninstall removes
- * both ends.
+ * <p>An artifact is in use when something that the use case did not create references it. The
+ * references between the artifacts of the use case do not count, because the uninstall removes both
+ * ends.
  *
  * <p>The uninstall releases nothing and unreleases nothing, as the install releases nothing. Each
  * status transition has its own endpoint and its own permission. So a released artifact stops the
@@ -46,7 +46,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class UninstallGuard {
 
-  private static final String INSTALLATION = "Installation";
+  private static final String USE_CASE = "UseCase";
   private static final String DATA_SOURCE = "DataSource";
   private static final String DATA_STRUCTURE = "DataStructure";
 
@@ -57,35 +57,35 @@ public class UninstallGuard {
   private final DataSourceRepository dataSourceRepository;
   private final ModelRegistryGateway modelRegistryGateway;
 
-  /** What the installation created, in the forms that the references use. */
+  /** What the use case created, in the forms that the references use. */
   private record Created(Set<UUID> dataSetIds, Set<UUID> dataSourceIds, Set<String> urns) {}
 
   /**
-   * Refuses the uninstall if an artifact of the installation cannot be removed. An artifact that no
+   * Refuses the uninstall if an artifact of the use case cannot be removed. An artifact that no
    * longer exists is not checked.
    *
-   * @param installationId the id of the installation
-   * @param lines the lines of the installation
-   * @throws SagaInFlightException if an operation on a Dataset of the installation is in progress
-   * @throws ResourceInUseException if a Dataset of the installation is released or has
-   *     infrastructure on the platform, if a Data source of the installation is released, or if
-   *     something that the installation did not create uses one of its artifacts
+   * @param useCaseId the id of the use case
+   * @param lines the lines of the use case
+   * @throws SagaInFlightException if an operation on a Dataset of the use case is in progress
+   * @throws ResourceInUseException if a Dataset of the use case is released or has infrastructure
+   *     on the platform, if a Data source of the use case is released, or if something that the use
+   *     case did not create uses one of its artifacts
    */
-  public void requireRemovable(UUID installationId, List<InstalledArtifact> lines) {
+  public void requireRemovable(UUID useCaseId, List<UseCaseArtifact> lines) {
     Created created =
         new Created(
-            shellIds(lines, InstalledArtifactType.DATA_SET),
-            shellIds(lines, InstalledArtifactType.DATA_SOURCE),
+            shellIds(lines, UseCaseArtifactType.DATA_SET),
+            shellIds(lines, UseCaseArtifactType.DATA_SOURCE),
             lines.stream()
-                .map(InstalledArtifact::getUrn)
+                .map(UseCaseArtifact::getUrn)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet()));
 
     existing(created.dataSetIds(), dataSetService::findById)
-        .forEach(dataSet -> requireNoInfrastructure(dataSet, installationId));
+        .forEach(dataSet -> requireNoInfrastructure(dataSet, useCaseId));
     existing(created.dataSourceIds(), dataSourceService::findById)
         .forEach(dataSource -> requireRemovable(dataSource, created));
-    existing(shellIds(lines, InstalledArtifactType.DATA_STRUCTURE), dataStructureService::findById)
+    existing(shellIds(lines, UseCaseArtifactType.DATA_STRUCTURE), dataStructureService::findById)
         .forEach(dataStructure -> requireNotUsedElsewhere(dataStructure, created));
   }
 
@@ -95,7 +95,7 @@ public class UninstallGuard {
    * completes later. The caller does these steps through the Dataset endpoints, so the uninstall
    * refuses and says which.
    */
-  private static void requireNoInfrastructure(DataSet dataSet, UUID installationId) {
+  private static void requireNoInfrastructure(DataSet dataSet, UUID useCaseId) {
     if (dataSet.getPendingSagaType() != null) {
       throw new SagaInFlightException(
           dataSet.getId(),
@@ -105,16 +105,16 @@ public class UninstallGuard {
     }
     if (dataSet.getDataSetStatus() == DataSetStatus.AVAILABLE) {
       throw new ResourceInUseException(
-          INSTALLATION,
-          installationId,
+          USE_CASE,
+          useCaseId,
           ("Cannot uninstall because Dataset '%s' is released. Unrelease the Dataset and delete"
                   + " it. Then uninstall again.")
               .formatted(dataSet.getName()));
     }
     if (dataSet.isProvisioned()) {
       throw new ResourceInUseException(
-          INSTALLATION,
-          installationId,
+          USE_CASE,
+          useCaseId,
           ("Cannot uninstall because Dataset '%s' has infrastructure on the platform. Delete the"
                   + " Dataset. Then uninstall again.")
               .formatted(dataSet.getName()));
@@ -123,7 +123,7 @@ public class UninstallGuard {
 
   /**
    * The platform deletes only a Data source that is not released. A Pipeline of a Dataset that the
-   * installation did not create must not use it.
+   * use case did not create must not use it.
    */
   private void requireRemovable(DataSource dataSource, Created created) {
     if (dataSource.getDataSourceStatus() == DataSourceStatus.AVAILABLE) {
@@ -143,7 +143,7 @@ public class UninstallGuard {
       throw new ResourceInUseException(
           DATA_SOURCE,
           dataSource.getId(),
-          ("Cannot uninstall because Data source '%s' is used by a Pipeline that the installation"
+          ("Cannot uninstall because Data source '%s' is used by a Pipeline that the use case"
                   + " did not create.")
               .formatted(dataSource.getName()),
           pipelines);
@@ -176,7 +176,7 @@ public class UninstallGuard {
           DATA_STRUCTURE,
           dataStructure.getId(),
           ("Cannot uninstall because Data structure '%s' is used by a Data source that the"
-                  + " installation did not create.")
+                  + " use case did not create.")
               .formatted(dataStructure.getName()),
           dataSources);
     }
@@ -194,25 +194,25 @@ public class UninstallGuard {
           DATA_STRUCTURE,
           dataStructure.getId(),
           ("Cannot uninstall because Data structure '%s' is used by an artifact that the"
-                  + " installation did not create.")
+                  + " use case did not create.")
               .formatted(dataStructure.getName()),
           referrers);
     }
   }
 
   /**
-   * Whether the installation created the artifact behind a URN. A reference can come from an
-   * Element, and the record names the Data structure that contains it.
+   * Whether the use case created the artifact behind a URN. A reference can come from an Element,
+   * and the record names the Data structure that contains it.
    */
   private boolean isCreated(String urn, Created created) {
     return created.urns().contains(modelRegistryGateway.logicalUrn(urn))
         || modelRegistryGateway.hostModelUrnsOf(urn).stream().anyMatch(created.urns()::contains);
   }
 
-  private static Set<UUID> shellIds(List<InstalledArtifact> lines, InstalledArtifactType type) {
+  private static Set<UUID> shellIds(List<UseCaseArtifact> lines, UseCaseArtifactType type) {
     return lines.stream()
         .filter(line -> line.getArtifactType() == type)
-        .map(InstalledArtifact::getShellId)
+        .map(UseCaseArtifact::getShellId)
         .filter(Objects::nonNull)
         .collect(Collectors.toSet());
   }

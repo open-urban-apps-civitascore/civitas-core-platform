@@ -9,12 +9,12 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 /**
- * Output DTO for one installation: the package and the artifact lines. The lines come with the
- * installation, so a caller needs no second request to see what the install created.
+ * Output DTO for one use case: the package and the artifact lines. The lines come with the use
+ * case, so a caller needs no second request to see what the install created.
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class InstallationOutputDTO extends BaseOutputDTO {
+public class UseCaseOutputDTO extends BaseOutputDTO {
 
   @Schema(
       description = "The identity of the package, as the caller gave it",
@@ -32,11 +32,11 @@ public class InstallationOutputDTO extends BaseOutputDTO {
   private UUID datapoolId;
 
   @Schema(
-      description = "The time of the uninstall. Null while the installation is active",
+      description = "The time of the uninstall. Null while the use case is active",
       accessMode = Schema.AccessMode.READ_ONLY,
       example = "2025-06-16T09:15:00")
   private LocalDateTime uninstalledAt;
 
   @Schema(description = "One line for each artifact that the install created")
-  private List<InstalledArtifactOutputDTO> artifacts = new ArrayList<>();
+  private List<UseCaseArtifactOutputDTO> artifacts = new ArrayList<>();
 }

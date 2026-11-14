@@ -6,25 +6,24 @@ import de.civitascore.portal.model.connector.MalformedDataSourceRequestException
 import de.civitascore.portal.model.embedded.ApiStandard;
 import de.civitascore.portal.model.embedded.DataSinkType;
 import de.civitascore.portal.model.embedded.DatapoolScopeType;
-import de.civitascore.portal.model.embedded.InstalledArtifactType;
+import de.civitascore.portal.model.embedded.UseCaseArtifactType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSink;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
-import de.civitascore.portal.model.entity.Installation;
-import de.civitascore.portal.model.entity.InstalledArtifact;
 import de.civitascore.portal.model.entity.Layer;
 import de.civitascore.portal.model.entity.NamedApi;
 import de.civitascore.portal.model.entity.Pipeline;
 import de.civitascore.portal.model.entity.Style;
+import de.civitascore.portal.model.entity.UseCase;
+import de.civitascore.portal.model.entity.UseCaseArtifact;
 import de.civitascore.portal.model.input.DataSetInputDTO;
 import de.civitascore.portal.model.input.DataSinkInputDTO;
 import de.civitascore.portal.model.input.DataSourceInputDTO;
 import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
-import de.civitascore.portal.model.input.InstallationInputDTO;
 import de.civitascore.portal.model.input.LayerInputDTO;
 import de.civitascore.portal.model.input.MappingInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
@@ -33,9 +32,10 @@ import de.civitascore.portal.model.input.PackageMemberInputDTO;
 import de.civitascore.portal.model.input.PackageMemberKind;
 import de.civitascore.portal.model.input.PipelineInputDTO;
 import de.civitascore.portal.model.input.StyleInputDTO;
+import de.civitascore.portal.model.input.UseCaseInputDTO;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataPoolRepository;
-import de.civitascore.portal.repository.InstallationRepository;
+import de.civitascore.portal.repository.UseCaseRepository;
 import de.civitascore.portal.service.connector.ConnectorValidator;
 import de.civitascore.portal.util.InvalidInputException;
 import de.civitascore.portal.util.ResourceNotFoundException;
@@ -64,7 +64,7 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Installs a package on this instance and keeps a record of the install.
+ * Installs a package on this instance and keeps the record of the install as a use case.
  *
  * <p>For each member, the install creates a copy on this instance. The backend gives each copy its
  * own URN. The record keeps the identity of the member in the package as the origin of the copy.
@@ -84,7 +84,7 @@ import tools.jackson.databind.ObjectMapper;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class InstallationService {
+public class UseCaseService {
 
   private static final String ID = "$id";
   private static final String SCHEMA = "$schema";
@@ -149,7 +149,7 @@ public class InstallationService {
           new NodeReference("mappingRef", PackageMemberKind.MAPPING),
           new NodeReference(SINK_REF, PackageMemberKind.DATASINK));
 
-  private final InstallationRepository installationRepository;
+  private final UseCaseRepository useCaseRepository;
   private final DataPoolRepository dataPoolRepository;
   private final DataStructureService dataStructureService;
   private final DataStructureVersionService dataStructureVersionService;
@@ -200,7 +200,7 @@ public class InstallationService {
    *
    * @param input the package to install, and the Data pool for its Data sources and its Dataset
    * @return the record, with one line for each artifact that the install created
-   * @throws UniqueConstraintViolationException if the Data pool has an active installation of the
+   * @throws UniqueConstraintViolationException if the Data pool has an active use case of the
    *     package, or, for a package without a Data pool, if this instance has one
    * @throws org.springframework.dao.DataIntegrityViolationException if an install of the same
    *     package in the same Data pool that runs at the same time commits first
@@ -208,18 +208,18 @@ public class InstallationService {
    *     platform refuses a member
    */
   @Transactional
-  public Installation install(InstallationInputDTO input) {
+  public UseCase install(UseCaseInputDTO input) {
     PackageManifestInputDTO manifest = input.getPackageManifest();
     UUID datapoolId = input.getDatapoolId();
     // A package without Data sources and without a Dataset puts nothing into the Data pool, so its
-    // record keeps no Data pool. Such a package has only one active installation on this instance.
+    // record keeps no Data pool. Such a package has only one active use case on this instance.
     return install(manifest, datapoolId, needsDatapool(manifest.getMembers()) ? datapoolId : null);
   }
 
   /**
    * Installs a package in a Data pool and returns the record of the install. The record keeps the
    * Data pool also for a package without Data sources and without a Dataset. Thus the Data pool
-   * lists the installation, and a user of the Data pool can read and uninstall it.
+   * lists the use case, and a user of the Data pool can read and uninstall it.
    *
    * @param datapoolId the Data pool from the path of the request
    * @param input the package to install. If the request names a Data pool, it must be the same.
@@ -227,11 +227,11 @@ public class InstallationService {
    * @throws ResourceNotFoundException if the Data pool does not exist
    * @throws InvalidInputException if the request names another Data pool, if the package or one of
    *     its members fails a check, or if the platform refuses a member
-   * @throws UniqueConstraintViolationException if the Data pool has an active installation of the
+   * @throws UniqueConstraintViolationException if the Data pool has an active use case of the
    *     package
    */
   @Transactional
-  public Installation installInDatapool(UUID datapoolId, InstallationInputDTO input) {
+  public UseCase installInDatapool(UUID datapoolId, UseCaseInputDTO input) {
     if (input.getDatapoolId() != null && !input.getDatapoolId().equals(datapoolId)) {
       throw new InvalidInputException(
           DATAPOOL_ID,
@@ -248,18 +248,18 @@ public class InstallationService {
    * different: a package without Data sources and without a Dataset can have a record without a
    * Data pool.
    */
-  private Installation install(
-      PackageManifestInputDTO manifest, UUID datapoolId, UUID installationDatapoolId) {
-    if (installationRepository.existsActive(manifest.getId(), installationDatapoolId)) {
-      throw alreadyInstalled(manifest.getId(), installationDatapoolId);
+  private UseCase install(
+      PackageManifestInputDTO manifest, UUID datapoolId, UUID useCaseDatapoolId) {
+    if (useCaseRepository.existsActive(manifest.getId(), useCaseDatapoolId)) {
+      throw alreadyInstalled(manifest.getId(), useCaseDatapoolId);
     }
     List<PreparedMember> members = prepare(manifest, datapoolId);
 
-    Installation installation = new Installation();
-    installation.setPackageId(manifest.getId());
-    installation.setPackageVersion(manifest.getVersion());
-    installation.setDatapoolId(installationDatapoolId);
-    claim(installation);
+    UseCase useCase = new UseCase();
+    useCase.setPackageId(manifest.getId());
+    useCase.setPackageVersion(manifest.getVersion());
+    useCase.setDatapoolId(useCaseDatapoolId);
+    claim(useCase);
 
     Map<String, Copy> copies = new HashMap<>();
     List<PreparedMember> apis = ofKind(members, PackageMemberKind.API);
@@ -270,90 +270,88 @@ public class InstallationService {
     boolean namedApisInstalled = false;
     for (PreparedMember member : members) {
       switch (member.kind()) {
-        case DATASTRUCTURE -> installation.addArtifact(installDataStructure(member, copies));
-        case DATASOURCE -> installation.addArtifact(installDataSource(member, datapoolId, copies));
+        case DATASTRUCTURE -> useCase.addArtifact(installDataStructure(member, copies));
+        case DATASOURCE -> useCase.addArtifact(installDataSource(member, datapoolId, copies));
         case DATASET -> {
-          InstalledArtifact line = installDataSet(member, datapoolId);
+          UseCaseArtifact line = installDataSet(member, datapoolId);
           dataSetId = line.getShellId();
           dataSetMember = member;
-          installation.addArtifact(line);
+          useCase.addArtifact(line);
         }
         case API -> {
           // The Dataset checks its named APIs as one list, so the first API member adds all.
           if (!namedApisInstalled) {
             installNamedApis(dataSetMember, dataSetId, apis, datapoolId)
-                .forEach(installation::addArtifact);
+                .forEach(useCase::addArtifact);
             namedApisInstalled = true;
           }
         }
-        case MAPPING -> installation.addArtifact(installMapping(member, dataSetId, copies));
-        case DATASINK -> installation.addArtifact(installDataSink(member, dataSetId, copies));
-        case PIPELINE -> installation.addArtifact(installPipeline(member, dataSetId, copies));
-        case STYLE -> installation.addArtifact(installStyle(member, dataSetId, copies));
-        case LAYER -> installation.addArtifact(installLayer(member, dataSetId, copies));
+        case MAPPING -> useCase.addArtifact(installMapping(member, dataSetId, copies));
+        case DATASINK -> useCase.addArtifact(installDataSink(member, dataSetId, copies));
+        case PIPELINE -> useCase.addArtifact(installPipeline(member, dataSetId, copies));
+        case STYLE -> useCase.addArtifact(installStyle(member, dataSetId, copies));
+        case LAYER -> useCase.addArtifact(installLayer(member, dataSetId, copies));
       }
     }
-    Installation saved = installationRepository.save(installation);
+    UseCase saved = useCaseRepository.save(useCase);
     log.info(
-        "Installed package {} as installation {}",
-        Encode.forJava(saved.getPackageId()),
-        saved.getId());
+        "Installed package {} as use case {}", Encode.forJava(saved.getPackageId()), saved.getId());
     return saved;
   }
 
   /**
-   * Returns a page of installations.
+   * Returns a page of use cases.
    *
    * @param pageable the page and the sort order
-   * @return the installations of the page, each with its lines
+   * @return the use cases of the page, each with its lines
    */
   @Transactional(readOnly = true)
-  public Page<Installation> findAll(Pageable pageable) {
-    return installationRepository.findAll(pageable);
+  public Page<UseCase> findAll(Pageable pageable) {
+    return useCaseRepository.findAll(pageable);
   }
 
   /**
-   * Returns one installation.
+   * Returns one use case.
    *
-   * @param id the id of the installation
-   * @return the installation with its lines
-   * @throws ResourceNotFoundException if the installation does not exist
+   * @param id the id of the use case
+   * @return the use case with its lines
+   * @throws ResourceNotFoundException if the use case does not exist
    */
   @Transactional(readOnly = true)
-  public Installation findByIdOrThrow(UUID id) {
-    return installationRepository
+  public UseCase findByIdOrThrow(UUID id) {
+    return useCaseRepository
         .findById(id)
-        .orElseThrow(() -> new ResourceNotFoundException("Installation", id.toString()));
+        .orElseThrow(() -> new ResourceNotFoundException("UseCase", id.toString()));
   }
 
   /**
-   * Returns a page of the installations of a Data pool.
+   * Returns a page of the use cases of a Data pool.
    *
    * @param datapoolId the Data pool
    * @param pageable the page and the sort order
-   * @return the installations of the page, each with its lines
+   * @return the use cases of the page, each with its lines
    * @throws ResourceNotFoundException if the Data pool does not exist
    */
   @Transactional(readOnly = true)
-  public Page<Installation> findAllInDatapool(UUID datapoolId, Pageable pageable) {
+  public Page<UseCase> findAllInDatapool(UUID datapoolId, Pageable pageable) {
     requireDatapool(datapoolId);
-    return installationRepository.findByDatapoolId(datapoolId, pageable);
+    return useCaseRepository.findByDatapoolId(datapoolId, pageable);
   }
 
   /**
-   * Returns one installation of a Data pool. For an installation of another Data pool, the result
-   * is the same as for an installation that does not exist.
+   * Returns one use case of a Data pool. For a use case of another Data pool, the result is the
+   * same as for a use case that does not exist.
    *
    * @param datapoolId the Data pool
-   * @param id the id of the installation
-   * @return the installation with its lines
-   * @throws ResourceNotFoundException if the installation does not exist in the Data pool
+   * @param id the id of the use case
+   * @return the use case with its lines
+   * @throws ResourceNotFoundException if the use case does not exist in the Data pool
    */
   @Transactional(readOnly = true)
-  public Installation findInDatapoolOrThrow(UUID datapoolId, UUID id) {
-    return installationRepository
+  public UseCase findInDatapoolOrThrow(UUID datapoolId, UUID id) {
+    return useCaseRepository
         .findByIdAndDatapoolId(id, datapoolId)
-        .orElseThrow(() -> new ResourceNotFoundException("Installation", id.toString()));
+        .orElseThrow(() -> new ResourceNotFoundException("UseCase", id.toString()));
   }
 
   private void requireDatapool(UUID datapoolId) {
@@ -368,8 +366,8 @@ public class InstallationService {
    * package in the same Data pool that runs at the same time waits here until the first install
    * commits. Then the database refuses the record, before the install changes the registry.
    */
-  private void claim(Installation installation) {
-    installationRepository.saveAndFlush(installation);
+  private void claim(UseCase useCase) {
+    useCaseRepository.saveAndFlush(useCase);
   }
 
   private static UniqueConstraintViolationException alreadyInstalled(
@@ -571,12 +569,12 @@ public class InstallationService {
           member.getUrn(),
           "Member '%s' needs a name or a document %s.".formatted(member.getUrn(), documentField));
     }
-    if (name.length() > InstalledArtifact.NAME_LENGTH) {
+    if (name.length() > UseCaseArtifact.NAME_LENGTH) {
       throw new InvalidInputException(
           NAME,
           member.getUrn(),
           "The name of member '%s' must not exceed %d characters."
-              .formatted(member.getUrn(), InstalledArtifact.NAME_LENGTH));
+              .formatted(member.getUrn(), UseCaseArtifact.NAME_LENGTH));
     }
     return name;
   }
@@ -783,8 +781,7 @@ public class InstallationService {
    * the Data structure. Then stores the model as the first version of the Data structure. The later
    * members reference the copy by each identity of the member.
    */
-  private InstalledArtifact installDataStructure(
-      PreparedMember prepared, Map<String, Copy> copies) {
+  private UseCaseArtifact installDataStructure(PreparedMember prepared, Map<String, Copy> copies) {
     DataStructureInputDTO structureInput = new DataStructureInputDTO();
     structureInput.setName(prepared.name());
     structureInput.setDescription(prepared.description());
@@ -803,7 +800,7 @@ public class InstallationService {
         new Copy(logicalUrn, version.getModelUrn(), structure.getId(), version.getId()),
         copies);
     return line(
-        InstalledArtifactType.DATA_STRUCTURE,
+        UseCaseArtifactType.DATA_STRUCTURE,
         prepared,
         structure.getId(),
         logicalUrn,
@@ -814,7 +811,7 @@ public class InstallationService {
    * Creates the Data source with the connector of its document. The Data source reads the version
    * of its Data structure copy, and only the Data pool of the request can use it. It stays DRAFT.
    */
-  private InstalledArtifact installDataSource(
+  private UseCaseArtifact installDataSource(
       PreparedMember prepared, UUID datapoolId, Map<String, Copy> copies) {
     DatapoolScopeInputDTO scope = new DatapoolScopeInputDTO();
     scope.setType(DatapoolScopeType.SPECIFIC);
@@ -837,7 +834,7 @@ public class InstallationService {
             null),
         copies);
     return line(
-        InstalledArtifactType.DATA_SOURCE,
+        UseCaseArtifactType.DATA_SOURCE,
         prepared,
         source.getId(),
         source.getConfigurationLogicalUrn(),
@@ -850,12 +847,12 @@ public class InstallationService {
    * sinks. The platform does not give the manifest of a Dataset a version, so its line has the
    * logical URN only.
    */
-  private InstalledArtifact installDataSet(PreparedMember prepared, UUID datapoolId) {
+  private UseCaseArtifact installDataSet(PreparedMember prepared, UUID datapoolId) {
     DataSet dataSet =
         dataSetService.create(
             dataSetInput(prepared.name(), prepared.description(), datapoolId, List.of()));
     return line(
-        InstalledArtifactType.DATA_SET,
+        UseCaseArtifactType.DATA_SET,
         prepared,
         dataSet.getId(),
         dataSet.getManifestLogicalUrn(),
@@ -868,17 +865,17 @@ public class InstallationService {
    * description and the Data pool that the install gave it. The record has one line for each named
    * API.
    */
-  private List<InstalledArtifact> installNamedApis(
+  private List<UseCaseArtifact> installNamedApis(
       PreparedMember dataSetMember, UUID dataSetId, List<PreparedMember> apis, UUID datapoolId) {
     DataSet dataSet =
         dataSetService.update(
             dataSetId,
             dataSetInput(dataSetMember.name(), dataSetMember.description(), datapoolId, apis));
 
-    List<InstalledArtifact> lines = new ArrayList<>();
+    List<UseCaseArtifact> lines = new ArrayList<>();
     for (PreparedMember api : apis) {
       UUID apiId = namedApiId(dataSet, requireString(api.member(), SLUG));
-      lines.add(line(InstalledArtifactType.NAMED_API, api, apiId, null, null));
+      lines.add(line(UseCaseArtifactType.NAMED_API, api, apiId, null, null));
     }
     return lines;
   }
@@ -950,7 +947,7 @@ public class InstallationService {
    * which is the form that the mapping compiler reads. Model Forge gives the Mapping its identity,
    * so the document keeps none. A Mapping has no row in the portal, so its line has no shell id.
    */
-  private InstalledArtifact installMapping(
+  private UseCaseArtifact installMapping(
       PreparedMember prepared, UUID dataSetId, Map<String, Copy> copies) {
     Map<String, Object> document = withoutKeys(prepared.member().getContent(), SCHEMA, STAMPED_ID);
     for (String field : List.of(SOURCE, TARGET)) {
@@ -966,8 +963,7 @@ public class InstallationService {
     ModelRegistryGateway.ModelPin pin = mappingService.create(dataSetId, mapping).pin();
 
     register(prepared, new Copy(pin.logicalUrn(), pin.versionedUrn(), null, null), copies);
-    return line(
-        InstalledArtifactType.MAPPING, prepared, null, pin.logicalUrn(), pin.versionedUrn());
+    return line(UseCaseArtifactType.MAPPING, prepared, null, pin.logicalUrn(), pin.versionedUrn());
   }
 
   /**
@@ -976,7 +972,7 @@ public class InstallationService {
    * element} references the versioned URN of the Data structure copy. A FROST sink accepts no key
    * but {@code port} and {@code element}.
    */
-  private InstalledArtifact installDataSink(
+  private UseCaseArtifact installDataSink(
       PreparedMember prepared, UUID dataSetId, Map<String, Copy> copies) {
     Map<String, Object> configuration =
         withoutKeys(
@@ -1002,7 +998,7 @@ public class InstallationService {
         new Copy(sink.getConfigurationLogicalUrn(), sink.getConfigurationUrn(), sink.getId(), null),
         copies);
     return line(
-        InstalledArtifactType.DATA_SINK,
+        UseCaseArtifactType.DATA_SINK,
         prepared,
         sink.getId(),
         sink.getConfigurationLogicalUrn(),
@@ -1015,7 +1011,7 @@ public class InstallationService {
    * the styles of the editor hold the ids of the instance that wrote them. Each node keeps its
    * {@code x-ui-position}.
    */
-  private InstalledArtifact installPipeline(
+  private UseCaseArtifact installPipeline(
       PreparedMember prepared, UUID dataSetId, Map<String, Copy> copies) {
     Map<String, Object> model =
         withoutKeys(
@@ -1035,7 +1031,7 @@ public class InstallationService {
     Pipeline pipeline = pipelineService.create(input);
 
     return line(
-        InstalledArtifactType.PIPELINE,
+        UseCaseArtifactType.PIPELINE,
         prepared,
         pipeline.getId(),
         pipeline.getModelLogicalUrn(),
@@ -1079,14 +1075,14 @@ public class InstallationService {
   }
 
   /** Creates the style in the Dataset. A layer references the style by the id of the copy. */
-  private InstalledArtifact installStyle(
+  private UseCaseArtifact installStyle(
       PreparedMember prepared, UUID dataSetId, Map<String, Copy> copies) {
     StyleInputDTO input = styleInput(prepared.member(), prepared.name());
     input.setDataSetId(dataSetId);
     Style style = styleService.create(input);
 
     register(prepared, new Copy(null, null, style.getId(), null), copies);
-    return line(InstalledArtifactType.STYLE, prepared, style.getId(), null, null);
+    return line(UseCaseArtifactType.STYLE, prepared, style.getId(), null, null);
   }
 
   /** Returns the style that the document of a style member describes: its name and its SLD. */
@@ -1101,7 +1097,7 @@ public class InstallationService {
    * Creates the layer in the Dataset, with the ids of the Data sink copy and of the style copies.
    * The layer API has no {@code keywords}, so the install ignores them.
    */
-  private InstalledArtifact installLayer(
+  private UseCaseArtifact installLayer(
       PreparedMember prepared, UUID dataSetId, Map<String, Copy> copies) {
     PackageMemberInputDTO member = prepared.member();
     LayerInputDTO input = layerInput(member, prepared.name());
@@ -1120,7 +1116,7 @@ public class InstallationService {
     }
     Layer layer = layerService.create(input);
 
-    return line(InstalledArtifactType.LAYER, prepared, layer.getId(), null, null);
+    return line(UseCaseArtifactType.LAYER, prepared, layer.getId(), null, null);
   }
 
   /** Returns the layer that the document of a layer member describes, without the ids. */
@@ -1157,13 +1153,13 @@ public class InstallationService {
     identitiesOf(prepared.member()).forEach(identity -> copies.put(identity, copy));
   }
 
-  private static InstalledArtifact line(
-      InstalledArtifactType type,
+  private static UseCaseArtifact line(
+      UseCaseArtifactType type,
       PreparedMember prepared,
       UUID shellId,
       String urn,
       String versionedUrn) {
-    InstalledArtifact artifact = new InstalledArtifact();
+    UseCaseArtifact artifact = new UseCaseArtifact();
     artifact.setArtifactType(type);
     artifact.setName(prepared.name());
     artifact.setShellId(shellId);

@@ -231,23 +231,23 @@
     "/v1/datapools/{id}/assignments": {
       "GET": "DATAPOOL_READ"
     },
-    "_comment_datapool_installations": "The installations of one data pool. The same permissions as /v1/installations, but the {id} of the data pool is the scopeId: a grant on the data pool is sufficient.",
-    "/v1/datapools/{id}/installations": {
-      "GET": "INSTALLATION_READ",
-      "POST": ["INSTALLATION_CREATE", "DATASTRUCTURE_CREATE", "DATASTRUCTURE_UPDATE", "DATASOURCE_CREATE", "DATASET_CREATE", "DATASET_UPDATE"]
+    "_comment_datapool_use_cases": "The use cases of one data pool. The same permissions as /v1/use-cases, but the {id} of the data pool is the scopeId: a grant on the data pool is sufficient.",
+    "/v1/datapools/{id}/use-cases": {
+      "GET": "USECASE_READ",
+      "POST": ["USECASE_CREATE", "DATASTRUCTURE_CREATE", "DATASTRUCTURE_UPDATE", "DATASOURCE_CREATE", "DATASET_CREATE", "DATASET_UPDATE"]
     },
-    "/v1/datapools/{id}/installations/{id}": {
-      "GET": "INSTALLATION_READ",
-      "DELETE": ["INSTALLATION_DELETE", "DATASET_DELETE", "DATASOURCE_DELETE", "DATASTRUCTURE_DELETE"]
+    "/v1/datapools/{id}/use-cases/{id}": {
+      "GET": "USECASE_READ",
+      "DELETE": ["USECASE_DELETE", "DATASET_DELETE", "DATASOURCE_DELETE", "DATASTRUCTURE_DELETE"]
     },
-    "/v1/installations": {
+    "/v1/use-cases": {
       "_collection": true,
-      "GET": "INSTALLATION_READ",
-      "POST": ["INSTALLATION_CREATE", "DATASTRUCTURE_CREATE", "DATASTRUCTURE_UPDATE", "DATASOURCE_CREATE", "DATASET_CREATE", "DATASET_UPDATE"]
+      "GET": "USECASE_READ",
+      "POST": ["USECASE_CREATE", "DATASTRUCTURE_CREATE", "DATASTRUCTURE_UPDATE", "DATASOURCE_CREATE", "DATASET_CREATE", "DATASET_UPDATE"]
     },
-    "/v1/installations/{id}": {
-      "GET": "INSTALLATION_READ",
-      "DELETE": ["INSTALLATION_DELETE", "DATASET_DELETE", "DATASOURCE_DELETE", "DATASTRUCTURE_DELETE"]
+    "/v1/use-cases/{id}": {
+      "GET": "USECASE_READ",
+      "DELETE": ["USECASE_DELETE", "DATASET_DELETE", "DATASOURCE_DELETE", "DATASTRUCTURE_DELETE"]
     }
   }
 }
