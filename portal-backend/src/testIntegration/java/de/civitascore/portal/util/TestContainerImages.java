@@ -26,7 +26,7 @@ public final class TestContainerImages {
   public static final String KAFKA = "apache/kafka:3.9.2";
 
   // renovate: datasource=docker
-  public static final String MOSQUITTO = "eclipse-mosquitto:2.0.20";
+  public static final String MOSQUITTO = "eclipse-mosquitto:2.0.22";
 
   // renovate: datasource=docker
   public static final String POSTGIS = "postgis/postgis:16-3.5-alpine";
