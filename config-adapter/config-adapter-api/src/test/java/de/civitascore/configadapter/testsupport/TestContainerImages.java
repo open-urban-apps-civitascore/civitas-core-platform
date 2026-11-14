@@ -45,7 +45,7 @@ public final class TestContainerImages {
   public static final String POSTGIS_GEOSERVER = "imresamu/postgis:17-3.5";
 
   // renovate: datasource=docker
-  public static final String GEOSERVER_CLOUD_REST = "geoservercloud/geoserver-cloud-rest:3.0.1.1";
+  public static final String GEOSERVER_CLOUD_REST = "geoservercloud/geoserver-cloud-rest:3.0.2.1";
 
   // renovate: datasource=docker
   public static final String FROST = "fraunhoferiosb/frost-server-http:2.8.1";
