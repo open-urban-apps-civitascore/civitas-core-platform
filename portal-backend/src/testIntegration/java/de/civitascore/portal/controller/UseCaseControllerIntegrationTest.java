@@ -16,9 +16,11 @@ import de.civitascore.portal.repository.UseCaseRepository;
 import de.civitascore.portal.security.AllowedScopesFilter;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -95,6 +97,15 @@ class UseCaseControllerIntegrationTest extends BaseKeycloakIntegrationTest {
       "urn:core:standard:test:datastructure:environment:airstation:v6lve8eqmu";
   private static final String AIR_FEED_URN =
       "urn:core:standard:test:datasource:environment:airmeasurementfeed:w2x3y4z5a6";
+
+  /** The kinds whose members belong to a Dataset and name it in {@code dataSetRef}. */
+  private static final Set<String> PART_OF_DATASET =
+      Set.of("api", "mapping", "datasink", "pipeline", "style", "layer");
+
+  private static final String PARKS_DATASET_URN =
+      "urn:core:standard:test:dataset:environment:parks:h8j9k0l1m2";
+  private static final String PARKS_API_URN =
+      "urn:core:standard:test:api:environment:parks:n3o4p5q6r7";
   private static final String AIR_DATASET_URN =
       "urn:core:standard:test:dataset:environment:airquality:b7c8d9e0f1";
   private static final String AIR_MAPPING_URN =
@@ -569,6 +580,58 @@ class UseCaseControllerIntegrationTest extends BaseKeycloakIntegrationTest {
         .containsEntry("element", lineFor(lines, STATION_URN).get("versionedUrn").asString());
     assertThat(nodeOfKind(storedContent(lineFor(lines, AIR_IMPORT_URN)), "sink"))
         .containsEntry("sinkRef", lineFor(lines, SENSOR_STORE_URN).get("versionedUrn").asString());
+  }
+
+  @Test
+  @DisplayName("POST installs two Datasets of one package, and DELETE removes both")
+  void install_whenPackageHasTwoDataSets_createsBothAndUninstallRemovesBoth() {
+    DataPool pool = portalData.dataPool();
+    Map<String, Object> parkApi =
+        member(
+            "api",
+            PARKS_API_URN,
+            "Park API",
+            null,
+            Map.of("name", "Park API", "slug", "parks", "standard", "CUSTOM"));
+    parkApi.put("dataSetRef", PARKS_DATASET_URN);
+    Map<String, Object> treeApi = customTreeApi();
+    treeApi.put("dataSetRef", DATASET_URN);
+
+    ResponseEntity<String> installed =
+        post(
+            request(
+                pool.getId(),
+                "trees-and-parks",
+                dataSet(),
+                member(
+                    "dataset",
+                    PARKS_DATASET_URN,
+                    "Parks",
+                    "Parks of the district",
+                    Map.of("openDataAccess", false)),
+                treeApi,
+                parkApi));
+
+    assertThat(installed.getStatusCode())
+        .as("%s", installed.getBody())
+        .isEqualTo(HttpStatus.CREATED);
+    List<JsonNode> lines = linesOf(installed);
+    assertThat(lines)
+        .extracting(line -> line.get("artifactType").asString())
+        .containsExactly("DATA_SET", "DATA_SET", "NAMED_API", "NAMED_API");
+    JsonNode trees = json(get("/datasets/" + shellIdOf(lines, DATASET_URN)).getBody());
+    assertThat(trees.at("/namedApis/0/slug").asString()).isEqualTo("map");
+    assertThat(trees.get("namedApis").size()).isEqualTo(1);
+    JsonNode parks = json(get("/datasets/" + shellIdOf(lines, PARKS_DATASET_URN)).getBody());
+    assertThat(parks.at("/namedApis/0/slug").asString()).isEqualTo("parks");
+    assertThat(parks.get("namedApis").size()).isEqualTo(1);
+
+    String id = json(installed.getBody()).get("id").asString();
+    assertThat(delete("/use-cases/" + id).getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+    assertThat(get("/datasets/" + shellIdOf(lines, DATASET_URN)).getStatusCode())
+        .isEqualTo(HttpStatus.NOT_FOUND);
+    assertThat(get("/datasets/" + shellIdOf(lines, PARKS_DATASET_URN)).getStatusCode())
+        .isEqualTo(HttpStatus.NOT_FOUND);
   }
 
   @Test
@@ -1090,8 +1153,34 @@ class UseCaseControllerIntegrationTest extends BaseKeycloakIntegrationTest {
       request.put("datapoolId", datapoolId.toString());
     }
     request.put(
-        "package", Map.of("id", packageId, "version", "1.0.0", "members", List.of(members)));
+        "package",
+        Map.of("id", packageId, "version", "1.0.0", "members", inTheOnlyDataSet(members)));
     return request;
+  }
+
+  /**
+   * Most test packages have one Dataset. Their helpers build the members once for all packages, so
+   * this adds the {@code dataSetRef} of the only Dataset to each member of a Dataset that names
+   * none, as a package does. A test with several Datasets names them itself.
+   */
+  @SafeVarargs
+  private static List<Map<String, Object>> inTheOnlyDataSet(Map<String, Object>... members) {
+    List<Object> dataSets =
+        Arrays.stream(members)
+            .filter(member -> "dataset".equals(member.get("kind")))
+            .map(member -> member.get("urn"))
+            .toList();
+    List<Map<String, Object>> named = new ArrayList<>();
+    for (Map<String, Object> member : members) {
+      Map<String, Object> copy = new LinkedHashMap<>(member);
+      if (dataSets.size() == 1
+          && PART_OF_DATASET.contains(String.valueOf(copy.get("kind")))
+          && !copy.containsKey("dataSetRef")) {
+        copy.put("dataSetRef", dataSets.getFirst());
+      }
+      named.add(copy);
+    }
+    return named;
   }
 
   private static UseCase useCaseOf(String packageId) {

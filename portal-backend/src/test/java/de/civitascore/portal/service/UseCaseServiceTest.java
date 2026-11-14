@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -37,6 +38,7 @@ import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.model.input.LayerInputDTO;
 import de.civitascore.portal.model.input.MappingInputDTO;
+import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.model.input.PackageManifestInputDTO;
 import de.civitascore.portal.model.input.PackageMemberInputDTO;
 import de.civitascore.portal.model.input.PackageMemberKind;
@@ -52,10 +54,12 @@ import de.civitascore.portal.util.ResourceNotFoundException;
 import de.civitascore.portal.util.UniqueConstraintViolationException;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -117,6 +121,27 @@ class UseCaseServiceTest {
       "urn:core:standard:test:style:environment:treesorange:k9l8m7n6o5";
   private static final String LAYER_URN =
       "urn:core:standard:test:layer:environment:trees:p4q3r2s1t0";
+
+  /** A second Dataset of the package, with a Data sink and an API of its own. */
+  private static final String PARKS_URN =
+      "urn:core:standard:test:dataset:environment:parks:z1y2x3w4v5";
+
+  private static final UUID PARKS_ID = UUID.fromString("77777777-7777-4000-8000-000000000017");
+  private static final String PARKS_SINK_URN =
+      "urn:core:standard:test:datasink:environment:parktable:q1w2e3r4t5";
+  private static final String PARKS_API_URN =
+      "urn:core:standard:test:api:environment:parks:t5r4e3w2q1";
+  private static final UUID PARKS_API_ID = UUID.fromString("88888888-8888-4000-8000-000000000018");
+
+  /** The kinds whose members belong to a Dataset. */
+  private static final Set<PackageMemberKind> PART_OF_DATASET =
+      EnumSet.of(
+          PackageMemberKind.API,
+          PackageMemberKind.MAPPING,
+          PackageMemberKind.DATASINK,
+          PackageMemberKind.PIPELINE,
+          PackageMemberKind.STYLE,
+          PackageMemberKind.LAYER);
 
   private static final UUID SINK_ID = UUID.fromString("99999999-9999-4000-8000-00000000000a");
   private static final UUID PIPELINE_ID = UUID.fromString("99999999-9999-4000-8000-00000000000b");
@@ -465,27 +490,142 @@ class UseCaseServiceTest {
   }
 
   @Test
-  void install_whenPackageHasTwoDataSets_changesNothing() {
-    PackageMemberInputDTO parks =
-        member(
-            PackageMemberKind.DATASET,
-            DATASET_URN + "-parks",
-            "Parks",
-            "Parks of the city",
-            Map.of("openDataAccess", false));
+  void install_whenPackageHasTwoDataSets_createsBothAndBindsEachMemberToItsOwn() {
+    stubDatapool();
+    stubTwoDataSets();
+    stubDataSink();
+    stubSave();
 
-    assertThatThrownBy(() -> useCaseService.install(request(DATAPOOL_ID, dataSet(), parks)))
+    UseCase useCase =
+        useCaseService.install(
+            request(DATAPOOL_ID, in(PARKS_URN, parkSink()), frostSink(), parks(), dataSet()));
+
+    verify(dataSetService, times(2)).create(dataSetCaptor.capture());
+    assertThat(dataSetCaptor.getAllValues())
+        .extracting(DataSetInputDTO::getName, DataSetInputDTO::getDatapoolId)
+        .containsExactly(tuple("Parks", DATAPOOL_ID), tuple("Trees", DATAPOOL_ID));
+    verify(dataSinkService, times(2)).create(sinkCaptor.capture());
+    assertThat(sinkCaptor.getAllValues())
+        .extracting(DataSinkInputDTO::getDataSetId)
+        .containsExactly(PARKS_ID, DATASET_ID);
+    assertThat(useCase.getArtifacts())
+        .extracting(UseCaseArtifact::getArtifactType, UseCaseArtifact::getShellId)
+        .containsExactly(
+            tuple(UseCaseArtifactType.DATA_SET, PARKS_ID),
+            tuple(UseCaseArtifactType.DATA_SET, DATASET_ID),
+            tuple(UseCaseArtifactType.DATA_SINK, SINK_ID),
+            tuple(UseCaseArtifactType.DATA_SINK, SINK_ID));
+  }
+
+  @Test
+  void install_whenTwoDataSetsHaveApis_updatesEachDataSetOnceWithItsOwnApis() {
+    stubDatapool();
+    stubTwoDataSets();
+    stubSave();
+    when(dataSetService.update(eq(DATASET_ID), any()))
+        .thenReturn(dataSetWithApi(DATASET_ID, "map", API_ID));
+    when(dataSetService.update(eq(PARKS_ID), any()))
+        .thenReturn(dataSetWithApi(PARKS_ID, "parks", PARKS_API_ID));
+
+    UseCase useCase =
+        useCaseService.install(
+            request(DATAPOOL_ID, api("map"), in(PARKS_URN, parkApi()), dataSet(), parks()));
+
+    verify(dataSetService).update(eq(DATASET_ID), dataSetCaptor.capture());
+    assertThat(dataSetCaptor.getValue().getNamedApis())
+        .extracting(NamedApiInputDTO::getSlug)
+        .containsExactly("map");
+    verify(dataSetService).update(eq(PARKS_ID), dataSetCaptor.capture());
+    assertThat(dataSetCaptor.getValue().getNamedApis())
+        .extracting(NamedApiInputDTO::getSlug)
+        .containsExactly("parks");
+    assertThat(useCase.getArtifacts())
+        .filteredOn(line -> line.getArtifactType() == UseCaseArtifactType.NAMED_API)
+        .extracting(UseCaseArtifact::getShellId, UseCaseArtifact::getOrigin)
+        .containsExactly(tuple(API_ID, API_URN), tuple(PARKS_API_ID, PARKS_API_URN));
+  }
+
+  @Test
+  void install_whenMemberOfADataSetNamesNoDataSet_changesNothing() {
+    assertThatThrownBy(
+            () -> useCaseService.install(request(tree(), dataSet(), in(null, mapping()))))
         .isInstanceOf(InvalidInputException.class)
-        .hasMessageContaining("has 2 Datasets");
+        .hasMessageContaining(MAPPING_URN)
+        .hasMessageContaining("must name the Dataset in 'dataSetRef'");
 
     verifyNoChange();
   }
 
   @Test
-  void install_whenPackageHasAnApiAndNoDataSet_changesNothing() {
+  void install_whenDataStructureNamesADataSet_changesNothing() {
+    assertThatThrownBy(() -> useCaseService.install(request(in(DATASET_URN, tree()), dataSet())))
+        .isInstanceOf(InvalidInputException.class)
+        .hasMessageContaining("belongs to no Dataset, so it must not name one");
+
+    verifyNoChange();
+  }
+
+  @Test
+  void install_whenDataSetRefNamesAMemberOfAnotherKind_changesNothing() {
+    assertThatThrownBy(
+            () -> useCaseService.install(request(tree(), dataSet(), in(FOREIGN_URN, mapping()))))
+        .isInstanceOf(InvalidInputException.class)
+        .hasMessageContaining("'dataSetRef'")
+        .hasMessageContaining("is not of the kind dataset");
+
+    verifyNoChange();
+  }
+
+  @Test
+  void install_whenPipelineUsesADataSinkOfAnotherDataSet_changesNothing() {
+    stubDatapool();
+
+    assertThatThrownBy(
+            () ->
+                useCaseService.install(
+                    request(
+                        DATAPOOL_ID,
+                        tree(),
+                        sqlSource(FOREIGN_URN),
+                        dataSet(),
+                        parks(),
+                        mapping(),
+                        in(PARKS_URN, postgisSink()),
+                        pipeline(SINK_URN))))
+        .isInstanceOf(InvalidInputException.class)
+        .hasMessageContaining("nodes[3].sinkRef")
+        .hasMessageContaining("belongs to another Dataset");
+
+    verifyNoChange();
+  }
+
+  @Test
+  void install_whenLayerUsesAStyleOfAnotherDataSet_changesNothing() {
+    stubDatapool();
+
+    assertThatThrownBy(
+            () ->
+                useCaseService.install(
+                    request(
+                        DATAPOOL_ID,
+                        dataSet(),
+                        parks(),
+                        frostSink(),
+                        in(PARKS_URN, style(GREEN_STYLE_URN, "trees-green")),
+                        layer("trees", GREEN_STYLE_URN, null))))
+        .isInstanceOf(InvalidInputException.class)
+        .hasMessageContaining("defaultStyleRef")
+        .hasMessageContaining("belongs to another Dataset");
+
+    verifyNoChange();
+  }
+
+  @Test
+  void install_whenApiNamesADataSetThatThePackageDoesNotHave_changesNothing() {
     assertThatThrownBy(() -> useCaseService.install(request(api("map"))))
         .isInstanceOf(InvalidInputException.class)
-        .hasMessageContaining("it has no Dataset");
+        .hasMessageContaining("'dataSetRef'")
+        .hasMessageContaining("the package has no member with this identity");
 
     verifyNoChange();
   }
@@ -641,10 +781,11 @@ class UseCaseServiceTest {
   }
 
   @Test
-  void install_whenMappingHasNoDataSet_changesNothing() {
+  void install_whenMappingNamesADataSetThatThePackageDoesNotHave_changesNothing() {
     assertThatThrownBy(() -> useCaseService.install(request(tree(), mapping())))
         .isInstanceOf(InvalidInputException.class)
-        .hasMessageContaining("it has no Dataset");
+        .hasMessageContaining("'dataSetRef'")
+        .hasMessageContaining("the package has no member with this identity");
 
     verifyNoChange();
   }
@@ -783,6 +924,32 @@ class UseCaseServiceTest {
     when(dataSetService.create(any())).thenReturn(dataSet);
     // Only a package with named APIs updates its Dataset.
     lenient().when(dataSetService.update(eq(DATASET_ID), any())).thenReturn(dataSet);
+  }
+
+  /** The Dataset service gives each of the two Datasets the id that belongs to its name. */
+  private void stubTwoDataSets() {
+    when(dataSetService.create(any()))
+        .thenAnswer(
+            invocation -> {
+              DataSetInputDTO input = invocation.getArgument(0);
+              UUID id = "Parks".equals(input.getName()) ? PARKS_ID : DATASET_ID;
+              DataSet dataSet =
+                  DataSet.builder()
+                      .name(input.getName())
+                      .manifestLogicalUrn("urn:core:platform:civitas:dataset:common:" + id)
+                      .build();
+              dataSet.setId(id);
+              return dataSet;
+            });
+  }
+
+  private static DataSet dataSetWithApi(UUID dataSetId, String slug, UUID apiId) {
+    NamedApi api = NamedApi.builder().slug(slug).build();
+    api.setId(apiId);
+    DataSet dataSet = DataSet.builder().build();
+    dataSet.setId(dataSetId);
+    dataSet.getNamedApis().add(api);
+    return dataSet;
   }
 
   private void stubMapping() {
@@ -1016,6 +1183,39 @@ class UseCaseServiceTest {
         Map.of("name", "Tree map", "slug", slug, "standard", "OWS"));
   }
 
+  private static PackageMemberInputDTO parks() {
+    return member(
+        PackageMemberKind.DATASET,
+        PARKS_URN,
+        "Parks",
+        "Parks of the city",
+        Map.of("openDataAccess", false));
+  }
+
+  private static PackageMemberInputDTO parkSink() {
+    return member(
+        PackageMemberKind.DATASINK,
+        PARKS_SINK_URN,
+        null,
+        null,
+        Map.of(TITLE, "Park store", "connectionType", "frost", "port", "ThingPark"));
+  }
+
+  private static PackageMemberInputDTO parkApi() {
+    return member(
+        PackageMemberKind.API,
+        PARKS_API_URN,
+        null,
+        null,
+        Map.of("name", "Park map", "slug", "parks", "standard", "STA"));
+  }
+
+  /** The member in the Dataset with the identity, or in none for null. */
+  private static PackageMemberInputDTO in(String dataSetUrn, PackageMemberInputDTO member) {
+    member.setDataSetRef(dataSetUrn);
+    return member;
+  }
+
   private static PackageMemberInputDTO member(
       String urn, String name, String description, Map<String, Object> content) {
     return member(PackageMemberKind.DATASTRUCTURE, urn, name, description, content);
@@ -1033,6 +1233,10 @@ class UseCaseServiceTest {
     member.setName(name);
     member.setDescription(description);
     member.setContent(content);
+    // A member of a Dataset belongs to the Dataset of dataSet() unless a test says otherwise.
+    if (PART_OF_DATASET.contains(kind)) {
+      member.setDataSetRef(DATASET_URN);
+    }
     return member;
   }
 

@@ -40,6 +40,14 @@ public class PackageMemberInputDTO {
               + " the document. A Data structure, a Data source and a Dataset need one of the two.")
   private String description;
 
+  @Size(max = UseCaseArtifact.URN_LENGTH, message = "dataSetRef must not exceed {max} characters") @Schema(
+      description =
+          "The identity of the member of the kind dataset that this member belongs to. Required"
+              + " for the kinds api, mapping, datasink, pipeline, style and layer, also when the"
+              + " package has only one Dataset. Not allowed for the other kinds, because Data"
+              + " structures and Data sources can serve several Datasets.")
+  private String dataSetRef;
+
   @NotEmpty(message = "content is required") @Schema(
       description =
           "The CORE document of the member, for example the JSON Schema of a Data structure or"

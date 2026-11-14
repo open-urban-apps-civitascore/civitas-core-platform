@@ -70,11 +70,12 @@ import tools.jackson.databind.ObjectMapper;
  * own URN. The record keeps the identity of the member in the package as the origin of the copy.
  * The members of a package reference each other by these identities. The install creates the
  * members in the order of their kinds and binds each reference to the copy of the member that it
- * names: first the Data structures, then the Data sources that read them, then the Dataset, then
- * the Mappings and Data sinks of its data flow, then its named APIs, which need the Data sinks that
- * back them, then its Pipelines, and last the styles and layers of its map. The install does not
- * release what it creates. Each copy stays DRAFT, and the release goes through the endpoint of each
- * artifact.
+ * names: first the Data structures, then the Data sources that read them, then the Datasets, then
+ * the Mappings and Data sinks of their data flows, then their named APIs, which need the Data sinks
+ * that back them, then their Pipelines, and last the styles and layers of their maps. A package can
+ * have no Dataset, one or several, and each member that belongs to a Dataset names it in {@code
+ * dataSetRef}. The install does not release what it creates. Each copy stays DRAFT, and the release
+ * goes through the endpoint of each artifact.
  *
  * <p>The install makes all changes to the database in one transaction. If one member fails, the
  * install keeps nothing. Model Forge keeps its dependency graph in memory, and a rollback does not
@@ -93,7 +94,6 @@ public class UseCaseService {
   private static final String DESCRIPTION = "description";
   private static final String NAME = "name";
   private static final String URN = "urn";
-  private static final String KIND = "kind";
   private static final String DATAPOOL_ID = "datapoolId";
   private static final String ELEMENT = "element";
   private static final String SLUG = "slug";
@@ -114,6 +114,7 @@ public class UseCaseService {
   private static final String CRS = "crs";
   private static final String NATIVE_BOUNDING_BOX = "nativeBoundingBox";
   private static final String LAT_LON_BOUNDING_BOX = "latLonBoundingBox";
+  private static final String DATA_SET_REF = "dataSetRef";
 
   /**
    * The version token of a reference to the newest version. A Pipeline references its Data sources
@@ -121,7 +122,7 @@ public class UseCaseService {
    */
   private static final String LATEST = ":latest";
 
-  /** The kinds whose copies belong to the Dataset of the package. */
+  /** The kinds whose copies belong to a Dataset. Their members name it in {@code dataSetRef}. */
   private static final Set<PackageMemberKind> PART_OF_DATASET =
       EnumSet.of(
           PackageMemberKind.API,
@@ -262,35 +263,40 @@ public class UseCaseService {
     claim(useCase);
 
     Map<String, Copy> copies = new HashMap<>();
-    List<PreparedMember> apis = ofKind(members, PackageMemberKind.API);
-    // The checks make sure that a member of a kind that belongs to the Dataset comes only with the
-    // Dataset, and the order of the kinds makes sure that the Dataset exists before such a member.
-    UUID dataSetId = null;
-    PreparedMember dataSetMember = null;
-    boolean namedApisInstalled = false;
+    // The checks make sure that each member of a Dataset names a Dataset of the package, and the
+    // order of the kinds makes sure that the Datasets exist before their members.
+    Map<String, PreparedMember> dataSetMembers = new HashMap<>();
+    Set<String> dataSetsWithApis = new LinkedHashSet<>();
     for (PreparedMember member : members) {
       switch (member.kind()) {
         case DATASTRUCTURE -> useCase.addArtifact(installDataStructure(member, copies));
         case DATASOURCE -> useCase.addArtifact(installDataSource(member, datapoolId, copies));
         case DATASET -> {
-          UseCaseArtifact line = installDataSet(member, datapoolId);
-          dataSetId = line.getShellId();
-          dataSetMember = member;
-          useCase.addArtifact(line);
+          useCase.addArtifact(installDataSet(member, datapoolId, copies));
+          dataSetMembers.put(key(member.member().getUrn()), member);
         }
         case API -> {
-          // The Dataset checks its named APIs as one list, so the first API member adds all.
-          if (!namedApisInstalled) {
-            installNamedApis(dataSetMember, dataSetId, apis, datapoolId)
+          // A Dataset checks its named APIs as one list, so its first API member adds all of them.
+          String dataSet = key(member.member().getDataSetRef());
+          if (dataSetsWithApis.add(dataSet)) {
+            installNamedApis(
+                    dataSetMembers.get(dataSet),
+                    dataSetIdOf(member, copies),
+                    apisOf(members, dataSet),
+                    datapoolId)
                 .forEach(useCase::addArtifact);
-            namedApisInstalled = true;
           }
         }
-        case MAPPING -> useCase.addArtifact(installMapping(member, dataSetId, copies));
-        case DATASINK -> useCase.addArtifact(installDataSink(member, dataSetId, copies));
-        case PIPELINE -> useCase.addArtifact(installPipeline(member, dataSetId, copies));
-        case STYLE -> useCase.addArtifact(installStyle(member, dataSetId, copies));
-        case LAYER -> useCase.addArtifact(installLayer(member, dataSetId, copies));
+        case MAPPING ->
+            useCase.addArtifact(installMapping(member, dataSetIdOf(member, copies), copies));
+        case DATASINK ->
+            useCase.addArtifact(installDataSink(member, dataSetIdOf(member, copies), copies));
+        case PIPELINE ->
+            useCase.addArtifact(installPipeline(member, dataSetIdOf(member, copies), copies));
+        case STYLE ->
+            useCase.addArtifact(installStyle(member, dataSetIdOf(member, copies), copies));
+        case LAYER ->
+            useCase.addArtifact(installLayer(member, dataSetIdOf(member, copies), copies));
       }
     }
     UseCase saved = useCaseRepository.save(useCase);
@@ -390,9 +396,14 @@ public class UseCaseService {
             .sorted(Comparator.comparing(PackageMemberInputDTO::getKind))
             .toList();
     Map<String, PackageMemberKind> kinds = kindsByIdentity(members);
-    requireOneDataSetWhereNecessary(members, manifest.getId());
+    requireDataSetRefs(members, kinds);
     requireDatapoolWhereNecessary(members, datapoolId, manifest.getId());
-    return members.stream().map(member -> prepare(member, kinds, datapoolId)).toList();
+    List<PreparedMember> prepared =
+        members.stream().map(member -> prepare(member, kinds, datapoolId)).toList();
+    // After the checks of each member, so that a reference to a member of the wrong kind gets the
+    // message about the kind.
+    requireSameDataSet(members);
+    return prepared;
   }
 
   /**
@@ -488,27 +499,85 @@ public class UseCaseService {
   }
 
   /**
-   * A package has at most one Dataset. The copies of some kinds belong to the Dataset, so a package
-   * with a member of such a kind must have its Dataset.
+   * A member whose copy belongs to a Dataset names that Dataset in {@code dataSetRef}, also when
+   * the package has only one Dataset. The other members belong to no Dataset and name none.
    */
-  private static void requireOneDataSetWhereNecessary(
-      List<PackageMemberInputDTO> members, String packageId) {
-    long dataSets =
-        members.stream().filter(member -> member.getKind() == PackageMemberKind.DATASET).count();
-    if (dataSets > 1) {
-      throw new InvalidInputException(
-          KIND,
-          packageId,
-          "Package '%s' has %d Datasets, but a package can have only one."
-              .formatted(packageId, dataSets));
+  private void requireDataSetRefs(
+      List<PackageMemberInputDTO> members, Map<String, PackageMemberKind> kinds) {
+    for (PackageMemberInputDTO member : members) {
+      String dataSetRef = member.getDataSetRef();
+      boolean namesDataSet = dataSetRef != null && !dataSetRef.isBlank();
+      if (PART_OF_DATASET.contains(member.getKind())) {
+        if (!namesDataSet) {
+          throw new InvalidInputException(
+              DATA_SET_REF,
+              member.getUrn(),
+              "Member '%s' belongs to a Dataset, so it must name the Dataset in '%s'."
+                  .formatted(member.getUrn(), DATA_SET_REF));
+        }
+        checkReference(member, DATA_SET_REF, dataSetRef, PackageMemberKind.DATASET, kinds);
+      } else if (namesDataSet) {
+        throw new InvalidInputException(
+            DATA_SET_REF,
+            member.getUrn(),
+            ("Member '%s' is of the kind %s, which belongs to no Dataset, so it must not name one"
+                    + " in '%s'.")
+                .formatted(member.getUrn(), kindName(member.getKind()), DATA_SET_REF));
+      }
     }
-    if (dataSets == 0
-        && members.stream().anyMatch(member -> PART_OF_DATASET.contains(member.getKind()))) {
+  }
+
+  /**
+   * A Pipeline and a layer use only the Mappings, Data sinks and styles of their own Dataset. Data
+   * sources serve all Datasets of the package, so a reference to a Data source is free.
+   */
+  private void requireSameDataSet(List<PackageMemberInputDTO> members) {
+    Map<String, String> dataSetOf = new HashMap<>();
+    for (PackageMemberInputDTO member : members) {
+      if (PART_OF_DATASET.contains(member.getKind())) {
+        dataSetOf.put(key(member.getUrn()), key(member.getDataSetRef()));
+      }
+    }
+    for (PackageMemberInputDTO member : members) {
+      if (member.getKind() == PackageMemberKind.PIPELINE) {
+        List<?> nodes = requireNodes(member);
+        for (int index = 0; index < nodes.size(); index++) {
+          if (!(nodes.get(index) instanceof Map<?, ?> node)) {
+            continue;
+          }
+          for (NodeReference reference : NODE_REFERENCES) {
+            if (reference.kind() != PackageMemberKind.DATASOURCE
+                && node.get(reference.field()) instanceof String value
+                && !value.isBlank()) {
+              String field = "%s[%d].%s".formatted(NODES, index, reference.field());
+              requireSameDataSet(member, field, value, dataSetOf);
+            }
+          }
+        }
+      } else if (member.getKind() == PackageMemberKind.LAYER) {
+        requireSameDataSet(member, SINK_REF, requireString(member, SINK_REF), dataSetOf);
+        String defaultStyle = optionalString(member.getContent(), DEFAULT_STYLE_REF);
+        if (defaultStyle != null) {
+          requireSameDataSet(member, DEFAULT_STYLE_REF, defaultStyle, dataSetOf);
+        }
+        List<String> alternativeStyles = stringList(member, ALTERNATIVE_STYLE_REFS);
+        if (alternativeStyles != null) {
+          alternativeStyles.forEach(
+              style -> requireSameDataSet(member, ALTERNATIVE_STYLE_REFS, style, dataSetOf));
+        }
+      }
+    }
+  }
+
+  private void requireSameDataSet(
+      PackageMemberInputDTO member, String field, String reference, Map<String, String> dataSetOf) {
+    String other = dataSetOf.get(key(reference));
+    if (other != null && !other.equals(key(member.getDataSetRef()))) {
       throw new InvalidInputException(
-          KIND,
-          packageId,
-          "Package '%s' has members that belong to a Dataset, but it has no Dataset."
-              .formatted(packageId));
+          field,
+          member.getUrn(),
+          "Member '%s' references '%s' in '%s', but that member belongs to another Dataset."
+              .formatted(member.getUrn(), reference, field));
     }
   }
 
@@ -842,15 +911,18 @@ public class UseCaseService {
   }
 
   /**
-   * Creates the Dataset without its named APIs. An API of a standard that Data sinks back needs
-   * such a Data sink in the Dataset, so {@link #installNamedApis} adds the APIs after the Data
-   * sinks. The platform does not give the manifest of a Dataset a version, so its line has the
-   * logical URN only.
+   * Creates a Dataset without its named APIs. An API of a standard that Data sinks back needs such
+   * a Data sink in the Dataset, so {@link #installNamedApis} adds the APIs after the Data sinks.
+   * The members of the Dataset find its copy by the identity of the member. The platform does not
+   * give the manifest of a Dataset a version, so its line has the logical URN only.
    */
-  private UseCaseArtifact installDataSet(PreparedMember prepared, UUID datapoolId) {
+  private UseCaseArtifact installDataSet(
+      PreparedMember prepared, UUID datapoolId, Map<String, Copy> copies) {
     DataSet dataSet =
         dataSetService.create(
             dataSetInput(prepared.name(), prepared.description(), datapoolId, List.of()));
+    register(
+        prepared, new Copy(dataSet.getManifestLogicalUrn(), null, dataSet.getId(), null), copies);
     return line(
         UseCaseArtifactType.DATA_SET,
         prepared,
@@ -1169,8 +1241,17 @@ public class UseCaseService {
     return artifact;
   }
 
-  private static List<PreparedMember> ofKind(List<PreparedMember> members, PackageMemberKind kind) {
-    return members.stream().filter(member -> member.kind() == kind).toList();
+  /** Returns the id of the copy of the Dataset that a member names in {@code dataSetRef}. */
+  private UUID dataSetIdOf(PreparedMember member, Map<String, Copy> copies) {
+    return copyOf(member.member().getDataSetRef(), copies).shellId();
+  }
+
+  /** Returns the API members of one Dataset, by the key of the identity of the Dataset. */
+  private List<PreparedMember> apisOf(List<PreparedMember> members, String dataSet) {
+    return members.stream()
+        .filter(member -> member.kind() == PackageMemberKind.API)
+        .filter(member -> dataSet.equals(key(member.member().getDataSetRef())))
+        .toList();
   }
 
   /**
