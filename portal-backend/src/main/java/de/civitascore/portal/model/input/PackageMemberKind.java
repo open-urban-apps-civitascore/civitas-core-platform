@@ -8,7 +8,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  *
  * <p>The order of the constants is the order of the install. A member references only members of
  * the kinds before its own kind, so the copy of each member that it references exists before the
- * install needs it.
+ * install needs it. A named API comes after the Data sinks, because an API of a standard that Data
+ * sinks back needs such a Data sink in its Dataset, and before the layers that it publishes.
  */
 public enum PackageMemberKind {
   @JsonProperty("datastructure")
@@ -17,12 +18,12 @@ public enum PackageMemberKind {
   DATASOURCE,
   @JsonProperty("dataset")
   DATASET,
-  @JsonProperty("api")
-  API,
   @JsonProperty("mapping")
   MAPPING,
   @JsonProperty("datasink")
   DATASINK,
+  @JsonProperty("api")
+  API,
   @JsonProperty("pipeline")
   PIPELINE,
   @JsonProperty("style")

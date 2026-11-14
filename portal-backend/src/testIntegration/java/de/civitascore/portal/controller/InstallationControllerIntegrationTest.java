@@ -413,7 +413,9 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
                 sqlSource(),
                 mqttSource(Map.of()),
                 dataSet(),
-                treeMap()));
+                // An OWS API needs a PostGIS Data sink, which this package does not have. The whole
+                // use case below installs an OWS API with its Data sink.
+                customTreeApi()));
 
     assertThat(installed.getStatusCode())
         .as("%s", installed.getBody())
@@ -443,7 +445,7 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
     assertThat(dataSet.at("/datapool/id").asString()).isEqualTo(pool.getId().toString());
     assertThat(dataSet.get("openDataAccess").asBoolean()).isFalse();
     assertThat(dataSet.at("/namedApis/0/slug").asString()).isEqualTo("map");
-    assertThat(dataSet.at("/namedApis/0/standard").asString()).isEqualTo("OWS");
+    assertThat(dataSet.at("/namedApis/0/standard").asString()).isEqualTo("CUSTOM");
     assertThat(lines.get(4).get("origin").asString()).isEqualTo(API_URN);
   }
 
@@ -499,9 +501,9 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
             "DATA_STRUCTURE",
             "DATA_SOURCE",
             "DATA_SET",
-            "NAMED_API",
             "MAPPING",
             "DATA_SINK",
+            "NAMED_API",
             "PIPELINE",
             "STYLE",
             "STYLE",
@@ -1037,6 +1039,24 @@ class InstallationControllerIntegrationTest extends BaseKeycloakIntegrationTest 
             "OWS",
             "description",
             "The street trees as a map service"));
+  }
+
+  /** A named API of a standard that no Data sink backs, so the Dataset needs no Data sink. */
+  private static Map<String, Object> customTreeApi() {
+    return member(
+        "api",
+        API_URN,
+        "Tree map",
+        null,
+        Map.of(
+            "name",
+            "Tree map",
+            "slug",
+            "map",
+            "standard",
+            "CUSTOM",
+            "description",
+            "The street trees through a custom API"));
   }
 
   private static Map<String, Object> member(String name, Map<String, Object> model) {

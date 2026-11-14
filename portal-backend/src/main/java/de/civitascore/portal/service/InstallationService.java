@@ -26,6 +26,7 @@ import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.model.input.DatapoolScopeInputDTO;
 import de.civitascore.portal.model.input.InstallationInputDTO;
 import de.civitascore.portal.model.input.LayerInputDTO;
+import de.civitascore.portal.model.input.MappingInputDTO;
 import de.civitascore.portal.model.input.NamedApiInputDTO;
 import de.civitascore.portal.model.input.PackageManifestInputDTO;
 import de.civitascore.portal.model.input.PackageMemberInputDTO;
@@ -60,6 +61,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Installs a package on this instance and keeps a record of the install.
@@ -68,10 +70,11 @@ import org.springframework.transaction.annotation.Transactional;
  * own URN. The record keeps the identity of the member in the package as the origin of the copy.
  * The members of a package reference each other by these identities. The install creates the
  * members in the order of their kinds and binds each reference to the copy of the member that it
- * names: first the Data structures, then the Data sources that read them, then the Dataset with its
- * named APIs, then the Mappings, Data sinks and Pipelines of its data flow, and last the styles and
- * layers of its map. The install does not release what it creates. Each copy stays DRAFT, and the
- * release goes through the endpoint of each artifact.
+ * names: first the Data structures, then the Data sources that read them, then the Dataset, then
+ * the Mappings and Data sinks of its data flow, then its named APIs, which need the Data sinks that
+ * back them, then its Pipelines, and last the styles and layers of its map. The install does not
+ * release what it creates. Each copy stays DRAFT, and the release goes through the endpoint of each
+ * artifact.
  *
  * <p>The install makes all changes to the database in one transaction. If one member fails, the
  * install keeps nothing. Model Forge keeps its dependency graph in memory, and a rollback does not
@@ -159,6 +162,9 @@ public class InstallationService {
   private final LayerService layerService;
   private final ModelRegistryGateway modelRegistryGateway;
   private final ConnectorValidator connectorValidator;
+
+  /** Reads the document of a Mapping member into the input that the Mapping API takes. */
+  private final ObjectMapper objectMapper;
 
   /**
    * The install makes the inputs of the Dataset, the named APIs, the styles and the layers itself,
@@ -260,17 +266,25 @@ public class InstallationService {
     // The checks make sure that a member of a kind that belongs to the Dataset comes only with the
     // Dataset, and the order of the kinds makes sure that the Dataset exists before such a member.
     UUID dataSetId = null;
+    PreparedMember dataSetMember = null;
+    boolean namedApisInstalled = false;
     for (PreparedMember member : members) {
       switch (member.kind()) {
         case DATASTRUCTURE -> installation.addArtifact(installDataStructure(member, copies));
         case DATASOURCE -> installation.addArtifact(installDataSource(member, datapoolId, copies));
         case DATASET -> {
-          List<InstalledArtifact> lines = installDataSet(member, apis, datapoolId);
-          dataSetId = lines.getFirst().getShellId();
-          lines.forEach(installation::addArtifact);
+          InstalledArtifact line = installDataSet(member, datapoolId);
+          dataSetId = line.getShellId();
+          dataSetMember = member;
+          installation.addArtifact(line);
         }
         case API -> {
-          // The Dataset creates its named APIs, see installDataSet.
+          // The Dataset checks its named APIs as one list, so the first API member adds all.
+          if (!namedApisInstalled) {
+            installNamedApis(dataSetMember, dataSetId, apis, datapoolId)
+                .forEach(installation::addArtifact);
+            namedApisInstalled = true;
+          }
         }
         case MAPPING -> installation.addArtifact(installMapping(member, dataSetId, copies));
         case DATASINK -> installation.addArtifact(installDataSink(member, dataSetId, copies));
@@ -831,25 +845,37 @@ public class InstallationService {
   }
 
   /**
-   * Creates the Dataset with its named APIs. The Dataset checks its named APIs as one list, so it
-   * gets all of them when the install creates it. The record has one line for the Dataset and one
-   * line for each named API. The platform does not give the manifest of a Dataset a version, so the
-   * line of the Dataset has the logical URN only.
+   * Creates the Dataset without its named APIs. An API of a standard that Data sinks back needs
+   * such a Data sink in the Dataset, so {@link #installNamedApis} adds the APIs after the Data
+   * sinks. The platform does not give the manifest of a Dataset a version, so its line has the
+   * logical URN only.
    */
-  private List<InstalledArtifact> installDataSet(
-      PreparedMember prepared, List<PreparedMember> apis, UUID datapoolId) {
+  private InstalledArtifact installDataSet(PreparedMember prepared, UUID datapoolId) {
     DataSet dataSet =
         dataSetService.create(
-            dataSetInput(prepared.name(), prepared.description(), datapoolId, apis));
+            dataSetInput(prepared.name(), prepared.description(), datapoolId, List.of()));
+    return line(
+        InstalledArtifactType.DATA_SET,
+        prepared,
+        dataSet.getId(),
+        dataSet.getManifestLogicalUrn(),
+        null);
+  }
+
+  /**
+   * Adds the named APIs to the Dataset, through the same update as the Dataset API. The Dataset
+   * checks its named APIs as one list, so it gets all of them in one update, with the name, the
+   * description and the Data pool that the install gave it. The record has one line for each named
+   * API.
+   */
+  private List<InstalledArtifact> installNamedApis(
+      PreparedMember dataSetMember, UUID dataSetId, List<PreparedMember> apis, UUID datapoolId) {
+    DataSet dataSet =
+        dataSetService.update(
+            dataSetId,
+            dataSetInput(dataSetMember.name(), dataSetMember.description(), datapoolId, apis));
 
     List<InstalledArtifact> lines = new ArrayList<>();
-    lines.add(
-        line(
-            InstalledArtifactType.DATA_SET,
-            prepared,
-            dataSet.getId(),
-            dataSet.getManifestLogicalUrn(),
-            null));
     for (PreparedMember api : apis) {
       UUID apiId = namedApiId(dataSet, requireString(api.member(), SLUG));
       lines.add(line(InstalledArtifactType.NAMED_API, api, apiId, null, null));
@@ -919,10 +945,10 @@ public class InstallationService {
   }
 
   /**
-   * Stores the Mapping in the Dataset. Its {@code source} and {@code target} reference the
-   * versioned URN of the Data structure copies, which is the form that the mapping compiler reads.
-   * Model Forge gives the Mapping its identity, so the document keeps none. A Mapping has no row in
-   * the portal, so its line has no shell id.
+   * Creates the Mapping in the Dataset, through the same service call as the Mapping API. Its
+   * {@code source} and {@code target} reference the versioned URN of the Data structure copies,
+   * which is the form that the mapping compiler reads. Model Forge gives the Mapping its identity,
+   * so the document keeps none. A Mapping has no row in the portal, so its line has no shell id.
    */
   private InstalledArtifact installMapping(
       PreparedMember prepared, UUID dataSetId, Map<String, Copy> copies) {
@@ -936,7 +962,8 @@ public class InstallationService {
     if (optionalString(document, TITLE) == null) {
       document.put(TITLE, prepared.name());
     }
-    ModelRegistryGateway.ModelPin pin = mappingService.store(dataSetId, null, document);
+    MappingInputDTO mapping = objectMapper.convertValue(document, MappingInputDTO.class);
+    ModelRegistryGateway.ModelPin pin = mappingService.create(dataSetId, mapping).pin();
 
     register(prepared, new Copy(pin.logicalUrn(), pin.versionedUrn(), null, null), copies);
     return line(

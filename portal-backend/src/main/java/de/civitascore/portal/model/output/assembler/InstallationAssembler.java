@@ -3,7 +3,6 @@ package de.civitascore.portal.model.output.assembler;
 import de.civitascore.portal.mapper.InstallationMapper;
 import de.civitascore.portal.model.entity.Installation;
 import de.civitascore.portal.model.output.InstallationOutputDTO;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -13,8 +12,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class InstallationAssembler
-    implements BaseAssembler<Installation, InstallationOutputDTO, UUID> {
+public class InstallationAssembler implements BaseAssembler<Installation, InstallationOutputDTO> {
 
   private final InstallationMapper installationMapper;
 
