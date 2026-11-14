@@ -3,7 +3,7 @@
   "private": true,
   "description": "Lints the OpenAPI spec of the portal backend with Spectral; see README.md",
   "devDependencies": {
-    "@stoplight/spectral-cli": "6.17.0",
+    "@stoplight/spectral-cli": "6.17.1",
     "@stoplight/spectral-owasp-ruleset": "2.0.1"
   }
 }
