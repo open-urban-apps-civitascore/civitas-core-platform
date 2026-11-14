@@ -7,7 +7,6 @@ import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -38,6 +37,7 @@ import de.civitascore.portal.model.input.DataStructureInputDTO;
 import de.civitascore.portal.model.input.DataStructureVersionInputDTO;
 import de.civitascore.portal.model.input.InstallationInputDTO;
 import de.civitascore.portal.model.input.LayerInputDTO;
+import de.civitascore.portal.model.input.MappingInputDTO;
 import de.civitascore.portal.model.input.PackageManifestInputDTO;
 import de.civitascore.portal.model.input.PackageMemberInputDTO;
 import de.civitascore.portal.model.input.PackageMemberKind;
@@ -68,6 +68,7 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Unit tests for {@link InstallationService}. The services of the platform and the registry are
@@ -143,6 +144,7 @@ class InstallationServiceTest {
   @Mock private ModelRegistryGateway modelRegistryGateway;
   @Spy private ConnectorValidator connectorValidator = new ConnectorValidator(List.of());
   @Spy private Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+  @Spy private ObjectMapper objectMapper = new ObjectMapper();
 
   @InjectMocks private InstallationService installationService;
 
@@ -150,7 +152,7 @@ class InstallationServiceTest {
   @Captor private ArgumentCaptor<DataStructureVersionInputDTO> versionCaptor;
   @Captor private ArgumentCaptor<DataSourceInputDTO> sourceCaptor;
   @Captor private ArgumentCaptor<DataSetInputDTO> dataSetCaptor;
-  @Captor private ArgumentCaptor<Map<String, Object>> documentCaptor;
+  @Captor private ArgumentCaptor<MappingInputDTO> mappingCaptor;
   @Captor private ArgumentCaptor<DataSinkInputDTO> sinkCaptor;
   @Captor private ArgumentCaptor<PipelineInputDTO> pipelineCaptor;
   @Captor private ArgumentCaptor<LayerInputDTO> layerCaptor;
@@ -506,7 +508,7 @@ class InstallationServiceTest {
   }
 
   @Test
-  void install_whenDataSetHasApis_createsThemWithTheDataSetAndRecordsOneLineEach() {
+  void install_whenDataSetHasApis_addsThemInOneUpdateAndRecordsOneLineEach() {
     stubDatapool();
     stubDataSet();
     stubSave();
@@ -522,10 +524,17 @@ class InstallationServiceTest {
         installationService.install(request(DATAPOOL_ID, api("map"), openDataSet));
 
     verify(dataSetService).create(dataSetCaptor.capture());
+    DataSetInputDTO created = dataSetCaptor.getValue();
+    assertThat(created.getName()).isEqualTo("Trees");
+    assertThat(created.getDatapoolId()).isEqualTo(DATAPOOL_ID);
+    assertThat(created.getOpenDataAccess()).isFalse();
+    assertThat(created.getNamedApis()).isNull();
+
+    // An API of a standard that Data sinks back needs such a Data sink, so the APIs come later.
+    verify(dataSetService).update(eq(DATASET_ID), dataSetCaptor.capture());
     DataSetInputDTO input = dataSetCaptor.getValue();
     assertThat(input.getName()).isEqualTo("Trees");
     assertThat(input.getDatapoolId()).isEqualTo(DATAPOOL_ID);
-    assertThat(input.getOpenDataAccess()).isFalse();
     assertThat(input.getNamedApis())
         .singleElement()
         .satisfies(
@@ -565,11 +574,9 @@ class InstallationServiceTest {
                 sqlSource(FOREIGN_URN),
                 tree()));
 
-    verify(mappingService).store(eq(DATASET_ID), isNull(), documentCaptor.capture());
-    assertThat(documentCaptor.getValue())
-        .containsEntry("source", VERSIONED_URN)
-        .containsEntry("target", VERSIONED_URN)
-        .doesNotContainKeys("$schema", "id");
+    verify(mappingService).create(eq(DATASET_ID), mappingCaptor.capture());
+    assertThat(mappingCaptor.getValue().getSource()).isEqualTo(VERSIONED_URN);
+    assertThat(mappingCaptor.getValue().getTarget()).isEqualTo(VERSIONED_URN);
     verify(dataSinkService).create(sinkCaptor.capture());
     assertThat(sinkCaptor.getValue().getDataSetId()).isEqualTo(DATASET_ID);
     assertThat(sinkCaptor.getValue().getDataSinkType()).isEqualTo(DataSinkType.POSTGIS);
@@ -780,12 +787,17 @@ class InstallationServiceTest {
     dataSet.setId(DATASET_ID);
     dataSet.getNamedApis().add(api);
     when(dataSetService.create(any())).thenReturn(dataSet);
+    // Only a package with named APIs updates its Dataset.
+    lenient().when(dataSetService.update(eq(DATASET_ID), any())).thenReturn(dataSet);
   }
 
   private void stubMapping() {
-    when(mappingService.store(any(), any(), any()))
+    when(mappingService.create(any(), any()))
         .thenReturn(
-            new ModelRegistryGateway.ModelPin(MAPPING_LOGICAL_URN, MAPPING_VERSIONED_URN, "1.0.0"));
+            new MappingService.StoredMapping(
+                new ModelRegistryGateway.ModelPin(
+                    MAPPING_LOGICAL_URN, MAPPING_VERSIONED_URN, "1.0.0"),
+                new MappingInputDTO()));
   }
 
   private void stubDataSink() {
