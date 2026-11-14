@@ -451,15 +451,15 @@ class AssignmentChangeAuthorizerTest {
   }
 
   /**
-   * The data permissions that apply only to the whole Tenant. An installation has no Scope of its
-   * own, so these permissions apply to no entity type. The check of assignment changes on an entity
-   * does not use them.
+   * The data permissions that apply only to the whole Tenant. A use case has no Scope of its own,
+   * so these permissions apply to no entity type. The check of assignment changes on an entity does
+   * not use them.
    */
   private static final Set<PermissionName> TENANT_ONLY_DATA_PERMISSIONS =
       Set.of(
-          PermissionName.INSTALLATION_CREATE,
-          PermissionName.INSTALLATION_READ,
-          PermissionName.INSTALLATION_DELETE);
+          PermissionName.USECASE_CREATE,
+          PermissionName.USECASE_READ,
+          PermissionName.USECASE_DELETE);
 
   static Stream<PermissionName> dataPermissions() {
     return Arrays.stream(PermissionName.values())

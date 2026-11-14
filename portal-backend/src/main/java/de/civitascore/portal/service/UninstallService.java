@@ -1,8 +1,8 @@
 package de.civitascore.portal.service;
 
-import de.civitascore.portal.model.entity.Installation;
-import de.civitascore.portal.model.entity.InstalledArtifact;
-import de.civitascore.portal.repository.InstallationRepository;
+import de.civitascore.portal.model.entity.UseCase;
+import de.civitascore.portal.model.entity.UseCaseArtifact;
+import de.civitascore.portal.repository.UseCaseRepository;
 import de.civitascore.portal.util.ResourceInUseException;
 import de.civitascore.portal.util.ResourceNotFoundException;
 import java.time.LocalDateTime;
@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Removes what an installation created and keeps its record.
+ * Removes what the install of a use case created and keeps the record of the use case.
  *
  * <p>The uninstall first makes sure that each artifact can be removed ({@link UninstallGuard}), and
  * it changes nothing if one cannot. Then it removes the artifacts in the reverse order of the
@@ -38,65 +38,65 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class UninstallService {
 
-  private final InstallationRepository installationRepository;
+  private final UseCaseRepository useCaseRepository;
   private final DataSetService dataSetService;
   private final DataSourceService dataSourceService;
   private final DataStructureService dataStructureService;
   private final UninstallGuard uninstallGuard;
 
   /**
-   * Removes the artifacts of an installation and records the time of the uninstall. An installation
-   * that is already uninstalled stays as it is.
+   * Removes the artifacts of a use case and records the time of the uninstall. A use case that is
+   * already uninstalled stays as it is.
    *
-   * @param id the id of the installation
-   * @throws ResourceNotFoundException if the installation does not exist
-   * @throws ResourceInUseException if a Dataset of the installation is released or has
-   *     infrastructure on the platform, if a Data source of the installation is released, or if
-   *     something that the installation did not create uses one of its artifacts
+   * @param id the id of the use case
+   * @throws ResourceNotFoundException if the use case does not exist
+   * @throws ResourceInUseException if a Dataset of the use case is released or has infrastructure
+   *     on the platform, if a Data source of the use case is released, or if something that the use
+   *     case did not create uses one of its artifacts
    * @throws de.civitascore.portal.util.SagaInFlightException if an operation on a Dataset of the
-   *     installation is in progress
+   *     use case is in progress
    */
   @Transactional
   public void uninstall(UUID id) {
     uninstall(
-        installationRepository
+        useCaseRepository
             .findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Installation", id.toString())));
+            .orElseThrow(() -> new ResourceNotFoundException("UseCase", id.toString())));
   }
 
   /**
-   * Uninstalls an installation of a Data pool, as {@link #uninstall(UUID)} does. For an
-   * installation of another Data pool, the result is the same as for an installation that does not
-   * exist, and nothing changes.
+   * Uninstalls a use case of a Data pool, as {@link #uninstall(UUID)} does. For a use case of
+   * another Data pool, the result is the same as for a use case that does not exist, and nothing
+   * changes.
    *
    * @param datapoolId the Data pool
-   * @param id the id of the installation
-   * @throws ResourceNotFoundException if the installation does not exist in the Data pool
+   * @param id the id of the use case
+   * @throws ResourceNotFoundException if the use case does not exist in the Data pool
    * @throws ResourceInUseException under the same conditions as {@link #uninstall(UUID)}
    */
   @Transactional
   public void uninstallInDatapool(UUID datapoolId, UUID id) {
     uninstall(
-        installationRepository
+        useCaseRepository
             .findByIdAndDatapoolId(id, datapoolId)
-            .orElseThrow(() -> new ResourceNotFoundException("Installation", id.toString())));
+            .orElseThrow(() -> new ResourceNotFoundException("UseCase", id.toString())));
   }
 
-  private void uninstall(Installation installation) {
-    if (installation.isUninstalled()) {
+  private void uninstall(UseCase useCase) {
+    if (useCase.isUninstalled()) {
       return;
     }
-    List<InstalledArtifact> lines = installation.getArtifacts();
-    uninstallGuard.requireRemovable(installation.getId(), lines);
+    List<UseCaseArtifact> lines = useCase.getArtifacts();
+    uninstallGuard.requireRemovable(useCase.getId(), lines);
 
     lines.reversed().forEach(this::remove);
 
-    installation.setUninstalledAt(LocalDateTime.now());
-    installationRepository.save(installation);
+    useCase.setUninstalledAt(LocalDateTime.now());
+    useCaseRepository.save(useCase);
     log.info(
-        "Uninstalled installation {} of package {}",
-        installation.getId(),
-        Encode.forJava(installation.getPackageId()));
+        "Uninstalled use case {} of package {}",
+        useCase.getId(),
+        Encode.forJava(useCase.getPackageId()));
   }
 
   /**
@@ -106,7 +106,7 @@ public class UninstallService {
    * because the message of the service does not, and a package can have more than one artifact of a
    * kind.
    */
-  private void remove(InstalledArtifact line) {
+  private void remove(UseCaseArtifact line) {
     try {
       switch (line.getArtifactType()) {
         case DATA_SET ->
@@ -130,7 +130,7 @@ public class UninstallService {
   }
 
   private static void removeIfExists(
-      InstalledArtifact line, Predicate<UUID> exists, Consumer<UUID> delete) {
+      UseCaseArtifact line, Predicate<UUID> exists, Consumer<UUID> delete) {
     if (!exists.test(line.getShellId())) {
       log.info(
           "Uninstall skips {} {}, because it no longer exists",

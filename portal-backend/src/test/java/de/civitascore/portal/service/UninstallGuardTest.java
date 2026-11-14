@@ -10,14 +10,14 @@ import static org.mockito.Mockito.when;
 
 import de.civitascore.portal.model.embedded.DataSetStatus;
 import de.civitascore.portal.model.embedded.DataSourceStatus;
-import de.civitascore.portal.model.embedded.InstalledArtifactType;
 import de.civitascore.portal.model.embedded.PendingSagaType;
+import de.civitascore.portal.model.embedded.UseCaseArtifactType;
 import de.civitascore.portal.model.entity.DataSet;
 import de.civitascore.portal.model.entity.DataSource;
 import de.civitascore.portal.model.entity.DataStructure;
 import de.civitascore.portal.model.entity.DataStructureVersion;
-import de.civitascore.portal.model.entity.InstalledArtifact;
 import de.civitascore.portal.model.entity.Pipeline;
+import de.civitascore.portal.model.entity.UseCaseArtifact;
 import de.civitascore.portal.modelregistry.ModelRegistryGateway;
 import de.civitascore.portal.repository.DataSourceRepository;
 import de.civitascore.portal.repository.PipelineRepository;
@@ -35,14 +35,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 /**
- * Unit tests for {@link UninstallGuard}: which artifacts of an installation stop an uninstall, and
- * which references do not count.
+ * Unit tests for {@link UninstallGuard}: which artifacts of a use case stop an uninstall, and which
+ * references do not count.
  */
 @ExtendWith(MockitoExtension.class)
 class UninstallGuardTest {
 
-  private static final UUID INSTALLATION_ID =
-      UUID.fromString("10101010-1010-4000-8000-000000000001");
+  private static final UUID USE_CASE_ID = UUID.fromString("10101010-1010-4000-8000-000000000001");
   private static final UUID STRUCTURE_ID = UUID.fromString("20202020-2020-4000-8000-000000000002");
   private static final UUID VERSION_ID = UUID.fromString("30303030-3030-4000-8000-000000000003");
   private static final UUID SOURCE_ID = UUID.fromString("40404040-4040-4000-8000-000000000004");
@@ -88,7 +87,7 @@ class UninstallGuardTest {
   }
 
   @Test
-  void requireRemovable_whenEachArtifactIsADraftThatOnlyTheInstallationUses_passes() {
+  void requireRemovable_whenEachArtifactIsADraftThatOnlyTheUseCaseUses_passes() {
     dataSetIs(dataSet(DataSetStatus.DRAFT));
     dataSourceIs(DataSourceStatus.DRAFT);
     pipelinesOfTheDataSourceAreIn(DATASET_ID);
@@ -96,8 +95,7 @@ class UninstallGuardTest {
     when(modelRegistryGateway.referencesTo(VERSIONED_STRUCTURE_URN))
         .thenReturn(List.of(SOURCE_URN + VERSION, MAPPING_URN + VERSION));
 
-    assertThatCode(() -> guard.requireRemovable(INSTALLATION_ID, treeMap()))
-        .doesNotThrowAnyException();
+    assertThatCode(() -> guard.requireRemovable(USE_CASE_ID, treeMap())).doesNotThrowAnyException();
   }
 
   @Test
@@ -111,8 +109,7 @@ class UninstallGuardTest {
     when(modelRegistryGateway.hostModelUrnsOf(ELEMENT_URN + VERSION))
         .thenReturn(Set.of(STRUCTURE_URN, ELEMENT_URN));
 
-    assertThatCode(() -> guard.requireRemovable(INSTALLATION_ID, treeMap()))
-        .doesNotThrowAnyException();
+    assertThatCode(() -> guard.requireRemovable(USE_CASE_ID, treeMap())).doesNotThrowAnyException();
   }
 
   @Test
@@ -121,8 +118,7 @@ class UninstallGuardTest {
     when(dataSourceService.findById(SOURCE_ID)).thenReturn(Optional.empty());
     when(dataStructureService.findById(STRUCTURE_ID)).thenReturn(Optional.empty());
 
-    assertThatCode(() -> guard.requireRemovable(INSTALLATION_ID, treeMap()))
-        .doesNotThrowAnyException();
+    assertThatCode(() -> guard.requireRemovable(USE_CASE_ID, treeMap())).doesNotThrowAnyException();
 
     verifyNoInteractions(pipelineRepository, dataSourceRepository);
   }
@@ -131,7 +127,7 @@ class UninstallGuardTest {
   void requireRemovable_whenDataSetIsReleased_throwsResourceInUse() {
     dataSetIs(dataSet(DataSetStatus.AVAILABLE));
 
-    assertThatThrownBy(() -> guard.requireRemovable(INSTALLATION_ID, treeMap()))
+    assertThatThrownBy(() -> guard.requireRemovable(USE_CASE_ID, treeMap()))
         .isInstanceOf(ResourceInUseException.class)
         .hasMessageContaining("is released")
         .hasMessageContaining("Unrelease the Dataset");
@@ -143,7 +139,7 @@ class UninstallGuardTest {
     dataSet.setProvisioned(true);
     dataSetIs(dataSet);
 
-    assertThatThrownBy(() -> guard.requireRemovable(INSTALLATION_ID, treeMap()))
+    assertThatThrownBy(() -> guard.requireRemovable(USE_CASE_ID, treeMap()))
         .isInstanceOf(ResourceInUseException.class)
         .hasMessageContaining("has infrastructure");
   }
@@ -154,7 +150,7 @@ class UninstallGuardTest {
     dataSet.setPendingSagaType(PendingSagaType.UNRELEASE);
     dataSetIs(dataSet);
 
-    assertThatThrownBy(() -> guard.requireRemovable(INSTALLATION_ID, treeMap()))
+    assertThatThrownBy(() -> guard.requireRemovable(USE_CASE_ID, treeMap()))
         .isInstanceOf(SagaInFlightException.class);
   }
 
@@ -163,7 +159,7 @@ class UninstallGuardTest {
     dataSetIs(dataSet(DataSetStatus.DRAFT));
     dataSourceIs(DataSourceStatus.AVAILABLE);
 
-    assertThatThrownBy(() -> guard.requireRemovable(INSTALLATION_ID, treeMap()))
+    assertThatThrownBy(() -> guard.requireRemovable(USE_CASE_ID, treeMap()))
         .isInstanceOf(ResourceInUseException.class)
         .hasMessageContaining("Unrelease the Data source");
   }
@@ -174,9 +170,9 @@ class UninstallGuardTest {
     dataSourceIs(DataSourceStatus.DRAFT);
     pipelinesOfTheDataSourceAreIn(DATASET_ID, OTHER_DATASET_ID);
 
-    assertThatThrownBy(() -> guard.requireRemovable(INSTALLATION_ID, treeMap()))
+    assertThatThrownBy(() -> guard.requireRemovable(USE_CASE_ID, treeMap()))
         .isInstanceOf(ResourceInUseException.class)
-        .hasMessageContaining("used by a Pipeline that the installation did not create");
+        .hasMessageContaining("used by a Pipeline that the use case did not create");
   }
 
   @Test
@@ -186,9 +182,9 @@ class UninstallGuardTest {
     pipelinesOfTheDataSourceAreIn(DATASET_ID);
     dataStructureIsPinnedBy(SOURCE_ID, OTHER_SOURCE_ID);
 
-    assertThatThrownBy(() -> guard.requireRemovable(INSTALLATION_ID, treeMap()))
+    assertThatThrownBy(() -> guard.requireRemovable(USE_CASE_ID, treeMap()))
         .isInstanceOf(ResourceInUseException.class)
-        .hasMessageContaining("used by a Data source that the installation did not create");
+        .hasMessageContaining("used by a Data source that the use case did not create");
   }
 
   @Test
@@ -200,9 +196,9 @@ class UninstallGuardTest {
     when(modelRegistryGateway.referencesTo(VERSIONED_STRUCTURE_URN))
         .thenReturn(List.of(MAPPING_URN + VERSION, OTHER_MAPPING_URN + VERSION));
 
-    assertThatThrownBy(() -> guard.requireRemovable(INSTALLATION_ID, treeMap()))
+    assertThatThrownBy(() -> guard.requireRemovable(USE_CASE_ID, treeMap()))
         .isInstanceOf(ResourceInUseException.class)
-        .hasMessageContaining("used by an artifact that the installation did not create");
+        .hasMessageContaining("used by an artifact that the use case did not create");
   }
 
   private void dataSetIs(DataSet dataSet) {
@@ -259,17 +255,17 @@ class UninstallGuardTest {
     return dataSet;
   }
 
-  /** The lines of a tree map installation, with the URNs that the install recorded. */
-  private static List<InstalledArtifact> treeMap() {
+  /** The lines of a tree map use case, with the URNs that the install recorded. */
+  private static List<UseCaseArtifact> treeMap() {
     return List.of(
-        line(InstalledArtifactType.DATA_STRUCTURE, STRUCTURE_ID, STRUCTURE_URN),
-        line(InstalledArtifactType.DATA_SOURCE, SOURCE_ID, SOURCE_URN),
-        line(InstalledArtifactType.DATA_SET, DATASET_ID, MANIFEST_URN),
-        line(InstalledArtifactType.MAPPING, null, MAPPING_URN));
+        line(UseCaseArtifactType.DATA_STRUCTURE, STRUCTURE_ID, STRUCTURE_URN),
+        line(UseCaseArtifactType.DATA_SOURCE, SOURCE_ID, SOURCE_URN),
+        line(UseCaseArtifactType.DATA_SET, DATASET_ID, MANIFEST_URN),
+        line(UseCaseArtifactType.MAPPING, null, MAPPING_URN));
   }
 
-  private static InstalledArtifact line(InstalledArtifactType type, UUID shellId, String urn) {
-    InstalledArtifact line = new InstalledArtifact();
+  private static UseCaseArtifact line(UseCaseArtifactType type, UUID shellId, String urn) {
+    UseCaseArtifact line = new UseCaseArtifact();
     line.setArtifactType(type);
     line.setShellId(shellId);
     line.setUrn(urn);

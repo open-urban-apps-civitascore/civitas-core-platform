@@ -18,10 +18,10 @@ import lombok.Setter;
 import org.hibernate.annotations.BatchSize;
 
 /**
- * The record of one install: the package that the caller installed and, through {@link
- * InstalledArtifact}, each artifact that the install created. The install writes the record in the
- * same transaction as the artifacts. A record exists only for a complete install. The audit columns
- * record who installed the package and when.
+ * A use case: the record of one install. It keeps the package that the caller installed and,
+ * through {@link UseCaseArtifact}, each artifact that the install created. The install writes the
+ * record in the same transaction as the artifacts. A record exists only for a complete install. The
+ * audit columns record who installed the package and when.
  *
  * <p>A line names its artifact by id and URN, not by a foreign key. When a user deletes an
  * artifact, the record stays. An uninstall removes the artifacts and sets {@link #uninstalledAt}.
@@ -30,8 +30,8 @@ import org.hibernate.annotations.BatchSize;
 @Getter
 @Setter
 @Entity
-@Table(name = "installations")
-public class Installation extends BaseEntity {
+@Table(name = "use_cases")
+public class UseCase extends BaseEntity {
 
   /** The maximum length of the package id, in characters. */
   public static final int PACKAGE_ID_LENGTH = 1024;
@@ -52,15 +52,15 @@ public class Installation extends BaseEntity {
 
   /**
    * The Data pool of the Data sources and of the Dataset that the install created. Null when the
-   * package has neither. A Data pool can have only one active installation of a package, and an
-   * instance can have only one active installation of a package without a Data pool.
+   * package has neither. A Data pool can have only one active use case of a package, and an
+   * instance can have only one active use case of a package without a Data pool.
    */
   @Column(name = "datapool_id")
   private UUID datapoolId;
 
   /**
-   * The time of the uninstall. Null while the installation is active. A package can be installed
-   * again when it has no active installation.
+   * The time of the uninstall. Null while the use case is active. A package can be installed again
+   * when it has no active use case.
    */
   @Column(name = "uninstalled_at")
   private LocalDateTime uninstalledAt;
@@ -68,27 +68,27 @@ public class Installation extends BaseEntity {
   /**
    * The artifact lines in the sequence of the install. A list, not a set: the install only adds
    * lines, and the position keeps the sequence the same for each read. {@code @BatchSize} loads the
-   * lines for a page of installations in a few queries. A fetch join would make Hibernate page in
+   * lines for a page of use cases in a few queries. A fetch join would make Hibernate page in
    * memory.
    */
   @Setter(AccessLevel.NONE)
   @OneToMany(
-      mappedBy = "installation",
+      mappedBy = "useCase",
       fetch = FetchType.LAZY,
       cascade = CascadeType.ALL,
       orphanRemoval = true)
   @OrderBy("position ASC")
   @BatchSize(size = 50)
-  private List<InstalledArtifact> artifacts = new ArrayList<>();
+  private List<UseCaseArtifact> artifacts = new ArrayList<>();
 
-  /** Adds an artifact line. Sets the position of the line and the link to this installation. */
-  public void addArtifact(InstalledArtifact artifact) {
+  /** Adds an artifact line. Sets the position of the line and the link to this use case. */
+  public void addArtifact(UseCaseArtifact artifact) {
     artifact.setPosition(artifacts.size());
     artifacts.add(artifact);
-    artifact.setInstallation(this);
+    artifact.setUseCase(this);
   }
 
-  /** Whether an uninstall removed the artifacts of this installation. */
+  /** Whether an uninstall removed the artifacts of this use case. */
   public boolean isUninstalled() {
     return uninstalledAt != null;
   }

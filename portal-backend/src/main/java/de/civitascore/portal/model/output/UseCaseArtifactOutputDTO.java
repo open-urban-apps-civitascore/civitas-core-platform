@@ -1,18 +1,18 @@
 package de.civitascore.portal.model.output;
 
-import de.civitascore.portal.model.embedded.InstalledArtifactType;
+import de.civitascore.portal.model.embedded.UseCaseArtifactType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
-/** Output DTO for one artifact line of an installation. */
+/** Output DTO for one artifact line of a use case. */
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class InstalledArtifactOutputDTO extends BaseOutputDTO {
+public class UseCaseArtifactOutputDTO extends BaseOutputDTO {
 
   @Schema(example = "DATA_STRUCTURE")
-  private InstalledArtifactType artifactType;
+  private UseCaseArtifactType artifactType;
 
   @Schema(example = "Tree cadastre")
   private String name;

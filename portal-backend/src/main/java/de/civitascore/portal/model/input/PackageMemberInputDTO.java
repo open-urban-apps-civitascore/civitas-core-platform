@@ -1,6 +1,6 @@
 package de.civitascore.portal.model.input;
 
-import de.civitascore.portal.model.entity.InstalledArtifact;
+import de.civitascore.portal.model.entity.UseCaseArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -20,14 +20,14 @@ public class PackageMemberInputDTO {
   @NotNull(message = "kind is required") @Schema(description = "The kind of the member", example = "datastructure")
   private PackageMemberKind kind;
 
-  @NotBlank(message = "urn is required") @Size(max = InstalledArtifact.URN_LENGTH, message = "urn must not exceed {max} characters") @Schema(
+  @NotBlank(message = "urn is required") @Size(max = UseCaseArtifact.URN_LENGTH, message = "urn must not exceed {max} characters") @Schema(
       description =
           "The identity of the member in the package. The other members reference the member by"
               + " this identity, and the journal keeps it as the origin of the copy. It does not"
               + " have to be a CORE URN.")
   private String urn;
 
-  @Size(max = InstalledArtifact.NAME_LENGTH, message = "name must not exceed {max} characters") @Schema(
+  @Size(max = UseCaseArtifact.NAME_LENGTH, message = "name must not exceed {max} characters") @Schema(
       description =
           "The display name. When it is empty, the install uses the title in the document, or"
               + " the name in the document of a named API.",

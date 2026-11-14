@@ -1,13 +1,13 @@
 package de.civitascore.portal.controller;
 
-import de.civitascore.portal.model.entity.Installation;
-import de.civitascore.portal.model.input.InstallationInputDTO;
-import de.civitascore.portal.model.output.InstallationOutputDTO;
-import de.civitascore.portal.model.output.assembler.InstallationAssembler;
+import de.civitascore.portal.model.entity.UseCase;
+import de.civitascore.portal.model.input.UseCaseInputDTO;
+import de.civitascore.portal.model.output.UseCaseOutputDTO;
+import de.civitascore.portal.model.output.assembler.UseCaseAssembler;
 import de.civitascore.portal.problem.ProblemType;
 import de.civitascore.portal.problem.Problems;
-import de.civitascore.portal.service.InstallationService;
 import de.civitascore.portal.service.UninstallService;
+import de.civitascore.portal.service.UseCaseService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -30,38 +30,39 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * REST controller for installations. A POST installs a package on this instance. A GET returns the
- * record of an install: the package and the artifacts that the install created. A DELETE removes
- * these artifacts and keeps the record.
+ * REST controller for use cases. A POST installs a package on this instance as a use case. A GET
+ * returns the record of an install: the package and the artifacts that the install created. A
+ * DELETE uninstalls: it removes these artifacts and keeps the record.
  */
 @RestController
-@RequestMapping("/installations")
+@RequestMapping("/use-cases")
 @RequiredArgsConstructor
 @Tag(
-    name = "Installations",
-    description = "Install and uninstall packages, and read the record of each install")
-public class InstallationController {
+    name = "Use cases",
+    description =
+        "Install and uninstall packages as use cases, and read the record of each install")
+public class UseCaseController {
 
-  private final InstallationService installationService;
+  private final UseCaseService useCaseService;
   private final UninstallService uninstallService;
-  private final InstallationAssembler installationAssembler;
+  private final UseCaseAssembler useCaseAssembler;
 
   /**
    * Installs a package on this instance.
    *
    * @param input the package to install
-   * @return the record of the install with HTTP 201 status
+   * @return the use case, the record of the install, with HTTP 201 status
    */
   @Operation(
       summary = "Install a package",
       description =
           "Creates a copy of each member of the package on this instance and keeps a record of the"
-              + " install. Each copy gets a URN of this instance. The record keeps the identity of"
-              + " each member in the package as the origin of the copy. Each Data structure stays"
-              + " DRAFT. If one member fails, the install keeps nothing. The same package can be"
-              + " installed in more than one Data pool. 409 means that the package is already"
-              + " installed in the Data pool, or, for a package without Data sources and without a"
-              + " Dataset, on this instance.")
+              + " install as a use case. Each copy gets a URN of this instance. The record keeps the"
+              + " identity of each member in the package as the origin of the copy. Each Data"
+              + " structure stays DRAFT. If one member fails, the install keeps nothing. The same"
+              + " package can be installed in more than one Data pool. 409 means that the package"
+              + " is already installed in the Data pool, or, for a package without Data sources and"
+              + " without a Dataset, on this instance.")
   @Problems({
     ProblemType.INVALID_INPUT,
     ProblemType.NOT_FOUND,
@@ -69,55 +70,50 @@ public class InstallationController {
   })
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  public ResponseEntity<InstallationOutputDTO> install(
-      @Valid @RequestBody InstallationInputDTO input) {
-    Installation installation = installationService.install(input);
-    return ResponseEntity.created(Locations.ofCreated(installation.getId()))
-        .body(installationAssembler.toOutput(installation));
+  public ResponseEntity<UseCaseOutputDTO> install(@Valid @RequestBody UseCaseInputDTO input) {
+    UseCase useCase = useCaseService.install(input);
+    return ResponseEntity.created(Locations.ofCreated(useCase.getId()))
+        .body(useCaseAssembler.toOutput(useCase));
   }
 
   /**
-   * Returns a page of installations.
+   * Returns a page of use cases.
    *
    * @param pageable pagination and sorting parameters
-   * @return a page of installations with HTTP 200 status
+   * @return a page of use cases with HTTP 200 status
    */
   @Operation(
-      summary = "List installations",
-      description = "Returns a page of installations. Each installation contains its lines.")
+      summary = "List use cases",
+      description = "Returns a page of use cases. Each use case contains its lines.")
   @GetMapping
-  public ResponseEntity<Page<InstallationOutputDTO>> getAll(
+  public ResponseEntity<Page<UseCaseOutputDTO>> getAll(
       @ParameterObject
           @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
           Pageable pageable) {
-    return ResponseEntity.ok(installationAssembler.toOutput(installationService.findAll(pageable)));
+    return ResponseEntity.ok(useCaseAssembler.toOutput(useCaseService.findAll(pageable)));
   }
 
   /**
-   * Returns one installation.
+   * Returns one use case.
    *
-   * @param id the id of the installation
-   * @return the installation with HTTP 200 status
+   * @param id the id of the use case
+   * @return the use case with HTTP 200 status
    */
-  @Operation(
-      summary = "Get installation by ID",
-      description = "Returns one installation with its lines.")
+  @Operation(summary = "Get use case by ID", description = "Returns one use case with its lines.")
   @Problems(ProblemType.NOT_FOUND)
   @GetMapping("/{id}")
-  public ResponseEntity<InstallationOutputDTO> getById(@PathVariable UUID id) {
-    return ResponseEntity.ok(
-        installationAssembler.toOutput(installationService.findByIdOrThrow(id)));
+  public ResponseEntity<UseCaseOutputDTO> getById(@PathVariable UUID id) {
+    return ResponseEntity.ok(useCaseAssembler.toOutput(useCaseService.findByIdOrThrow(id)));
   }
 
   /**
-   * Uninstalls an installation: removes the artifacts that the install created and keeps the
-   * record.
+   * Uninstalls a use case: removes the artifacts that the install created and keeps the record.
    *
-   * @param id the id of the installation
+   * @param id the id of the use case
    * @return HTTP 204 status
    */
   @Operation(
-      summary = "Uninstall an installation",
+      summary = "Uninstall a use case",
       description =
           "Removes the artifacts that the install created, in the reverse order of the install, and"
               + " keeps the record with the time of the uninstall. The Dataset goes with all that"

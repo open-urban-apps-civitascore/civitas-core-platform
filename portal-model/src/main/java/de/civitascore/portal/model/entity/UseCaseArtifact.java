@@ -1,6 +1,6 @@
 package de.civitascore.portal.model.entity;
 
-import de.civitascore.portal.model.embedded.InstalledArtifactType;
+import de.civitascore.portal.model.embedded.UseCaseArtifactType;
 import de.civitascore.portal.model.entity.base.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -15,15 +15,15 @@ import lombok.Getter;
 import lombok.Setter;
 
 /**
- * One artifact line of an {@link Installation}: the type of the artifact, and the shell row and the
- * URN that the install created for it. The shell id and the URN are values, not foreign keys (see
- * {@link Installation}).
+ * One artifact line of a {@link UseCase}: the type of the artifact, and the shell row and the URN
+ * that the install created for it. The shell id and the URN are values, not foreign keys (see
+ * {@link UseCase}).
  */
 @Getter
 @Setter
 @Entity
-@Table(name = "installed_artifacts")
-public class InstalledArtifact extends BaseEntity {
+@Table(name = "use_case_artifacts")
+public class UseCaseArtifact extends BaseEntity {
 
   /** The maximum length of a URN in a line, in characters. */
   public static final int URN_LENGTH = 1024;
@@ -32,16 +32,16 @@ public class InstalledArtifact extends BaseEntity {
   public static final int NAME_LENGTH = 255;
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
-  @JoinColumn(name = "installation_id", nullable = false)
-  private Installation installation;
+  @JoinColumn(name = "use_case_id", nullable = false)
+  private UseCase useCase;
 
-  /** The position of the line in its installation. {@link Installation#addArtifact} sets it. */
+  /** The position of the line in its use case. {@link UseCase#addArtifact} sets it. */
   @Column(name = "position", nullable = false)
   private int position;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "artifact_type", nullable = false)
-  private InstalledArtifactType artifactType;
+  private UseCaseArtifactType artifactType;
 
   @Column(name = "name", length = NAME_LENGTH)
   private String name;
