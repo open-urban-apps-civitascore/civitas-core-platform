@@ -3,7 +3,7 @@
 # portal-backend does not write to the registry yet, so on a fresh stack that registry is empty
 # and shows only what you create through these pages. Started by dev-environment/start-portal-dev.sh
 # as the "model-forge-admin-ui" service in dev-environment/apps/docker-compose.yml.
-FROM eclipse-temurin:25-jre-alpine
+FROM eclipse-temurin:25-jre-alpine@sha256:e1898fd6a11fc965a994d8ace186fd3585aeb636cf8f05f47a723fcfee0b0918
 
 LABEL maintainer="CIVITAS/CORE Team"
 LABEL description="CIVITAS/CORE Model Forge Admin UI - registry console"

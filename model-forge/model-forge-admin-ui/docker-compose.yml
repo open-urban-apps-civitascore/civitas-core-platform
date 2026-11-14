@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:15
+    image: postgres:15@sha256:5a407822929c3789ff5154d3d35bd7e2090318149344c8a3d4ca942b035822ed
     container_name: model-forge-admin-postgres
     environment:
       POSTGRES_DB: model_forge_admin
