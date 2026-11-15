@@ -26,7 +26,7 @@ public final class TestContainerImages {
   public static final String KEYCLOAK = "quay.io/keycloak/keycloak:26.8.2";
 
   // renovate: datasource=docker
-  public static final String MAILPIT = "axllent/mailpit:v1.32";
+  public static final String MAILPIT = "axllent/mailpit:v1.33";
 
   // renovate: datasource=docker
   public static final String ETCD = "quay.io/coreos/etcd:v3.7.3";
