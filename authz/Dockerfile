@@ -38,7 +38,7 @@ HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=5 \
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
 
 # Pinned: alpine:3.23.5 (2026-09-24). Update digest on base image updates.
-FROM alpine:3.23.7@sha256:ff7f0c727dd796aa36787bfcd9a64bf35a6ce72a73451b3359fde849b6703d63 AS fetcher
+FROM alpine:3.23.8@sha256:469c9ea410b9215eaee7976ba6c0639039b444be8e5d638f7abbada189971eb2 AS fetcher
 COPY authz/rego/bundle.tar.gz /bundle.tar.gz
 RUN mkdir /out && \
     tar -xzf /bundle.tar.gz -C /out && \
