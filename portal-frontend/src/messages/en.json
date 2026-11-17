@@ -837,6 +837,7 @@
       "GROUP": "Group",
       "PERMISSION": "Permission",
       "ROLE": "Role",
+      "USECASE": "Use case",
       "USER": "User"
     }
   },
