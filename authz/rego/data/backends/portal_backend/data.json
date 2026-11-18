@@ -231,7 +231,7 @@
     "/v1/datapools/{id}/assignments": {
       "GET": "DATAPOOL_READ"
     },
-    "_comment_datapool_use_cases": "The use cases of one data pool. The same permissions as /v1/use-cases, but the {id} of the data pool is the scopeId: a grant on the data pool is sufficient.",
+    "_comment_datapool_use_cases": "The use cases of one data pool. The same permissions as /v1/use-cases, but the {id} of the data pool is the scopeId, so OPA accepts a grant on the data pool. That grant does not apply to the Data structures and Data sources that the install creates: see DatapoolUseCaseController.",
     "/v1/datapools/{id}/use-cases": {
       "GET": "USECASE_READ",
       "POST": ["USECASE_CREATE", "DATASTRUCTURE_CREATE", "DATASTRUCTURE_UPDATE", "DATASOURCE_CREATE", "DATASET_CREATE", "DATASET_UPDATE"]

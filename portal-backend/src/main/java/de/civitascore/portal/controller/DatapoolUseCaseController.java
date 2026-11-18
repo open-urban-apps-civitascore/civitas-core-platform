@@ -32,8 +32,12 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * REST controller for the use cases of one Data pool. The operations are the same as in {@link
  * UseCaseController}, under the path of the Data pool. OPA checks the permissions on the Data pool
- * of the path, so a grant on the Data pool is sufficient. This controller makes sure that each use
- * case that it reads or uninstalls is in that Data pool.
+ * of the path. This controller makes sure that each use case that it reads or uninstalls is in that
+ * Data pool.
+ *
+ * <p>A grant on the Data pool applies to the Datasets of the Data pool, but not to the Data
+ * structures and Data sources that the install creates. Thus a caller with only a grant on the Data
+ * pool cannot yet install a package with Data sources or a Dataset.
  *
  * <p>springdoc names each operation after its handler method, so the methods here have names of
  * their own, apart from the ones in {@link UseCaseController}.

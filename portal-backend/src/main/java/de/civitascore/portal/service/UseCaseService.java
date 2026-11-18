@@ -79,8 +79,10 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>The install makes all changes to the database in one transaction. If one member fails, the
  * install keeps nothing. Model Forge keeps its dependency graph in memory, and a rollback does not
- * restore the graph. For this reason, the install does all its checks before the first change to
- * the registry.
+ * restore the graph. For this reason, the install makes its own checks before the first change to
+ * the registry. Some rules of the platform apply only when the install updates a Dataset, for
+ * example that an OWS named API needs a PostGIS Data sink. A package that breaks such a rule fails
+ * after the first change to the registry.
  */
 @Slf4j
 @Service
