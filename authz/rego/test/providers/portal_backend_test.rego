@@ -326,3 +326,53 @@ test_is_collection_endpoint_datapools if {
 test_not_collection_endpoint_datapools_resource if {
 	not portal_backend.is_collection_endpoint with input as portal_request("GET", "/v1/datapools/pool-123")
 }
+
+# =============================================================================
+# USE CASE ENDPOINT TESTS
+# =============================================================================
+
+test_endpoints_contains_use_cases if {
+	portal_backend.endpoints["/v1/use-cases"]
+}
+
+test_endpoints_contains_use_cases_id if {
+	portal_backend.endpoints["/v1/use-cases/{id}"]
+}
+
+test_path_pattern_use_cases_with_id if {
+	result := portal_backend.path_pattern with input as portal_request("GET", "/v1/use-cases/use-case-123")
+	result == "/v1/use-cases/{id}"
+}
+
+# Use cases are resources of the whole tenant (the {id} is not a scopeId)
+test_scope_type_use_cases if {
+	result := portal_backend.expected_scope_type with input as portal_request("GET", "/v1/use-cases/use-case-123")
+	result == "TENANT"
+}
+
+test_is_collection_endpoint_use_cases if {
+	portal_backend.is_collection_endpoint with input as portal_request("POST", "/v1/use-cases")
+}
+
+test_path_pattern_datapool_use_cases if {
+	result := portal_backend.path_pattern with input as portal_request("POST", "/v1/datapools/pool-123/use-cases")
+	result == "/v1/datapools/{id}/use-cases"
+}
+
+test_path_pattern_datapool_use_case_with_id if {
+	result := portal_backend.path_pattern with input as portal_request("GET", "/v1/datapools/pool-123/use-cases/use-case-123")
+	result == "/v1/datapools/{id}/use-cases/{id}"
+}
+
+# Under the path of a data pool, the scope is the data pool, and the scopeId is its id
+test_scope_of_datapool_use_cases if {
+	scope_type := portal_backend.expected_scope_type with input as portal_request("POST", "/v1/datapools/pool-123/use-cases")
+	scope_type == "DATAPOOL"
+	scope_id := portal_backend.resource_id with input as portal_request("POST", "/v1/datapools/pool-123/use-cases")
+	scope_id == "pool-123"
+}
+
+# Not a collection: else a POST would need a tenant-wide grant
+test_not_collection_endpoint_datapool_use_cases if {
+	not portal_backend.is_collection_endpoint with input as portal_request("POST", "/v1/datapools/pool-123/use-cases")
+}

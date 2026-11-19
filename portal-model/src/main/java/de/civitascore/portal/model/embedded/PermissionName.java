@@ -81,7 +81,11 @@ public enum PermissionName implements GrantedAuthority {
   DATASTRUCTURE_READ(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASTRUCTURE_UPDATE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
   DATASTRUCTURE_DELETE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
-  DATASTRUCTURE_RELEASE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL);
+  DATASTRUCTURE_RELEASE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
+
+  USECASE_CREATE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
+  USECASE_READ(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL),
+  USECASE_DELETE(PermissionType.DATA, PermissionCategory.DATA, PermissionSource.INTERNAL);
 
   private final PermissionType permissionType;
   private final PermissionCategory category;

@@ -239,7 +239,75 @@ class RoleInitializerTest {
             "DATASOURCE_RELEASE",
             "DATASTRUCTURE_READ",
             "DATASTRUCTURE_RELEASE",
-            "DATAPOOL_READ");
+            "DATAPOOL_READ",
+            "USECASE_READ");
+  }
+
+  @Test
+  @DisplayName("Should give USECASE_CREATE only with all other permissions of the install route")
+  void shouldGiveUseCaseCreateOnlyWithAllPermissionsOfTheInstallRoute() {
+    // given
+    when(permissionRepository.findAll()).thenReturn(allPermissions);
+    when(roleRepository.findAll()).thenReturn(List.of());
+
+    // when
+    roleInitializer.initialize();
+
+    // then
+    verify(roleRepository).saveAll(rolesCaptor.capture());
+    List<Role> installers =
+        rolesCaptor.getValue().stream()
+            .filter(
+                role ->
+                    role.getPermissions().stream()
+                        .anyMatch(permission -> "USECASE_CREATE".equals(permission.getName())))
+            .toList();
+
+    // POST /v1/use-cases requires these permissions together with USECASE_CREATE
+    // (the route map of the policy, authz/rego/data/backends/portal_backend/data.json).
+    assertThat(installers)
+        .isNotEmpty()
+        .allSatisfy(
+            role ->
+                assertThat(role.getPermissions())
+                    .extracting(Permission::getName)
+                    .contains(
+                        "DATASTRUCTURE_CREATE",
+                        "DATASTRUCTURE_UPDATE",
+                        "DATASOURCE_CREATE",
+                        "DATASET_CREATE",
+                        "DATASET_UPDATE"));
+  }
+
+  @Test
+  @DisplayName("Should give USECASE_DELETE only with all other permissions of the uninstall route")
+  void shouldGiveUseCaseDeleteOnlyWithAllPermissionsOfTheUninstallRoute() {
+    // given
+    when(permissionRepository.findAll()).thenReturn(allPermissions);
+    when(roleRepository.findAll()).thenReturn(List.of());
+
+    // when
+    roleInitializer.initialize();
+
+    // then
+    verify(roleRepository).saveAll(rolesCaptor.capture());
+    List<Role> uninstallers =
+        rolesCaptor.getValue().stream()
+            .filter(
+                role ->
+                    role.getPermissions().stream()
+                        .anyMatch(permission -> "USECASE_DELETE".equals(permission.getName())))
+            .toList();
+
+    // DELETE /v1/use-cases/{id} requires these permissions together with USECASE_DELETE
+    // (the route map of the policy, authz/rego/data/backends/portal_backend/data.json).
+    assertThat(uninstallers)
+        .isNotEmpty()
+        .allSatisfy(
+            role ->
+                assertThat(role.getPermissions())
+                    .extracting(Permission::getName)
+                    .contains("DATASET_DELETE", "DATASOURCE_DELETE", "DATASTRUCTURE_DELETE"));
   }
 
   @Test

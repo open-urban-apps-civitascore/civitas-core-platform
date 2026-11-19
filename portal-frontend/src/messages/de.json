@@ -830,6 +830,7 @@
       "GROUP": "Gruppe",
       "PERMISSION": "Berechtigung",
       "ROLE": "Rolle",
+      "USECASE": "Anwendungsfall",
       "USER": "Benutzer"
     }
   },
