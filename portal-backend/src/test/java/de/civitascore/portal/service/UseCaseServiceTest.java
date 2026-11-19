@@ -67,9 +67,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import tools.jackson.databind.ObjectMapper;
@@ -167,11 +165,11 @@ class UseCaseServiceTest {
   @Mock private StyleService styleService;
   @Mock private LayerService layerService;
   @Mock private ModelRegistryGateway modelRegistryGateway;
-  @Spy private ConnectorValidator connectorValidator = new ConnectorValidator(List.of());
-  @Spy private Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
-  @Spy private ObjectMapper objectMapper = new ObjectMapper();
+  private final ConnectorValidator connectorValidator = new ConnectorValidator(List.of());
+  private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
+  private final ObjectMapper objectMapper = new ObjectMapper();
 
-  @InjectMocks private UseCaseService useCaseService;
+  private UseCaseService useCaseService;
 
   @Captor private ArgumentCaptor<DataStructureInputDTO> structureCaptor;
   @Captor private ArgumentCaptor<DataStructureVersionInputDTO> versionCaptor;
@@ -184,7 +182,26 @@ class UseCaseServiceTest {
 
   /** The identities in these tests have no version, so the registry gives them back unchanged. */
   @BeforeEach
-  void keepIdentities() {
+  void setUp() {
+    PackagePreparer packagePreparer =
+        new PackagePreparer(
+            dataPoolRepository, modelRegistryGateway, connectorValidator, validator);
+    useCaseService =
+        new UseCaseService(
+            useCaseRepository,
+            dataPoolRepository,
+            dataStructureService,
+            dataStructureVersionService,
+            dataSourceService,
+            dataSetService,
+            mappingService,
+            dataSinkService,
+            pipelineService,
+            styleService,
+            layerService,
+            modelRegistryGateway,
+            packagePreparer,
+            objectMapper);
     lenient()
         .when(modelRegistryGateway.logicalUrn(anyString()))
         .thenAnswer(invocation -> invocation.getArgument(0));
